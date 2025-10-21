@@ -2,16 +2,63 @@
 #
 # https://gqlgen.com/getting-started/
 
+scalar DateTime
+
+enum Types{
+  Report
+  Project
+}
+
 type User {
   id: ID!
   name: String!
   email: String!
   password: String!
+  createdAt: DateTime
+  updatedAt: DateTime
 }
+
+type Chat {
+  id: ID!
+  project_id: ID
+  prompt: String!
+  response: String!
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type File {
+  id: ID!
+  file_name: String!
+  file_type: String!
+  size: Int
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type Project {
+  id: ID!
+  project_name: String!
+  description: String
+  chats: [Chat!]
+  techStacks: [TechStack!]
+  flowcharts: [Flowchart!]
+  finalReport: Report
+}
+
+type Flowchart{
+  id: ID!
+  name: String!
+  data: String!
+}
+
 type Query {
-  users: [User!]!
-  user: User
+  getUsers: [User!]!
+  getUserByID(id: ID!): User
+  getUserByEmail(email: String!): User
+  getUserByName(name: String!): User
 }
+
 input NewUser {
   id: String!
   name:String!

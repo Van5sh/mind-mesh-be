@@ -5,8 +5,9 @@ import (
 )
 
 type DBUser struct {
-	ID       uuid.UUID
-	Name     string
-	Email    string
-	Password string
+	tableName struct{}  `pg:"users"`
+	ID        uuid.UUID `pg:"type:uuid,pk"`
+	Name      string
+	Email     string
+	Password  string
 }

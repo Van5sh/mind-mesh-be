@@ -12,33 +12,42 @@ import (
 
 // CreateUser is the resolver for the createUser field.
 func (r *mutationResolver) CreateUser(ctx context.Context, input model.NewUser) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: CreateUser - createUser"))
+	return r.UsersData.CreateUser(ctx, &input)
 }
 
 // UpdateUser is the resolver for the updateUser field.
 func (r *mutationResolver) UpdateUser(ctx context.Context, id string, name *string, password *string, email *string) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: UpdateUser - updateUser"))
+	return r.UsersData.UpdateUser(ctx, id, name, password, email)
 }
 
 // DeleteUser is the resolver for the deleteUser field.
 func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (string, error) {
-	panic(fmt.Errorf("not implemented: DeleteUser - deleteUser"))
+	return r.UsersData.DeleteUser(ctx, id)
 }
 
-// Users is the resolver for the users field.
-func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
-	panic(fmt.Errorf("not implemented: Users - users"))
+// GetUsers is the resolver for the getUsers field.
+func (r *queryResolver) GetUsers(ctx context.Context) ([]*model.User, error) {
+	panic(fmt.Errorf("not implemented: GetUsers - getUsers"))
 }
 
-// User is the resolver for the user field.
-func (r *queryResolver) User(ctx context.Context) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: User - user"))
+// GetUserByID is the resolver for the getUserByID field.
+func (r *queryResolver) GetUserByID(ctx context.Context, id string) (*model.User, error) {
+	panic(fmt.Errorf("not implemented: GetUserByID - getUserByID"))
+}
+
+// GetUserByEmail is the resolver for the getUserByEmail field.
+func (r *queryResolver) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
+	panic(fmt.Errorf("not implemented: GetUserByEmail - getUserByEmail"))
+}
+
+// GetUserByName is the resolver for the getUserByName field.
+func (r *queryResolver) GetUserByName(ctx context.Context, name string) (*model.User, error) {
+	panic(fmt.Errorf("not implemented: GetUserByName - getUserByName"))
 }
 
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
-// Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
@@ -51,10 +60,19 @@ type queryResolver struct{ *Resolver }
 //    it when you're done.
 //  - You have helper methods in this file. Move them out to keep these resolver files clean.
 /*
-	func (r *mutationResolver) CreateTodo(ctx context.Context, input model.NewTodo) (*model.Todo, error) {
-	panic(fmt.Errorf("not implemented: CreateTodo - createTodo"))
+	func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
+	return r.UsersData.GetUsers()
 }
-func (r *queryResolver) Todos(ctx context.Context) ([]*model.Todo, error) {
-	panic(fmt.Errorf("not implemented: Todos - todos"))
+func (r *queryResolver) UserById(ctx context.Context, id string) (*model.User, error) {
+	return r.UsersData.GetUserByID(id)
+}
+func (r *queryResolver) UserByEmail(ctx context.Context, email string) (*model.User, error) {
+	return r.UsersData.GetUserByEmail(email)
+}
+func (r *queryResolver) UserByName(ctx context.Context, name string) (*model.User, error) {
+	return r.UsersData.GetUserByName(name)
+}
+func (r *queryResolver) User(ctx context.Context) (*model.User, error) {
+	panic("unimplemented")
 }
 */
