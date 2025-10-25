@@ -32,6 +32,7 @@ require (
 	github.com/go-pg/pg/v10 v10.15.0
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/gofiber/fiber v1.14.6
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect

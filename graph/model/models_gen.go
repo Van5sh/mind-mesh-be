@@ -2,6 +2,51 @@
 
 package model
 
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"strconv"
+)
+
+type AuthPayload struct {
+	Token string `json:"token"`
+	User  *User  `json:"user"`
+}
+
+type Chat struct {
+	ID        string  `json:"id"`
+	ProjectID *string `json:"project_id,omitempty"`
+	Prompt    string  `json:"prompt"`
+	Response  string  `json:"response"`
+	CreatedAt *string `json:"createdAt,omitempty"`
+	UpdatedAt *string `json:"updatedAt,omitempty"`
+}
+
+type File struct {
+	ID        string  `json:"id"`
+	FileName  string  `json:"file_name"`
+	FileType  string  `json:"file_type"`
+	Size      *int32  `json:"size,omitempty"`
+	CreatedAt *string `json:"createdAt,omitempty"`
+	UpdatedAt *string `json:"updatedAt,omitempty"`
+}
+
+type Flowchart struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Data string `json:"data"`
+}
+
+type Folder struct {
+	ID          string  `json:"id"`
+	FolderName  string  `json:"folder_name"`
+	FolderSize  *int32  `json:"folder_size,omitempty"`
+	FolderItems []*File `json:"folder_items"`
+	CreatedAt   *string `json:"createdAt,omitempty"`
+	UpdatedAt   *string `json:"updatedAt,omitempty"`
+}
+
 type Mutation struct {
 }
 
@@ -12,12 +57,82 @@ type NewUser struct {
 	Password string `json:"password"`
 }
 
+type Project struct {
+	ID          string       `json:"id"`
+	ProjectName string       `json:"project_name"`
+	Description *string      `json:"description,omitempty"`
+	Chats       []*Chat      `json:"chats,omitempty"`
+	TechStacks  []*TechStack `json:"techStacks,omitempty"`
+	Flowcharts  []*Flowchart `json:"flowcharts,omitempty"`
+}
+
 type Query struct {
 }
 
+type TechStack struct {
+	Stacks []string `json:"Stacks"`
+}
+
 type User struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	Email     string  `json:"email"`
+	Password  string  `json:"password"`
+	CreatedAt *string `json:"createdAt,omitempty"`
+	UpdatedAt *string `json:"updatedAt,omitempty"`
+}
+
+type Types string
+
+const (
+	TypesReport  Types = "Report"
+	TypesProject Types = "Project"
+)
+
+var AllTypes = []Types{
+	TypesReport,
+	TypesProject,
+}
+
+func (e Types) IsValid() bool {
+	switch e {
+	case TypesReport, TypesProject:
+		return true
+	}
+	return false
+}
+
+func (e Types) String() string {
+	return string(e)
+}
+
+func (e *Types) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = Types(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid Types", str)
+	}
+	return nil
+}
+
+func (e Types) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *Types) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e Types) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }

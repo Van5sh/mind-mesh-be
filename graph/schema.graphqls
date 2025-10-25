@@ -18,6 +18,8 @@ type User {
   updatedAt: DateTime
 }
 
+# optional: Token type not needed when using AuthPayload
+
 type Chat {
   id: ID!
   project_id: ID
@@ -36,6 +38,15 @@ type File {
   updatedAt: DateTime
 }
 
+type Folder {
+  id:ID!
+  folder_name:String!
+  folder_size:Int
+  folder_items:[File!]!  
+  createdAt:DateTime
+  updatedAt: DateTime
+}
+
 type Project {
   id: ID!
   project_name: String!
@@ -43,7 +54,10 @@ type Project {
   chats: [Chat!]
   techStacks: [TechStack!]
   flowcharts: [Flowchart!]
-  finalReport: Report
+}
+
+type TechStack {
+  Stacks:[String!]!
 }
 
 type Flowchart{
@@ -57,6 +71,11 @@ type Query {
   getUserByID(id: ID!): User
   getUserByEmail(email: String!): User
   getUserByName(name: String!): User
+  # Auth
+  currentUser: User
+
+  getFiles: [File!]!
+  getFolders: [Folder]!
 }
 
 input NewUser {
@@ -70,4 +89,10 @@ type Mutation {
   createUser(input: NewUser!): User!
   updateUser(id: ID!, name: String, password: String, email: String): User!
   deleteUser(id: ID!): String!
+  login(email: String!, password: String!): AuthPayload!
+}
+
+type AuthPayload {
+  token: String!
+  user: User!
 }

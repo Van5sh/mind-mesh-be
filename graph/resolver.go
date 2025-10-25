@@ -1,6 +1,7 @@
 package graph
 
 import (
+	// "example/hello/graph/postgres"
 	"example/hello/graph/postgres"
 )
 

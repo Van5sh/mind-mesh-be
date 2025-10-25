@@ -25,6 +25,11 @@ func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (string, e
 	return r.UsersData.DeleteUser(ctx, id)
 }
 
+// Login is the resolver for the login field.
+func (r *mutationResolver) Login(ctx context.Context, email string, password string) (*model.AuthPayload, error) {
+	return r.UsersData.Login(ctx, email, password)
+}
+
 // GetUsers is the resolver for the getUsers field.
 func (r *queryResolver) GetUsers(ctx context.Context) ([]*model.User, error) {
 	panic(fmt.Errorf("not implemented: GetUsers - getUsers"))
@@ -45,34 +50,27 @@ func (r *queryResolver) GetUserByName(ctx context.Context, name string) (*model.
 	panic(fmt.Errorf("not implemented: GetUserByName - getUserByName"))
 }
 
+// CurrentUser returns the authenticated user based on JWT in request context
+func (r *queryResolver) CurrentUser(ctx context.Context) (*model.User, error) {
+	userID, ok := GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthenticated")
+	}
+	return r.UsersData.GetUserByID(userID)
+}
+
+func (r *queryResolver) GetFiles(ctx context.Context) ([]*model.File, error) {
+	panic(fmt.Errorf("not implemented: GetFiles - getFiles"))
+}
+
+// GetFolders is the resolver for the getFolders field.
+func (r *queryResolver) GetFolders(ctx context.Context) ([]*model.Folder, error) {
+	panic(fmt.Errorf("not implemented: GetFolders - getFolders"))
+}
+
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
-
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-/*
-	func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
-	return r.UsersData.GetUsers()
-}
-func (r *queryResolver) UserById(ctx context.Context, id string) (*model.User, error) {
-	return r.UsersData.GetUserByID(id)
-}
-func (r *queryResolver) UserByEmail(ctx context.Context, email string) (*model.User, error) {
-	return r.UsersData.GetUserByEmail(email)
-}
-func (r *queryResolver) UserByName(ctx context.Context, name string) (*model.User, error) {
-	return r.UsersData.GetUserByName(name)
-}
-func (r *queryResolver) User(ctx context.Context) (*model.User, error) {
-	panic("unimplemented")
-}
-*/
