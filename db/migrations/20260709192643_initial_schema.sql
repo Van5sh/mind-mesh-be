@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -154,71 +155,44 @@ CREATE TABLE chats (
 
 CREATE TABLE chat_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
     chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
-
     role message_role NOT NULL,
-
     content TEXT NOT NULL,
-
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE flowcharts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-
     name VARCHAR(100) NOT NULL,
-
     data JSONB NOT NULL,
-
     generated_by UUID REFERENCES users(id) ON DELETE SET NULL,
-
     generated_by_ai BOOLEAN DEFAULT FALSE,
-
     status flowchart_status NOT NULL DEFAULT 'READY',
-
     created_at TIMESTAMPTZ DEFAULT NOW(),
-
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE reports (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-
     title VARCHAR(100) NOT NULL,
-
     content TEXT NOT NULL,
-
     generated_by UUID REFERENCES users(id) ON DELETE SET NULL,
-
     generated_by_ai BOOLEAN DEFAULT FALSE,
-
     status report_status NOT NULL DEFAULT 'READY',
-
     format VARCHAR(20) DEFAULT 'MARKDOWN',
-
     created_at TIMESTAMPTZ DEFAULT NOW(),
-
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE activity_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-
     action VARCHAR(100) NOT NULL,
-
     entity_type VARCHAR(50),
-
     entity_id UUID,
-
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -310,6 +284,7 @@ ON activity_logs(user_id);
 CREATE INDEX idx_activity_logs_created_at
 ON activity_logs(created_at DESC);
 
+-- +goose Down
 DROP TABLE IF EXISTS chat_embeddings CASCADE;
 DROP TABLE IF EXISTS file_embeddings CASCADE;
 DROP TABLE IF EXISTS activity_logs CASCADE;
@@ -323,10 +298,11 @@ DROP TABLE IF EXISTS folders CASCADE;
 DROP TABLE IF EXISTS project_members CASCADE;
 DROP TABLE IF EXISTS projects CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
-
 DROP TYPE IF EXISTS flowchart_status;
 DROP TYPE IF EXISTS report_status;
 DROP TYPE IF EXISTS project_visibility;
 DROP TYPE IF EXISTS message_role;
 DROP TYPE IF EXISTS file_permission;
 DROP TYPE IF EXISTS project_role;
+DROP EXTENSION IF EXISTS vector;
+DROP EXTENSION IF EXISTS "pgcrypto";
