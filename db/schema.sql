@@ -19,6 +19,10 @@ CREATE TYPE message_role AS ENUM (
     'AI',
     'SYSTEM'
 );
+CREATE TYPE chat_type AS ENUM (
+    'GENERAL',
+    'AI_ASSISTANT'
+);
 CREATE TYPE project_visibility AS ENUM (
     'PRIVATE',
     'TEAM'
@@ -49,6 +53,7 @@ CREATE TABLE projects (
     name VARCHAR(100) NOT NULL,
     description TEXT,
     visibility project_visibility NOT NULL DEFAULT 'PRIVATE',
+    archived_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -125,6 +130,7 @@ CREATE TABLE chats (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     title VARCHAR(100),
+    type chat_type NOT NULL DEFAULT 'GENERAL',
     last_activity_at TIMESTAMPTZ DEFAULT NOW(),
     status chat_status NOT NULL DEFAULT 'ACTIVE',
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -133,9 +139,11 @@ CREATE TABLE chats (
 CREATE TABLE chat_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+    sender_id UUID REFERENCES users(id) ON DELETE SET NULL,
     role message_role NOT NULL,
     content TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE TABLE chat_ai_metadata (
     message_id UUID PRIMARY KEY REFERENCES chat_messages(id) ON DELETE CASCADE,
@@ -143,6 +151,7 @@ CREATE TABLE chat_ai_metadata (
     embedding_synced BOOLEAN DEFAULT FALSE,
     indexed_at TIMESTAMPTZ
 );
+
 CREATE TABLE flowcharts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -198,6 +207,12 @@ ON files(project_id);
 
 CREATE INDEX idx_files_folder
 ON files(folder_id);
+
+CREATE INDEX idx_file_ai_metadata_synced
+ON file_ai_metadata(embedding_synced);
+
+CREATE INDEX idx_chat_ai_metadata_synced
+ON chat_ai_metadata(embedding_synced);
 
 CREATE INDEX idx_file_storage_uploaded_by
 ON file_storage(uploaded_by);
@@ -256,12 +271,17 @@ ON activity_logs(user_id);
 CREATE INDEX idx_activity_logs_created_at
 ON activity_logs(created_at DESC);
 
+CREATE INDEX idx_chat_messages_sender
+ON chat_messages(sender_id);
+
 DROP TABLE IF EXISTS activity_logs CASCADE;
 DROP TABLE IF EXISTS reports CASCADE;
 DROP TABLE IF EXISTS flowcharts CASCADE;
+DROP TABLE IF EXISTS chat_ai_metadata CASCADE;
 DROP TABLE IF EXISTS chat_messages CASCADE;
 DROP TABLE IF EXISTS chats CASCADE;
 DROP TABLE IF EXISTS file_shares CASCADE;
+DROP TABLE IF EXISTS file_ai_metadata CASCADE;
 DROP TABLE IF EXISTS file_properties CASCADE;
 DROP TABLE IF EXISTS file_storage CASCADE;
 DROP TABLE IF EXISTS files CASCADE;
@@ -271,9 +291,11 @@ DROP TABLE IF EXISTS projects CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TYPE IF EXISTS flowchart_status;
 DROP TYPE IF EXISTS report_status;
+DROP TYPE IF EXISTS chat_type;
 DROP TYPE IF EXISTS project_visibility;
 DROP TYPE IF EXISTS message_role;
 DROP TYPE IF EXISTS file_permission;
 DROP TYPE IF EXISTS project_role;
 DROP TYPE IF EXISTS chat_status;
+
 DROP EXTENSION IF EXISTS "pgcrypto";
