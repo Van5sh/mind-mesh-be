@@ -1,49 +1,41 @@
 -- +goose Up
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-
 CREATE TYPE project_role AS ENUM (
     'OWNER',
     'ADMIN',
     'EDITOR',
     'VIEWER'
 );
-
 CREATE TYPE chat_status AS ENUM (
     'ACTIVE',
     'GENERATING',
     'ARCHIVED'
 );
-
 CREATE TYPE file_permission AS ENUM (
     'READ',
     'WRITE'
 );
-
 CREATE TYPE message_role AS ENUM (
     'USER',
     'AI',
     'SYSTEM'
 );
-
 CREATE TYPE project_visibility AS ENUM (
     'PRIVATE',
     'TEAM'
 );
-
 CREATE TYPE report_status AS ENUM (
     'DRAFT',
     'GENERATING',
     'READY',
     'FAILED'
 );
-
 CREATE TYPE flowchart_status AS ENUM (
     'DRAFT',
     'GENERATING',
     'READY',
     'FAILED'
 );
-
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username VARCHAR(50) NOT NULL UNIQUE,
@@ -52,7 +44,6 @@ CREATE TABLE users (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 CREATE TABLE projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -62,7 +53,6 @@ CREATE TABLE projects (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 CREATE TABLE project_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -71,7 +61,6 @@ CREATE TABLE project_members (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(project_id, user_id)
 );
-
 CREATE TABLE folders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -81,7 +70,6 @@ CREATE TABLE folders (
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(project_id, parent_folder_id, name)
 );
-
 CREATE TABLE files (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -92,7 +80,6 @@ CREATE TABLE files (
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(project_id, folder_id, name)
 );
-
 CREATE TABLE file_storage(
     file_id UUID PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
     bucket_name VARCHAR(100) NOT NULL,
@@ -106,18 +93,15 @@ CREATE TABLE file_storage(
     uploaded_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE(bucket_name, object_key)
 );
-
 CREATE TABLE file_properties (
     file_id UUID PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
     original_name VARCHAR(255),
-    extracted_text TEXT,
-    is_indexed BOOLEAN DEFAULT FALSE,
+    is_indexed BOOLEAN NOT NULL DEFAULT FALSE,
     is_favorite BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ
 );
-
 CREATE TABLE file_ai_metadata (
     file_id UUID PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
     extracted_text TEXT,
@@ -126,13 +110,6 @@ CREATE TABLE file_ai_metadata (
     indexed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE chat_ai_metadata (
-    message_id UUID PRIMARY KEY REFERENCES chat_messages(id) ON DELETE CASCADE,
-    embedding_model VARCHAR(100),
-    embedding_synced BOOLEAN DEFAULT FALSE,
-    indexed_at TIMESTAMPTZ
 );
 
 CREATE TABLE file_shares (
@@ -145,7 +122,6 @@ CREATE TABLE file_shares (
     UNIQUE(file_id, shared_with),
     CHECK (shared_by <> shared_with)
 );
-
 CREATE TABLE chats (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -155,7 +131,6 @@ CREATE TABLE chats (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 CREATE TABLE chat_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
@@ -163,7 +138,12 @@ CREATE TABLE chat_messages (
     content TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
+CREATE TABLE chat_ai_metadata (
+    message_id UUID PRIMARY KEY REFERENCES chat_messages(id) ON DELETE CASCADE,
+    embedding_model VARCHAR(100),
+    embedding_synced BOOLEAN DEFAULT FALSE,
+    indexed_at TIMESTAMPTZ
+);
 CREATE TABLE flowcharts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -176,7 +156,6 @@ CREATE TABLE flowcharts (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 CREATE TABLE reports (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -190,7 +169,6 @@ CREATE TABLE reports (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 CREATE TABLE activity_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
@@ -200,6 +178,7 @@ CREATE TABLE activity_logs (
     entity_id UUID,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 CREATE INDEX idx_projects_owner
 ON projects(owner_id);
 
@@ -277,8 +256,8 @@ ON activity_logs(user_id);
 
 CREATE INDEX idx_activity_logs_created_at
 ON activity_logs(created_at DESC);
--- +goose Down
 
+-- +goose Down
 DROP TABLE IF EXISTS activity_logs CASCADE;
 DROP TABLE IF EXISTS reports CASCADE;
 DROP TABLE IF EXISTS flowcharts CASCADE;
