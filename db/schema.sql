@@ -5,6 +5,11 @@ CREATE TYPE project_role AS ENUM (
     'EDITOR',
     'VIEWER'
 );
+CREATE TYPE report_format AS ENUM(
+    'MARKDOWN',
+    'PDF',
+    'DOCX'
+);
 CREATE TYPE chat_status AS ENUM (
     'ACTIVE',
     'GENERATING',
@@ -47,6 +52,15 @@ CREATE TABLE users (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE TABLE user_profiles (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    bio TEXT,
+    avatar_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 CREATE TABLE projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -63,6 +77,7 @@ CREATE TABLE project_members (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role project_role NOT NULL DEFAULT 'EDITOR',
     created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(project_id, user_id)
 );
 CREATE TABLE folders (
@@ -72,6 +87,7 @@ CREATE TABLE folders (
     name VARCHAR(100) NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
+    CHECK (parent_folder_id IS NULL OR parent_folder_id <> id),
     UNIQUE(project_id, parent_folder_id, name)
 );
 CREATE TABLE files (
@@ -173,7 +189,7 @@ CREATE TABLE reports (
     generated_by_ai BOOLEAN DEFAULT FALSE,
     status report_status NOT NULL DEFAULT 'READY',
     source_chat_id UUID REFERENCES chats(id) ON DELETE SET NULL,
-    format VARCHAR(20) DEFAULT 'MARKDOWN',
+    format report_format NOT NULL DEFAULT 'MARKDOWN',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -274,6 +290,18 @@ ON activity_logs(created_at DESC);
 CREATE INDEX idx_chat_messages_sender
 ON chat_messages(sender_id);
 
+CREATE INDEX idx_files_project_folder
+ON files(project_id, folder_id);
+
+CREATE INDEX idx_folders_project_parent
+ON folders(project_id, parent_folder_id);
+
+CREATE INDEX idx_chat_messages_chat_sender
+ON chat_messages(chat_id, sender_id);
+
+CREATE INDEX idx_projects_archived
+ON projects(archived_at);
+
 DROP TABLE IF EXISTS activity_logs CASCADE;
 DROP TABLE IF EXISTS reports CASCADE;
 DROP TABLE IF EXISTS flowcharts CASCADE;
@@ -288,8 +316,10 @@ DROP TABLE IF EXISTS files CASCADE;
 DROP TABLE IF EXISTS folders CASCADE;
 DROP TABLE IF EXISTS project_members CASCADE;
 DROP TABLE IF EXISTS projects CASCADE;
+DROP TABLE IF EXISTS user_profiles CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TYPE IF EXISTS flowchart_status;
+DROP TYPE IF EXISTS report_format;
 DROP TYPE IF EXISTS report_status;
 DROP TYPE IF EXISTS chat_type;
 DROP TYPE IF EXISTS project_visibility;

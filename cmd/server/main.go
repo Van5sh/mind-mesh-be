@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"example/hello/graph"
-	"example/hello/graph/postgres"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
@@ -17,6 +16,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 	"github.com/vektah/gqlparser/v2/ast"
+	"gorm.io/driver/postgres"
 )
 
 const defaultPort = "8080"
@@ -71,7 +71,6 @@ func StartServer() {
 	log.Printf("🚀 Server ready at http://localhost:%s/", port)
 	log.Printf("🔍 GraphQL Playground at http://localhost:%s/", port)
 	log.Printf("📡 GraphQL endpoint at http://localhost:%s/query", port)
-
 	app.Listen(port)
 }
 
