@@ -74,7 +74,7 @@ CREATE TABLE projects (
 CREATE TABLE project_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES users(id) ON Dare the schema in both correctELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role project_role NOT NULL DEFAULT 'EDITOR',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -131,7 +131,6 @@ CREATE TABLE file_ai_metadata (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 CREATE TABLE file_shares (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     file_id UUID NOT NULL REFERENCES files(id) ON DELETE CASCADE,
@@ -167,7 +166,6 @@ CREATE TABLE chat_ai_metadata (
     embedding_synced BOOLEAN DEFAULT FALSE,
     indexed_at TIMESTAMPTZ
 );
-
 CREATE TABLE flowcharts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -202,7 +200,6 @@ CREATE TABLE activity_logs (
     entity_id UUID,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 CREATE INDEX idx_projects_owner
 ON projects(owner_id);
 
