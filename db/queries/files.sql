@@ -422,7 +422,7 @@ FROM files f
 JOIN file_properties fp
 ON f.id = fp.file_id
 WHERE fp.is_favorite = TRUE
-    AND f.project_id = $1
+    AND f.project_id = $1;
 
 -- name: GetIndexedFiles :many
 SELECT f.*
