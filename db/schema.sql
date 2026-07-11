@@ -186,7 +186,7 @@ CREATE TABLE reports (
     generated_by UUID REFERENCES users(id) ON DELETE SET NULL,
     generated_by_ai BOOLEAN DEFAULT FALSE,
     status report_status NOT NULL DEFAULT 'READY',
-    source_chat_id UUID REFERENCES chats(id) ON DELETE SET NULL,
+    source_chat_id UUID REFERENCES cha ts(id) ON DELETE SET NULL,
     format report_format NOT NULL DEFAULT 'MARKDOWN',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -298,31 +298,3 @@ ON chat_messages(chat_id, sender_id);
 
 CREATE INDEX idx_projects_archived
 ON projects(archived_at);
-
-DROP TABLE IF EXISTS activity_logs CASCADE;
-DROP TABLE IF EXISTS reports CASCADE;
-DROP TABLE IF EXISTS flowcharts CASCADE;
-DROP TABLE IF EXISTS chat_ai_metadata CASCADE;
-DROP TABLE IF EXISTS chat_messages CASCADE;
-DROP TABLE IF EXISTS chats CASCADE;
-DROP TABLE IF EXISTS file_shares CASCADE;
-DROP TABLE IF EXISTS file_ai_metadata CASCADE;
-DROP TABLE IF EXISTS file_properties CASCADE;
-DROP TABLE IF EXISTS file_storage CASCADE;
-DROP TABLE IF EXISTS files CASCADE;
-DROP TABLE IF EXISTS folders CASCADE;
-DROP TABLE IF EXISTS project_members CASCADE;
-DROP TABLE IF EXISTS projects CASCADE;
-DROP TABLE IF EXISTS user_profiles CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
-DROP TYPE IF EXISTS flowchart_status;
-DROP TYPE IF EXISTS report_format;
-DROP TYPE IF EXISTS report_status;
-DROP TYPE IF EXISTS chat_type;
-DROP TYPE IF EXISTS project_visibility;
-DROP TYPE IF EXISTS message_role;
-DROP TYPE IF EXISTS file_permission;
-DROP TYPE IF EXISTS project_role;
-DROP TYPE IF EXISTS chat_status;
-
-DROP EXTENSION IF EXISTS "pgcrypto";
