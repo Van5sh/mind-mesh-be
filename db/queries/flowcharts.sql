@@ -79,3 +79,23 @@ FROM flowcharts f
 JOIN projects p
 ON f.project_id = p.id
 WHERE f.id = $1;
+
+-- name: GetAIFlowCharts :many
+SELECT *
+FROM flowcharts
+WHERE generated_by_ai = TRUE
+ORDER BY created_at DESC;
+
+-- name: GetFlowchartsByStatus :many
+SELECT *
+FROM flowcharts
+WHERE status = $1
+ORDER BY created_at DESC;
+
+-- name: GetFlowchartsByProjectAndStatus :many
+SELECT *
+FROM flowcharts
+WHERE project_id = $1
+    AND status = $2
+ORDER BY created_at DESC;
+SET

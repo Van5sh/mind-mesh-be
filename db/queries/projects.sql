@@ -133,3 +133,9 @@ SET
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;
+
+-- name: GetProjectByName:one
+SELECT *
+FROM projects
+WHERE name = $1
+    AND owner_id = $2;

@@ -415,3 +415,36 @@ RETURNING *;
 DELETE
 FROM file_shares
 WHERE id = $1;
+
+-- name: GetFavoritesFiles :many
+SELECT f.*
+FROM files f
+JOIN file_properties fp
+ON f.id = fp.file_id
+WHERE fp.is_favorite = TRUE
+    AND f.project_id = $1
+
+-- name: GetIndexedFiles :many
+SELECT f.*
+FROM files f
+JOIN file_properties fp
+ON f.id = fp.file_id
+WHERE fp.is_indexed = TRUE
+    AND f.project_id = $1;
+
+-- name: GetFilesByIDs :many
+SELECT *
+FROM files
+WHERE id = ANY($1::UUID[])
+ORDER BY name;
+
+-- name: UpdateFileProperties :one
+UPDATE file_properties
+SET
+    original_name = $2,
+    is_indexed = $3,
+    is_favorite = $4,
+    deleted_at = $5,
+    updated_at = NOW()
+WHERE file_id = $1
+RETURNING *;

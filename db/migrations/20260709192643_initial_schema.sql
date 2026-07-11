@@ -187,7 +187,7 @@ CREATE TABLE reports (
     generated_by UUID REFERENCES users(id) ON DELETE SET NULL,
     generated_by_ai BOOLEAN DEFAULT FALSE,
     status report_status NOT NULL DEFAULT 'READY',
-    source_chat_id UUID REFERENCES cha ts(id) ON DELETE SET NULL,
+    source_chat_id UUID REFERENCES chats(id) ON DELETE SET NULL,
     format report_format NOT NULL DEFAULT 'MARKDOWN',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

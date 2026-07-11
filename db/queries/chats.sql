@@ -182,3 +182,30 @@ RETURNING *;
 DELETE
 FROM chat_ai_metadata
 WHERE message_id = $1;
+
+-- name: GeneratingChats :many
+SELECT *
+FROM chats
+WHERE project_id = $1
+    AND status = 'GENERATING';
+
+-- name: GetArchivedChats :many
+SELECT *
+FROM chats
+WHERE project_id = $1
+    AND status = 'ARCHIVED'
+ORDER BY last_activity_at DESC;
+
+-- name: GetActiveChats :many
+SELECT *
+FROM chats
+WHERE project_id = $1
+    AND status = 'ACTIVE'
+ORDER BY last_activity_at DESC;
+
+-- name: GetArchivedChatMessages :many
+SELECT *
+FROM chat_messages
+WHERE chat_id = $1
+    AND role = 'ARCHIVED'
+ORDER BY created_at ASC;
