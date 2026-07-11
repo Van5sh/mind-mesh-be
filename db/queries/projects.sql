@@ -68,7 +68,8 @@ WHERE id = $1;
 -- name: GetProjectMembers :many
 SELECT *
 FROM project_members
-WHERE project_id = $1;
+WHERE project_id = $1
+ORDER BY created_at;
 
 
 -- name: GetProjectMember :one
@@ -91,7 +92,9 @@ RETURNING *;
 
 -- name: UpdateProjectMemberRole :one
 UPDATE project_members
-SET role = $3
+SET
+    role = $3,
+    updated_at = NOW()
 WHERE project_id = $1
   AND user_id = $2
 RETURNING *;
@@ -102,3 +105,31 @@ DELETE
 FROM project_members
 WHERE project_id = $1
   AND user_id = $2;
+
+
+-- name: GetArchivedProjectsByOwner :many
+SELECT *
+FROM projects
+WHERE owner_id = $1
+  AND archived_at IS NOT NULL;
+
+
+-- name: GetArchivedProjectsForUser :many
+SELECT DISTINCT p.*
+FROM projects p
+LEFT JOIN project_members pm
+    ON p.id = pm.project_id
+WHERE p.archived_at IS NOT NULL
+  AND (
+      p.owner_id = $1
+      OR pm.user_id = $1
+  );
+
+
+-- name: TransferOwnership :one
+UPDATE projects
+SET
+    owner_id = $2,
+    updated_at = NOW()
+WHERE id = $1
+RETURNING *;
