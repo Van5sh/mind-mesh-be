@@ -228,4 +228,4 @@ JOIN chats c
 ON cm.chat_id = c.id
 WHERE cm.chat_id = $1
     AND c.status = 'ARCHIVED'
-ORDER BY created_at ASC;
+ORDER BY cm.created_at ASC;
