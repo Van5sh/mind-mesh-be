@@ -1,15 +1,78 @@
 # GraphQL schema example
 #
 # https://gqlgen.com/getting-started/
-type User{
-  id:ID!
-  name:String!
-  email:String!
-  password:String!
+
+enum ProjectRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
 }
 
-type File{
+enum ChatStatus {
+  ACTIVE
+  GENERATING
+  ARCHIVED
+}
+
+enum ChatType {
+  GENERAL
+  AI_ASSISTANT
+}
+
+enum MessageRole {
+  USER
+  AI
+  SYSTEM
+}
+
+enum ProjectVisibility {
+  PRIVATE
+  TEAM
+}
+
+enum FilePermission {
+  READ
+  WRITE
+}
+
+enum ReportStatus {
+  DRAFT
+  GENERATING
+  READY
+  FAILED
+}
+
+enum FlowchartStatus {
+  DRAFT
+  GENERATING
+  READY
+  FAILED
+}
+
+enum ReportFormat {
+  MARKDOWN
+  PDF
+  DOCX
+}
+
+type User {
   id:ID!
-  name:String!
-  extension:String!
+  username:String!
+  email:String!
+  profile:UserProfile
+  ownedProjects:[Projects]!
+  projectMemberships:[ProjectMember!]!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type UserProfile {
+  user: User!
+  firstName: String!
+  lastName: String!
+  bio: String
+  avatarUrl: String
+  createdAt: Time!
+  updatedAt: Time!
 }

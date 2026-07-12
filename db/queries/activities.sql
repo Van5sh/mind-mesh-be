@@ -15,6 +15,13 @@ SELECT *
 FROM activity_logs
 WHERE id = $1;
 
+-- name: GetActivityLogsPaginated :many
+SELECT *
+FROM activity_logs
+ORDER BY created_at DESC
+LIMIT $1
+OFFSET $2;
+
 -- name: GetActivityLogsByProjectID :many
 SELECT *
 FROM activity_logs
@@ -84,6 +91,15 @@ WHERE project_id = $1;
 SELECT COUNT(*) AS count
 FROM activity_logs
 WHERE user_id = $1;
+
+
+-- name: GetProjectStats :one
+SELECT
+    (SELECT COUNT(*) FROM project_members pm WHERE pm.project_id = $1) AS member_count,
+    (SELECT COUNT(*) FROM project_files pf WHERE pf.project_id = $1) AS file_count,
+    (SELECT COUNT(*) FROM chats c WHERE c.project_id = $1) AS chat_count,
+    (SELECT COUNT(*) FROM reports r WHERE r.project_id = $1) AS report_count,
+    (SELECT COUNT(*) FROM flowcharts f WHERE f.project_id = $1) AS flowchart_count;
 
 
 -- name: DeleteActivityLogByID :exec

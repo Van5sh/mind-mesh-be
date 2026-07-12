@@ -30,6 +30,14 @@ WHERE project_id = $1
 ORDER BY last_activity_at DESC;
 
 
+-- name: SearchChatsByTitle :many
+SELECT *
+FROM chats
+WHERE project_id = $1
+  AND title ILIKE '%' || $2 || '%'
+ORDER BY last_activity_at DESC;
+
+
 -- name: RenameChat :one
 UPDATE chats
 SET
@@ -137,6 +145,16 @@ WHERE id = ANY($1::UUID[])
 ORDER BY created_at ASC;
 
 
+-- name: SearchChatMessages :many
+SELECT cm.*
+FROM chat_messages cm
+JOIN chats c
+ON cm.chat_id = c.id
+WHERE c.project_id = $1
+  AND cm.content ILIKE '%' || $2 || '%'
+ORDER BY cm.created_at DESC;
+
+
 -- name: UpdateChatMessage :one
 UPDATE chat_messages
 SET
@@ -204,8 +222,10 @@ WHERE project_id = $1
 ORDER BY last_activity_at DESC;
 
 -- name: GetArchivedChatMessages :many
-SELECT *
-FROM chat_messages
-WHERE chat_id = $1
-    AND role = 'ARCHIVED'
+SELECT cm.*
+FROM chat_messages cm
+JOIN chats c
+ON cm.chat_id = c.id
+WHERE cm.chat_id = $1
+    AND c.status = 'ARCHIVED'
 ORDER BY created_at ASC;

@@ -89,17 +89,15 @@ CREATE TABLE folders (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     CHECK (parent_folder_id IS NULL OR parent_folder_id <> id),
-    UNIQUE(project_id, parent_folder_id, name)
+    UNIQUE(project_id, parent_folder_id, name),
+    UNIQUE(id, project_id)
 );
 CREATE TABLE files (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    folder_id UUID REFERENCES folders(id) ON DELETE SET NULL,
     name VARCHAR(255) NOT NULL,
     size BIGINT NOT NULL CHECK(size >= 0),
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(project_id, folder_id, name)
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE TABLE file_storage(
     file_id UUID PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
@@ -118,7 +116,6 @@ CREATE TABLE file_properties (
     file_id UUID PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
     original_name VARCHAR(255),
     is_indexed BOOLEAN NOT NULL DEFAULT FALSE,
-    is_favorite BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ
@@ -141,6 +138,24 @@ CREATE TABLE file_shares (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(file_id, shared_with),
     CHECK (shared_by <> shared_with)
+);
+CREATE TABLE project_files (
+    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    file_id UUID NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    folder_id UUID,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (project_id, file_id),
+    FOREIGN KEY (folder_id, project_id)
+        REFERENCES folders(id, project_id)
+        ON DELETE SET NULL
+);
+CREATE TABLE user_file_preferences (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    file_id UUID NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    is_favorite BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (user_id, file_id)
 );
 CREATE TABLE chats (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -166,6 +181,12 @@ CREATE TABLE chat_ai_metadata (
     embedding_model VARCHAR(100),
     embedding_synced BOOLEAN DEFAULT FALSE,
     indexed_at TIMESTAMPTZ
+);
+CREATE TABLE message_file_references (
+    message_id UUID NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+    file_id UUID NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (message_id, file_id)
 );
 CREATE TABLE flowcharts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -216,12 +237,6 @@ ON folders(project_id);
 CREATE INDEX idx_folders_parent
 ON folders(parent_folder_id);
 
-CREATE INDEX idx_files_project
-ON files(project_id);
-
-CREATE INDEX idx_files_folder
-ON files(folder_id);
-
 CREATE INDEX idx_file_ai_metadata_synced
 ON file_ai_metadata(embedding_synced);
 
@@ -233,9 +248,6 @@ ON file_storage(uploaded_by);
 
 CREATE INDEX idx_file_properties_deleted_at
 ON file_properties(deleted_at);
-
-CREATE INDEX idx_file_properties_favorite
-ON file_properties(is_favorite);
 
 CREATE INDEX idx_file_properties_indexed
 ON file_properties(is_indexed);
@@ -257,6 +269,18 @@ ON file_shares(file_id);
 
 CREATE INDEX idx_file_shares_shared_with
 ON file_shares(shared_with);
+
+CREATE INDEX idx_project_files_project
+ON project_files(project_id);
+
+CREATE INDEX idx_project_files_folder
+ON project_files(folder_id);
+
+CREATE INDEX idx_project_files_project_folder
+ON project_files(project_id, folder_id);
+
+CREATE INDEX idx_user_file_preferences_favorite
+ON user_file_preferences(user_id, is_favorite);
 
 CREATE INDEX idx_chats_project
 ON chats(project_id);
@@ -288,14 +312,14 @@ ON activity_logs(created_at DESC);
 CREATE INDEX idx_chat_messages_sender
 ON chat_messages(sender_id);
 
-CREATE INDEX idx_files_project_folder
-ON files(project_id, folder_id);
-
 CREATE INDEX idx_folders_project_parent
 ON folders(project_id, parent_folder_id);
 
 CREATE INDEX idx_chat_messages_chat_sender
 ON chat_messages(chat_id, sender_id);
+
+CREATE INDEX idx_message_file_references_file
+ON message_file_references(file_id);
 
 CREATE INDEX idx_projects_archived
 ON projects(archived_at);
@@ -307,6 +331,9 @@ DROP TABLE IF EXISTS flowcharts CASCADE;
 DROP TABLE IF EXISTS chat_ai_metadata CASCADE;
 DROP TABLE IF EXISTS chat_messages CASCADE;
 DROP TABLE IF EXISTS chats CASCADE;
+DROP TABLE IF EXISTS message_file_references CASCADE;
+DROP TABLE IF EXISTS user_file_preferences CASCADE;
+DROP TABLE IF EXISTS project_files CASCADE;
 DROP TABLE IF EXISTS file_shares CASCADE;
 DROP TABLE IF EXISTS file_ai_metadata CASCADE;
 DROP TABLE IF EXISTS file_properties CASCADE;

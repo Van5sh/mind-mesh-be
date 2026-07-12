@@ -11,6 +11,14 @@ FROM flowcharts
 WHERE id = $1;
 
 
+-- name: GetLatestFlowchart :one
+SELECT *
+FROM flowcharts
+WHERE project_id = $1
+ORDER BY created_at DESC
+LIMIT 1;
+
+
 -- name: CreateFlowchart :one
 INSERT INTO flowcharts (
     id,
@@ -44,6 +52,15 @@ RETURNING *;
 UPDATE flowcharts
 SET
     status = $2,
+    updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
+
+-- name: RenameFlowchart :one
+UPDATE flowcharts
+SET
+    name = $2,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;

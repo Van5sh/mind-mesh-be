@@ -1,75 +1,107 @@
 -- name: CreateFile :one
 INSERT INTO files (
     id,
-    project_id,
-    folder_id,
     name,
     size
 )
-VALUES ($1, $2, $3, $4, $5)
+VALUES ($1, $2, $3)
 RETURNING *;
-
 
 -- name: GetFileByID :one
 SELECT *
 FROM files
 WHERE id = $1;
 
+-- name: CreateProjectFile :one
+INSERT INTO project_files (
+    project_id,
+    file_id,
+    folder_id
+)
+VALUES ($1, $2, $3)
+RETURNING *;
+
+-- name: GetProjectFile :one
+SELECT *
+FROM project_files
+WHERE project_id = $1
+  AND file_id = $2;
 
 -- name: GetProjectFileByID :one
-SELECT *
-FROM files
-WHERE id = $1
-  AND project_id = $2;
+SELECT f.*
+FROM files f
+JOIN project_files pf
+ON f.id = pf.file_id
+WHERE f.id = $1
+  AND pf.project_id = $2;
 
+-- name: CheckProjectContainsFile :one
+SELECT EXISTS (
+    SELECT 1
+    FROM project_files
+    WHERE project_id = $1
+      AND file_id = $2
+);
 
 -- name: GetFilesByProjectID :many
-SELECT *
-FROM files
-WHERE project_id = $1
-ORDER BY name;
+SELECT f.*
+FROM files f
+JOIN project_files pf
+ON f.id = pf.file_id
+WHERE pf.project_id = $1
+ORDER BY f.name;
 
+-- name: CountProjectFiles :one
+SELECT COUNT(*) AS count
+FROM project_files
+WHERE project_id = $1;
 
 -- name: GetFilesByFolderID :many
-SELECT *
-FROM files
-WHERE folder_id IS NOT DISTINCT FROM $1
-ORDER BY name;
-
+SELECT f.*
+FROM files f
+JOIN project_files pf
+ON f.id = pf.file_id
+WHERE pf.project_id = $1
+  AND pf.folder_id IS NOT DISTINCT FROM $2
+ORDER BY f.name;
 
 -- name: GetRootFiles :many
-SELECT *
-FROM files
-WHERE project_id = $1
-  AND folder_id IS NULL
-ORDER BY name;
-
+SELECT f.*
+FROM files f
+JOIN project_files pf
+ON f.id = pf.file_id
+WHERE pf.project_id = $1
+  AND pf.folder_id IS NULL
+ORDER BY f.name;
 
 -- name: GetFileByFolderAndName :one
-SELECT *
-FROM files
-WHERE project_id = $1
-  AND folder_id IS NOT DISTINCT FROM $2
-  AND name = $3;
-
+SELECT f.*
+FROM files f
+JOIN project_files pf
+ON f.id = pf.file_id
+WHERE pf.project_id = $1
+  AND pf.folder_id IS NOT DISTINCT FROM $2
+  AND f.name = $3;
 
 -- name: CheckFileNameExists :one
 SELECT EXISTS (
     SELECT 1
-    FROM files
-    WHERE project_id = $1
-      AND folder_id IS NOT DISTINCT FROM $2
-      AND name = $3
+    FROM files f
+    JOIN project_files pf
+    ON f.id = pf.file_id
+    WHERE pf.project_id = $1
+      AND pf.folder_id IS NOT DISTINCT FROM $2
+      AND f.name = $3
 );
 
-
 -- name: SearchFiles :many
-SELECT *
-FROM files
-WHERE project_id = $1
-  AND name ILIKE '%' || $2 || '%'
-ORDER BY name;
-
+SELECT f.*
+FROM files f
+JOIN project_files pf
+ON f.id = pf.file_id
+WHERE pf.project_id = $1
+  AND f.name ILIKE '%' || $2 || '%'
+ORDER BY f.name;
 
 -- name: RenameFile :one
 UPDATE files
@@ -79,15 +111,13 @@ SET
 WHERE id = $1
 RETURNING *;
 
-
 -- name: MoveFile :one
-UPDATE files
+UPDATE project_files
 SET
-    folder_id = $2,
-    updated_at = NOW()
-WHERE id = $1
+    folder_id = $3
+WHERE project_id = $1
+  AND file_id = $2
 RETURNING *;
-
 
 -- name: UpdateFileSize :one
 UPDATE files
@@ -97,12 +127,16 @@ SET
 WHERE id = $1
 RETURNING *;
 
-
 -- name: DeleteFile :exec
 DELETE
 FROM files
 WHERE id = $1;
 
+-- name: RemoveProjectFile :exec
+DELETE
+FROM project_files
+WHERE project_id = $1
+  AND file_id = $2;
 
 -- name: CreateFolder :one
 INSERT INTO folders (
@@ -113,7 +147,6 @@ INSERT INTO folders (
 )
 VALUES ($1, $2, $3, $4)
 RETURNING *;
-
 
 -- name: GetFolderByID :one
 SELECT *
@@ -194,20 +227,24 @@ SELECT EXISTS (
 
 -- name: GetFolderContents :many
 SELECT
-    id,
-    name,
+    f.id,
+    f.name,
     'folder' AS item_type,
-    created_at
-FROM folders
-WHERE parent_folder_id IS NOT DISTINCT FROM $1
+    f.created_at
+FROM folders f
+WHERE f.project_id = $1
+  AND f.parent_folder_id IS NOT DISTINCT FROM $2
 UNION ALL
 SELECT
-    id,
-    name,
+    fi.id,
+    fi.name,
     'file' AS item_type,
-    created_at
-FROM files
-WHERE folder_id IS NOT DISTINCT FROM $1
+    fi.created_at
+FROM files fi
+JOIN project_files pf
+ON fi.id = pf.file_id
+WHERE pf.project_id = $1
+  AND pf.folder_id IS NOT DISTINCT FROM $2
 ORDER BY item_type, name;
 
 
@@ -216,10 +253,9 @@ INSERT INTO file_properties (
     file_id,
     original_name,
     is_indexed,
-    is_favorite,
     deleted_at
 )
-VALUES ($1, $2, $3, $4, $5)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 
@@ -236,14 +272,6 @@ SET
     updated_at = NOW()
 WHERE file_id = $1
 RETURNING *;
-
-
--- name: SetFavorite :exec
-UPDATE file_properties
-SET
-    is_favorite = $2,
-    updated_at = NOW()
-WHERE file_id = $1;
 
 
 -- name: MarkFileIndexed :exec
@@ -274,6 +302,77 @@ WHERE file_id = $1;
 DELETE
 FROM file_properties
 WHERE file_id = $1;
+
+
+-- name: CreateUserFilePreference :one
+INSERT INTO user_file_preferences (
+    user_id,
+    file_id,
+    is_favorite
+)
+VALUES ($1, $2, $3)
+RETURNING *;
+
+
+-- name: GetUserFilePreference :one
+SELECT *
+FROM user_file_preferences
+WHERE user_id = $1
+  AND file_id = $2;
+
+
+-- name: SetFavorite :one
+INSERT INTO user_file_preferences (
+    user_id,
+    file_id,
+    is_favorite
+)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id, file_id)
+DO UPDATE SET
+    is_favorite = EXCLUDED.is_favorite,
+    updated_at = NOW()
+RETURNING *;
+
+
+-- name: DeleteUserFilePreference :exec
+DELETE
+FROM user_file_preferences
+WHERE user_id = $1
+  AND file_id = $2;
+
+
+-- name: CreateMessageFileReference :one
+INSERT INTO message_file_references (
+    message_id,
+    file_id
+)
+VALUES ($1, $2)
+RETURNING *;
+
+
+-- name: GetMessageFileReferences :many
+SELECT f.*
+FROM files f
+JOIN message_file_references mfr
+ON f.id = mfr.file_id
+WHERE mfr.message_id = $1
+ORDER BY f.name;
+
+
+-- name: DeleteMessageFileReferences :exec
+DELETE
+FROM message_file_references
+WHERE message_id = $1;
+
+
+-- name: GetMessagesReferencingFile :many
+SELECT cm.*
+FROM chat_messages cm
+JOIN message_file_references mfr
+ON cm.id = mfr.message_id
+WHERE mfr.file_id = $1
+ORDER BY cm.created_at ASC;
 
 
 -- name: CreateFileStorage :one
@@ -336,6 +435,15 @@ FROM file_ai_metadata
 WHERE file_id = $1;
 
 
+-- name: GetFilesPendingEmbedding :many
+SELECT f.*
+FROM files f
+JOIN file_ai_metadata fam
+ON f.id = fam.file_id
+WHERE fam.embedding_synced = FALSE
+ORDER BY f.created_at ASC;
+
+
 -- name: UpdateFileAIMetadata :one
 UPDATE file_ai_metadata
 SET
@@ -343,6 +451,16 @@ SET
     embedding_model = $3,
     embedding_synced = $4,
     indexed_at = $5,
+    updated_at = NOW()
+WHERE file_id = $1
+RETURNING *;
+
+
+-- name: MarkFileEmbeddingSynced :one
+UPDATE file_ai_metadata
+SET
+    embedding_synced = $2,
+    indexed_at = $3,
     updated_at = NOW()
 WHERE file_id = $1
 RETURNING *;
@@ -359,8 +477,10 @@ SELECT f.*
 FROM files f
 JOIN file_properties fp
 ON f.id = fp.file_id
+JOIN project_files pf
+ON f.id = pf.file_id
 WHERE fp.deleted_at IS NOT NULL
-  AND f.project_id = $1
+  AND pf.project_id = $1
 ORDER BY fp.deleted_at DESC;
 
 
@@ -396,6 +516,13 @@ WHERE shared_with = $1
 ORDER BY created_at DESC;
 
 
+-- name: GetFilesSharedByUser :many
+SELECT *
+FROM file_shares
+WHERE shared_by = $1
+ORDER BY created_at DESC;
+
+
 -- name: GetFileShareByFileAndSharedWith :one
 SELECT *
 FROM file_shares
@@ -416,21 +543,29 @@ DELETE
 FROM file_shares
 WHERE id = $1;
 
+
 -- name: GetFavoritesFiles :many
 SELECT f.*
 FROM files f
-JOIN file_properties fp
-ON f.id = fp.file_id
-WHERE fp.is_favorite = TRUE
-    AND f.project_id = $1;
+JOIN user_file_preferences ufp
+ON f.id = ufp.file_id
+JOIN project_files pf
+ON f.id = pf.file_id
+WHERE ufp.user_id = $1
+  AND ufp.is_favorite = TRUE
+  AND pf.project_id = $2;
+
 
 -- name: GetIndexedFiles :many
 SELECT f.*
 FROM files f
 JOIN file_properties fp
 ON f.id = fp.file_id
+JOIN project_files pf
+ON f.id = pf.file_id
 WHERE fp.is_indexed = TRUE
-    AND f.project_id = $1;
+  AND pf.project_id = $1;
+
 
 -- name: GetFilesByIDs :many
 SELECT *
@@ -438,13 +573,13 @@ FROM files
 WHERE id = ANY($1::UUID[])
 ORDER BY name;
 
+
 -- name: UpdateFileProperties :one
 UPDATE file_properties
 SET
     original_name = $2,
     is_indexed = $3,
-    is_favorite = $4,
-    deleted_at = $5,
+    deleted_at = $4,
     updated_at = NOW()
 WHERE file_id = $1
 RETURNING *;

@@ -49,6 +49,22 @@ WHERE project_id = $1
 ORDER BY created_at DESC;
 
 
+-- name: GetReportsByStatus :many
+SELECT *
+FROM reports
+WHERE project_id = $1
+  AND status = $2
+ORDER BY created_at DESC;
+
+
+-- name: GetReportsByFormat :many
+SELECT *
+FROM reports
+WHERE project_id = $1
+  AND format = $2
+ORDER BY created_at DESC;
+
+
 -- name: UpdateReport :one
 UPDATE reports
 SET
