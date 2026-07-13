@@ -166,6 +166,12 @@ CREATE TABLE chats (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE TABLE chat_participants (
+    chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    joined_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (chat_id, user_id)
+);
 CREATE TABLE chat_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
@@ -180,6 +186,12 @@ CREATE TABLE chat_ai_metadata (
     embedding_model VARCHAR(100),
     embedding_synced BOOLEAN DEFAULT FALSE,
     indexed_at TIMESTAMPTZ
+);
+CREATE TABLE message_mentions (
+    message_id UUID NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+    mentioned_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (message_id, mentioned_user_id)
 );
 CREATE TABLE message_file_references (
     message_id UUID NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
@@ -242,6 +254,9 @@ ON file_ai_metadata(embedding_synced);
 CREATE INDEX idx_chat_ai_metadata_synced
 ON chat_ai_metadata(embedding_synced);
 
+CREATE INDEX idx_message_mentions_user
+ON message_mentions(mentioned_user_id);
+
 CREATE INDEX idx_file_storage_uploaded_by
 ON file_storage(uploaded_by);
 
@@ -287,6 +302,12 @@ ON chats(project_id);
 CREATE INDEX idx_chats_last_activity
 ON chats(last_activity_at DESC);
 
+CREATE INDEX idx_chat_participants_chat
+ON chat_participants(chat_id);
+
+CREATE INDEX idx_chat_participants_user
+ON chat_participants(user_id);
+
 CREATE INDEX idx_chat_messages_chat
 ON chat_messages(chat_id);
 
@@ -316,6 +337,9 @@ ON folders(project_id, parent_folder_id);
 
 CREATE INDEX idx_chat_messages_chat_sender
 ON chat_messages(chat_id, sender_id);
+
+CREATE INDEX idx_message_mentions_message
+ON message_mentions(message_id);
 
 CREATE INDEX idx_message_file_references_file
 ON message_file_references(file_id);

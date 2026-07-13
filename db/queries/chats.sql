@@ -14,6 +14,70 @@ SELECT *
 FROM chats
 WHERE id = $1;
 
+-- name: CreateChatParticipant :one
+INSERT INTO chat_participants (
+    chat_id,
+    user_id
+)
+VALUES ($1, $2)
+RETURNING *;
+
+-- name: GetChatParticipant :one
+SELECT *
+FROM chat_participants
+WHERE chat_id = $1
+  AND user_id = $2;
+
+-- name: GetChatParticipants :many
+SELECT *
+FROM chat_participants
+WHERE chat_id = $1
+ORDER BY joined_at ASC;
+
+-- name: GetChatParticipantsWithUsers :many
+SELECT
+    cp.chat_id,
+    cp.user_id,
+    cp.joined_at,
+    u.username,
+    u.email
+FROM chat_participants cp
+JOIN users u
+ON cp.user_id = u.id
+WHERE cp.chat_id = $1
+ORDER BY cp.joined_at ASC;
+
+-- name: GetChatsByUserID :many
+SELECT c.*
+FROM chats c
+JOIN chat_participants cp
+ON c.id = cp.chat_id
+WHERE cp.user_id = $1
+ORDER BY c.last_activity_at DESC;
+
+-- name: GetChatsByProjectAndUser :many
+SELECT c.*
+FROM chats c
+JOIN chat_participants cp
+ON c.id = cp.chat_id
+WHERE c.project_id = $1
+  AND cp.user_id = $2
+ORDER BY c.last_activity_at DESC;
+
+-- name: CheckUserInChat :one
+SELECT EXISTS (
+    SELECT 1
+    FROM chat_participants
+    WHERE chat_id = $1
+      AND user_id = $2
+);
+
+-- name: RemoveChatParticipant :exec
+DELETE
+FROM chat_participants
+WHERE chat_id = $1
+  AND user_id = $2;
+
 
 -- name: GetChatsByProjectID :many
 SELECT *
@@ -167,6 +231,53 @@ RETURNING *;
 DELETE
 FROM chat_messages
 WHERE id = $1;
+
+-- name: CreateMessageMention :one
+INSERT INTO message_mentions (
+    message_id,
+    mentioned_user_id
+)
+VALUES ($1, $2)
+RETURNING *;
+
+
+-- name: GetMessageMentions :many
+SELECT
+    mm.message_id,
+    mm.mentioned_user_id,
+    mm.created_at,
+    u.username,
+    u.email
+FROM message_mentions mm
+JOIN users u
+ON mm.mentioned_user_id = u.id
+WHERE mm.message_id = $1
+ORDER BY mm.created_at ASC;
+
+
+-- name: DeleteMessageMentions :exec
+DELETE
+FROM message_mentions
+WHERE message_id = $1;
+
+
+-- name: GetMessagesMentioningUser :many
+SELECT cm.*
+FROM chat_messages cm
+JOIN message_mentions mm
+ON cm.id = mm.message_id
+WHERE mm.mentioned_user_id = $1
+ORDER BY cm.created_at DESC;
+
+
+-- name: GetUserMentionsInChat :many
+SELECT cm.*
+FROM chat_messages cm
+JOIN message_mentions mm
+ON cm.id = mm.message_id
+WHERE cm.chat_id = $1
+  AND mm.mentioned_user_id = $2
+ORDER BY cm.created_at DESC;
 
 
 -- name: CreateChatAIMetadata :one
