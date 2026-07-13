@@ -1,10 +1,11 @@
 -- name: CreateFile :one
 INSERT INTO files (
     id,
+    folder_id,
     name,
     size
 )
-VALUES ($1, $2, $3)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: GetFileByID :one
@@ -57,6 +58,12 @@ FROM project_files
 WHERE project_id = $1;
 
 -- name: GetFilesByFolderID :many
+SELECT *
+FROM files
+WHERE folder_id IS NOT DISTINCT FROM $1
+ORDER BY name;
+
+-- name: GetProjectFilesByFolderID :many
 SELECT f.*
 FROM files f
 JOIN project_files pf
@@ -75,6 +82,12 @@ WHERE pf.project_id = $1
 ORDER BY f.name;
 
 -- name: GetFileByFolderAndName :one
+SELECT *
+FROM files
+WHERE folder_id IS NOT DISTINCT FROM $1
+  AND name = $2;
+
+-- name: GetProjectFileByFolderAndName :one
 SELECT f.*
 FROM files f
 JOIN project_files pf
@@ -84,6 +97,14 @@ WHERE pf.project_id = $1
   AND f.name = $3;
 
 -- name: CheckFileNameExists :one
+SELECT EXISTS (
+    SELECT 1
+    FROM files
+    WHERE folder_id IS NOT DISTINCT FROM $1
+      AND name = $2
+);
+
+-- name: CheckProjectFileNameExists :one
 SELECT EXISTS (
     SELECT 1
     FROM files f
@@ -112,6 +133,14 @@ WHERE id = $1
 RETURNING *;
 
 -- name: MoveFile :one
+UPDATE files
+SET
+    folder_id = $2,
+    updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
+-- name: MoveProjectFile :one
 UPDATE project_files
 SET
     folder_id = $3
@@ -182,12 +211,26 @@ WHERE project_id = $1
   AND parent_folder_id IS NULL
 ORDER BY name;
 
+-- name: GetStandaloneRootFolders :many
+SELECT *
+FROM folders
+WHERE project_id IS NULL
+  AND parent_folder_id IS NULL
+ORDER BY name;
+
 
 -- name: SearchFolders :many
 SELECT *
 FROM folders
 WHERE project_id = $1
   AND name ILIKE '%' || $2 || '%'
+ORDER BY name;
+
+-- name: SearchStandaloneFolders :many
+SELECT *
+FROM folders
+WHERE project_id IS NULL
+  AND name ILIKE '%' || $1 || '%'
 ORDER BY name;
 
 
@@ -226,6 +269,24 @@ SELECT EXISTS (
 
 
 -- name: GetFolderContents :many
+SELECT
+    f.id,
+    f.name,
+    'folder' AS item_type,
+    f.created_at
+FROM folders f
+WHERE f.parent_folder_id IS NOT DISTINCT FROM $1
+UNION ALL
+SELECT
+    fi.id,
+    fi.name,
+    'file' AS item_type,
+    fi.created_at
+FROM files fi
+WHERE fi.folder_id IS NOT DISTINCT FROM $1
+ORDER BY item_type, name;
+
+-- name: GetProjectFolderContents :many
 SELECT
     f.id,
     f.name,

@@ -1,7 +1,8 @@
 # GraphQL schema example
 #
 # https://gqlgen.com/getting-started/
-
+scalar Time
+scalar Int64
 enum ProjectRole {
   OWNER
   ADMIN
@@ -61,7 +62,7 @@ type User {
   username:String!
   email:String!
   profile:UserProfile
-  ownedProjects:[Projects]!
+  ownedProjects:[Project]!
   projectMemberships:[ProjectMember!]!
   createdAt: Time!
   updatedAt: Time!
@@ -77,20 +78,46 @@ type UserProfile {
   updatedAt: Time!
 }
 
-type Projects {
+type Project {
+  id: ID!
+  name: String!
+  description: String!
+  visibility: ProjectVisibility
+  owner: User!
+  archivedAt: Time
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type ProjectMember {
+  id:ID!
+  role: ProjectRole!
+  createdAt: Time!
+  user: User!
+  project: Project!
+  createdAt: Time!
+  updatedAt: Time!  
+}
+
+type ProjectFiles {
 
 }
 
-type ProjectMembers {
-
+type Folder {
+  id: ID!
+  projectID: Project!
+  parentFolderId: Folder!
+  name: String!
+  createdAt: Time!
+  updatedAt: Time!
 }
 
-type Folders {
-
-}
-
-type Files {
-
+type File {
+  id: ID!
+  name: String!
+  size: Number!
+  createdAt: Time!
+  updatedAt: Time!
 }
 
 type FileStorage {
@@ -105,9 +132,6 @@ type FileShares {
 
 }
 
-type ProjectFiles {
-
-}
 
 type Chats {
 
