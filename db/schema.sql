@@ -216,13 +216,17 @@ CREATE TABLE reports (
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     title VARCHAR(100) NOT NULL,
     content TEXT NOT NULL,
+    format report_format NOT NULL DEFAULT 'MARKDOWN',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE report_properties (
+    report_id UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
     generated_by UUID REFERENCES users(id) ON DELETE SET NULL,
     generated_by_ai BOOLEAN DEFAULT FALSE,
     status report_status NOT NULL DEFAULT 'READY',
     source_chat_id UUID REFERENCES chats(id) ON DELETE SET NULL,
-    format report_format NOT NULL DEFAULT 'MARKDOWN',
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    PRIMARY KEY (report_id)
 );
 CREATE TABLE activity_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -276,7 +280,13 @@ CREATE INDEX idx_flowcharts_generated_by
 ON flowcharts(generated_by);
 
 CREATE INDEX idx_reports_generated_by
-ON reports(generated_by);
+ON report_properties(generated_by);
+
+CREATE INDEX idx_report_properties_status
+ON report_properties(status);
+
+CREATE INDEX idx_report_properties_source_chat
+ON report_properties(source_chat_id);
 
 CREATE INDEX idx_file_shares_file
 ON file_shares(file_id);

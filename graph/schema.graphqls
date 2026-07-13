@@ -76,3 +76,59 @@ type UserProfile {
   createdAt: Time!
   updatedAt: Time!
 }
+
+type Projects {
+
+}
+
+type ProjectMembers {
+
+}
+
+type Folders {
+
+}
+
+type Files {
+
+}
+
+type FileStorage {
+
+}
+
+type FileProperties {
+
+}
+
+type FileShares {
+
+}
+
+type ProjectFiles {
+
+}
+
+type Chats {
+
+}
+
+type ChatMessages {
+
+}
+
+type ChatMetaData {
+
+}
+
+type FlowChats {
+
+}
+
+type Reports {
+
+}
+
+type ActivityLogs {
+  
+}

@@ -12,19 +12,43 @@ import (
 )
 
 const createReport = `-- name: CreateReport :one
-INSERT INTO reports (
-    id,
-    project_id,
-    title,
-    content,
-    generated_by,
-    generated_by_ai,
-    status,
-    source_chat_id,
-    format
+WITH new_report AS (
+    INSERT INTO reports (
+        id,
+        project_id,
+        title,
+        content,
+        format
+    )
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING id, project_id, title, content, format, created_at, updated_at
+),
+new_properties AS (
+    INSERT INTO report_properties (
+        report_id,
+        generated_by,
+        generated_by_ai,
+        status,
+        source_chat_id
+    )
+    VALUES ($1, $6, $7, $8, $9)
+    RETURNING report_id, generated_by, generated_by_ai, status, source_chat_id
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, project_id, title, content, generated_by, generated_by_ai, status, source_chat_id, format, created_at, updated_at
+SELECT
+    r.id,
+    r.project_id,
+    r.title,
+    r.content,
+    r.format,
+    r.created_at,
+    r.updated_at,
+    rp.generated_by,
+    rp.generated_by_ai,
+    rp.status,
+    rp.source_chat_id
+FROM new_report r
+JOIN new_properties rp
+ON r.id = rp.report_id
 `
 
 type CreateReportParams struct {
@@ -32,38 +56,52 @@ type CreateReportParams struct {
 	ProjectID     pgtype.UUID
 	Title         string
 	Content       string
+	Format        ReportFormat
 	GeneratedBy   pgtype.UUID
 	GeneratedByAi pgtype.Bool
 	Status        ReportStatus
 	SourceChatID  pgtype.UUID
-	Format        ReportFormat
 }
 
-func (q *Queries) CreateReport(ctx context.Context, arg CreateReportParams) (Report, error) {
+type CreateReportRow struct {
+	ID            pgtype.UUID
+	ProjectID     pgtype.UUID
+	Title         string
+	Content       string
+	Format        ReportFormat
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	GeneratedBy   pgtype.UUID
+	GeneratedByAi pgtype.Bool
+	Status        ReportStatus
+	SourceChatID  pgtype.UUID
+}
+
+func (q *Queries) CreateReport(ctx context.Context, arg CreateReportParams) (CreateReportRow, error) {
 	row := q.db.QueryRow(ctx, createReport,
 		arg.ID,
 		arg.ProjectID,
 		arg.Title,
 		arg.Content,
+		arg.Format,
 		arg.GeneratedBy,
 		arg.GeneratedByAi,
 		arg.Status,
 		arg.SourceChatID,
-		arg.Format,
 	)
-	var i Report
+	var i CreateReportRow
 	err := row.Scan(
 		&i.ID,
 		&i.ProjectID,
 		&i.Title,
 		&i.Content,
+		&i.Format,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 		&i.GeneratedBy,
 		&i.GeneratedByAi,
 		&i.Status,
 		&i.SourceChatID,
-		&i.Format,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -80,34 +118,61 @@ func (q *Queries) DeleteReport(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getAIReports = `-- name: GetAIReports :many
-SELECT id, project_id, title, content, generated_by, generated_by_ai, status, source_chat_id, format, created_at, updated_at
-FROM reports
-WHERE project_id = $1
-  AND generated_by_ai = TRUE
-ORDER BY created_at DESC
+SELECT
+    r.id,
+    r.project_id,
+    r.title,
+    r.content,
+    r.format,
+    r.created_at,
+    r.updated_at,
+    rp.generated_by,
+    rp.generated_by_ai,
+    rp.status,
+    rp.source_chat_id
+FROM reports r
+JOIN report_properties rp
+ON r.id = rp.report_id
+WHERE r.project_id = $1
+  AND rp.generated_by_ai = TRUE
+ORDER BY r.created_at DESC
 `
 
-func (q *Queries) GetAIReports(ctx context.Context, projectID pgtype.UUID) ([]Report, error) {
+type GetAIReportsRow struct {
+	ID            pgtype.UUID
+	ProjectID     pgtype.UUID
+	Title         string
+	Content       string
+	Format        ReportFormat
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	GeneratedBy   pgtype.UUID
+	GeneratedByAi pgtype.Bool
+	Status        ReportStatus
+	SourceChatID  pgtype.UUID
+}
+
+func (q *Queries) GetAIReports(ctx context.Context, projectID pgtype.UUID) ([]GetAIReportsRow, error) {
 	rows, err := q.db.Query(ctx, getAIReports, projectID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Report
+	var items []GetAIReportsRow
 	for rows.Next() {
-		var i Report
+		var i GetAIReportsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProjectID,
 			&i.Title,
 			&i.Content,
+			&i.Format,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.GeneratedBy,
 			&i.GeneratedByAi,
 			&i.Status,
 			&i.SourceChatID,
-			&i.Format,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -120,37 +185,76 @@ func (q *Queries) GetAIReports(ctx context.Context, projectID pgtype.UUID) ([]Re
 }
 
 const getReportByID = `-- name: GetReportByID :one
-SELECT id, project_id, title, content, generated_by, generated_by_ai, status, source_chat_id, format, created_at, updated_at
-FROM reports
-WHERE id = $1
+SELECT
+    r.id,
+    r.project_id,
+    r.title,
+    r.content,
+    r.format,
+    r.created_at,
+    r.updated_at,
+    rp.generated_by,
+    rp.generated_by_ai,
+    rp.status,
+    rp.source_chat_id
+FROM reports r
+JOIN report_properties rp
+ON r.id = rp.report_id
+WHERE r.id = $1
 `
 
-func (q *Queries) GetReportByID(ctx context.Context, id pgtype.UUID) (Report, error) {
+type GetReportByIDRow struct {
+	ID            pgtype.UUID
+	ProjectID     pgtype.UUID
+	Title         string
+	Content       string
+	Format        ReportFormat
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	GeneratedBy   pgtype.UUID
+	GeneratedByAi pgtype.Bool
+	Status        ReportStatus
+	SourceChatID  pgtype.UUID
+}
+
+func (q *Queries) GetReportByID(ctx context.Context, id pgtype.UUID) (GetReportByIDRow, error) {
 	row := q.db.QueryRow(ctx, getReportByID, id)
-	var i Report
+	var i GetReportByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.ProjectID,
 		&i.Title,
 		&i.Content,
+		&i.Format,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 		&i.GeneratedBy,
 		&i.GeneratedByAi,
 		&i.Status,
 		&i.SourceChatID,
-		&i.Format,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getReportWithProject = `-- name: GetReportWithProject :one
 SELECT
-    r.id, r.project_id, r.title, r.content, r.generated_by, r.generated_by_ai, r.status, r.source_chat_id, r.format, r.created_at, r.updated_at,
+    r.id,
+    r.project_id,
+    r.title,
+    r.content,
+    r.format,
+    r.created_at,
+    r.updated_at,
+    rp.generated_by,
+    rp.generated_by_ai,
+    rp.status,
+    rp.source_chat_id,
     p.name AS project_name,
     p.owner_id,
     p.visibility
 FROM reports r
+JOIN report_properties rp
+ON r.id = rp.report_id
 JOIN projects p
 ON r.project_id = p.id
 WHERE r.id = $1
@@ -161,13 +265,13 @@ type GetReportWithProjectRow struct {
 	ProjectID     pgtype.UUID
 	Title         string
 	Content       string
+	Format        ReportFormat
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
 	GeneratedBy   pgtype.UUID
 	GeneratedByAi pgtype.Bool
 	Status        ReportStatus
 	SourceChatID  pgtype.UUID
-	Format        ReportFormat
-	CreatedAt     pgtype.Timestamptz
-	UpdatedAt     pgtype.Timestamptz
 	ProjectName   string
 	OwnerID       pgtype.UUID
 	Visibility    ProjectVisibility
@@ -181,13 +285,13 @@ func (q *Queries) GetReportWithProject(ctx context.Context, id pgtype.UUID) (Get
 		&i.ProjectID,
 		&i.Title,
 		&i.Content,
+		&i.Format,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 		&i.GeneratedBy,
 		&i.GeneratedByAi,
 		&i.Status,
 		&i.SourceChatID,
-		&i.Format,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.ProjectName,
 		&i.OwnerID,
 		&i.Visibility,
@@ -196,33 +300,60 @@ func (q *Queries) GetReportWithProject(ctx context.Context, id pgtype.UUID) (Get
 }
 
 const getReportsByChatID = `-- name: GetReportsByChatID :many
-SELECT id, project_id, title, content, generated_by, generated_by_ai, status, source_chat_id, format, created_at, updated_at
-FROM reports
-WHERE source_chat_id = $1
-ORDER BY created_at DESC
+SELECT
+    r.id,
+    r.project_id,
+    r.title,
+    r.content,
+    r.format,
+    r.created_at,
+    r.updated_at,
+    rp.generated_by,
+    rp.generated_by_ai,
+    rp.status,
+    rp.source_chat_id
+FROM reports r
+JOIN report_properties rp
+ON r.id = rp.report_id
+WHERE rp.source_chat_id = $1
+ORDER BY r.created_at DESC
 `
 
-func (q *Queries) GetReportsByChatID(ctx context.Context, sourceChatID pgtype.UUID) ([]Report, error) {
+type GetReportsByChatIDRow struct {
+	ID            pgtype.UUID
+	ProjectID     pgtype.UUID
+	Title         string
+	Content       string
+	Format        ReportFormat
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	GeneratedBy   pgtype.UUID
+	GeneratedByAi pgtype.Bool
+	Status        ReportStatus
+	SourceChatID  pgtype.UUID
+}
+
+func (q *Queries) GetReportsByChatID(ctx context.Context, sourceChatID pgtype.UUID) ([]GetReportsByChatIDRow, error) {
 	rows, err := q.db.Query(ctx, getReportsByChatID, sourceChatID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Report
+	var items []GetReportsByChatIDRow
 	for rows.Next() {
-		var i Report
+		var i GetReportsByChatIDRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProjectID,
 			&i.Title,
 			&i.Content,
+			&i.Format,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.GeneratedBy,
 			&i.GeneratedByAi,
 			&i.Status,
 			&i.SourceChatID,
-			&i.Format,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -235,11 +366,24 @@ func (q *Queries) GetReportsByChatID(ctx context.Context, sourceChatID pgtype.UU
 }
 
 const getReportsByFormat = `-- name: GetReportsByFormat :many
-SELECT id, project_id, title, content, generated_by, generated_by_ai, status, source_chat_id, format, created_at, updated_at
-FROM reports
-WHERE project_id = $1
-  AND format = $2
-ORDER BY created_at DESC
+SELECT
+    r.id,
+    r.project_id,
+    r.title,
+    r.content,
+    r.format,
+    r.created_at,
+    r.updated_at,
+    rp.generated_by,
+    rp.generated_by_ai,
+    rp.status,
+    rp.source_chat_id
+FROM reports r
+JOIN report_properties rp
+ON r.id = rp.report_id
+WHERE r.project_id = $1
+  AND r.format = $2
+ORDER BY r.created_at DESC
 `
 
 type GetReportsByFormatParams struct {
@@ -247,27 +391,41 @@ type GetReportsByFormatParams struct {
 	Format    ReportFormat
 }
 
-func (q *Queries) GetReportsByFormat(ctx context.Context, arg GetReportsByFormatParams) ([]Report, error) {
+type GetReportsByFormatRow struct {
+	ID            pgtype.UUID
+	ProjectID     pgtype.UUID
+	Title         string
+	Content       string
+	Format        ReportFormat
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	GeneratedBy   pgtype.UUID
+	GeneratedByAi pgtype.Bool
+	Status        ReportStatus
+	SourceChatID  pgtype.UUID
+}
+
+func (q *Queries) GetReportsByFormat(ctx context.Context, arg GetReportsByFormatParams) ([]GetReportsByFormatRow, error) {
 	rows, err := q.db.Query(ctx, getReportsByFormat, arg.ProjectID, arg.Format)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Report
+	var items []GetReportsByFormatRow
 	for rows.Next() {
-		var i Report
+		var i GetReportsByFormatRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProjectID,
 			&i.Title,
 			&i.Content,
+			&i.Format,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.GeneratedBy,
 			&i.GeneratedByAi,
 			&i.Status,
 			&i.SourceChatID,
-			&i.Format,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -280,33 +438,60 @@ func (q *Queries) GetReportsByFormat(ctx context.Context, arg GetReportsByFormat
 }
 
 const getReportsByGenerator = `-- name: GetReportsByGenerator :many
-SELECT id, project_id, title, content, generated_by, generated_by_ai, status, source_chat_id, format, created_at, updated_at
-FROM reports
-WHERE generated_by = $1
-ORDER BY created_at DESC
+SELECT
+    r.id,
+    r.project_id,
+    r.title,
+    r.content,
+    r.format,
+    r.created_at,
+    r.updated_at,
+    rp.generated_by,
+    rp.generated_by_ai,
+    rp.status,
+    rp.source_chat_id
+FROM reports r
+JOIN report_properties rp
+ON r.id = rp.report_id
+WHERE rp.generated_by = $1
+ORDER BY r.created_at DESC
 `
 
-func (q *Queries) GetReportsByGenerator(ctx context.Context, generatedBy pgtype.UUID) ([]Report, error) {
+type GetReportsByGeneratorRow struct {
+	ID            pgtype.UUID
+	ProjectID     pgtype.UUID
+	Title         string
+	Content       string
+	Format        ReportFormat
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	GeneratedBy   pgtype.UUID
+	GeneratedByAi pgtype.Bool
+	Status        ReportStatus
+	SourceChatID  pgtype.UUID
+}
+
+func (q *Queries) GetReportsByGenerator(ctx context.Context, generatedBy pgtype.UUID) ([]GetReportsByGeneratorRow, error) {
 	rows, err := q.db.Query(ctx, getReportsByGenerator, generatedBy)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Report
+	var items []GetReportsByGeneratorRow
 	for rows.Next() {
-		var i Report
+		var i GetReportsByGeneratorRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProjectID,
 			&i.Title,
 			&i.Content,
+			&i.Format,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.GeneratedBy,
 			&i.GeneratedByAi,
 			&i.Status,
 			&i.SourceChatID,
-			&i.Format,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -319,33 +504,60 @@ func (q *Queries) GetReportsByGenerator(ctx context.Context, generatedBy pgtype.
 }
 
 const getReportsByProjectID = `-- name: GetReportsByProjectID :many
-SELECT id, project_id, title, content, generated_by, generated_by_ai, status, source_chat_id, format, created_at, updated_at
-FROM reports
-WHERE project_id = $1
-ORDER BY created_at DESC
+SELECT
+    r.id,
+    r.project_id,
+    r.title,
+    r.content,
+    r.format,
+    r.created_at,
+    r.updated_at,
+    rp.generated_by,
+    rp.generated_by_ai,
+    rp.status,
+    rp.source_chat_id
+FROM reports r
+JOIN report_properties rp
+ON r.id = rp.report_id
+WHERE r.project_id = $1
+ORDER BY r.created_at DESC
 `
 
-func (q *Queries) GetReportsByProjectID(ctx context.Context, projectID pgtype.UUID) ([]Report, error) {
+type GetReportsByProjectIDRow struct {
+	ID            pgtype.UUID
+	ProjectID     pgtype.UUID
+	Title         string
+	Content       string
+	Format        ReportFormat
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	GeneratedBy   pgtype.UUID
+	GeneratedByAi pgtype.Bool
+	Status        ReportStatus
+	SourceChatID  pgtype.UUID
+}
+
+func (q *Queries) GetReportsByProjectID(ctx context.Context, projectID pgtype.UUID) ([]GetReportsByProjectIDRow, error) {
 	rows, err := q.db.Query(ctx, getReportsByProjectID, projectID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Report
+	var items []GetReportsByProjectIDRow
 	for rows.Next() {
-		var i Report
+		var i GetReportsByProjectIDRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProjectID,
 			&i.Title,
 			&i.Content,
+			&i.Format,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.GeneratedBy,
 			&i.GeneratedByAi,
 			&i.Status,
 			&i.SourceChatID,
-			&i.Format,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -358,11 +570,24 @@ func (q *Queries) GetReportsByProjectID(ctx context.Context, projectID pgtype.UU
 }
 
 const getReportsByStatus = `-- name: GetReportsByStatus :many
-SELECT id, project_id, title, content, generated_by, generated_by_ai, status, source_chat_id, format, created_at, updated_at
-FROM reports
-WHERE project_id = $1
-  AND status = $2
-ORDER BY created_at DESC
+SELECT
+    r.id,
+    r.project_id,
+    r.title,
+    r.content,
+    r.format,
+    r.created_at,
+    r.updated_at,
+    rp.generated_by,
+    rp.generated_by_ai,
+    rp.status,
+    rp.source_chat_id
+FROM reports r
+JOIN report_properties rp
+ON r.id = rp.report_id
+WHERE r.project_id = $1
+  AND rp.status = $2
+ORDER BY r.created_at DESC
 `
 
 type GetReportsByStatusParams struct {
@@ -370,27 +595,41 @@ type GetReportsByStatusParams struct {
 	Status    ReportStatus
 }
 
-func (q *Queries) GetReportsByStatus(ctx context.Context, arg GetReportsByStatusParams) ([]Report, error) {
+type GetReportsByStatusRow struct {
+	ID            pgtype.UUID
+	ProjectID     pgtype.UUID
+	Title         string
+	Content       string
+	Format        ReportFormat
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	GeneratedBy   pgtype.UUID
+	GeneratedByAi pgtype.Bool
+	Status        ReportStatus
+	SourceChatID  pgtype.UUID
+}
+
+func (q *Queries) GetReportsByStatus(ctx context.Context, arg GetReportsByStatusParams) ([]GetReportsByStatusRow, error) {
 	rows, err := q.db.Query(ctx, getReportsByStatus, arg.ProjectID, arg.Status)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Report
+	var items []GetReportsByStatusRow
 	for rows.Next() {
-		var i Report
+		var i GetReportsByStatusRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProjectID,
 			&i.Title,
 			&i.Content,
+			&i.Format,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.GeneratedBy,
 			&i.GeneratedByAi,
 			&i.Status,
 			&i.SourceChatID,
-			&i.Format,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -403,14 +642,31 @@ func (q *Queries) GetReportsByStatus(ctx context.Context, arg GetReportsByStatus
 }
 
 const updateReport = `-- name: UpdateReport :one
-UPDATE reports
-SET
-    title = $2,
-    content = $3,
-    format = $4,
-    updated_at = NOW()
-WHERE id = $1
-RETURNING id, project_id, title, content, generated_by, generated_by_ai, status, source_chat_id, format, created_at, updated_at
+WITH updated_report AS (
+    UPDATE reports
+    SET
+        title = $2,
+        content = $3,
+        format = $4,
+        updated_at = NOW()
+    WHERE id = $1
+    RETURNING id, project_id, title, content, format, created_at, updated_at
+)
+SELECT
+    r.id,
+    r.project_id,
+    r.title,
+    r.content,
+    r.format,
+    r.created_at,
+    r.updated_at,
+    rp.generated_by,
+    rp.generated_by_ai,
+    rp.status,
+    rp.source_chat_id
+FROM updated_report r
+JOIN report_properties rp
+ON r.id = rp.report_id
 `
 
 type UpdateReportParams struct {
@@ -420,37 +676,68 @@ type UpdateReportParams struct {
 	Format  ReportFormat
 }
 
-func (q *Queries) UpdateReport(ctx context.Context, arg UpdateReportParams) (Report, error) {
+type UpdateReportRow struct {
+	ID            pgtype.UUID
+	ProjectID     pgtype.UUID
+	Title         string
+	Content       string
+	Format        ReportFormat
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	GeneratedBy   pgtype.UUID
+	GeneratedByAi pgtype.Bool
+	Status        ReportStatus
+	SourceChatID  pgtype.UUID
+}
+
+func (q *Queries) UpdateReport(ctx context.Context, arg UpdateReportParams) (UpdateReportRow, error) {
 	row := q.db.QueryRow(ctx, updateReport,
 		arg.ID,
 		arg.Title,
 		arg.Content,
 		arg.Format,
 	)
-	var i Report
+	var i UpdateReportRow
 	err := row.Scan(
 		&i.ID,
 		&i.ProjectID,
 		&i.Title,
 		&i.Content,
+		&i.Format,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 		&i.GeneratedBy,
 		&i.GeneratedByAi,
 		&i.Status,
 		&i.SourceChatID,
-		&i.Format,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const updateReportStatus = `-- name: UpdateReportStatus :one
-UPDATE reports
-SET
-    status = $2,
-    updated_at = NOW()
-WHERE id = $1
-RETURNING id, project_id, title, content, generated_by, generated_by_ai, status, source_chat_id, format, created_at, updated_at
+WITH updated_properties AS (
+    UPDATE report_properties
+    SET
+        status = $2
+    WHERE report_id = $1
+    RETURNING report_id, generated_by, generated_by_ai, status, source_chat_id
+)
+SELECT
+    r.id,
+    r.project_id,
+    r.title,
+    r.content,
+    r.format,
+    r.created_at,
+    r.updated_at,
+    rp.generated_by,
+    rp.generated_by_ai,
+    rp.status,
+    rp.source_chat_id
+FROM reports r
+JOIN updated_properties rp
+ON r.id = rp.report_id
+WHERE r.id = $1
 `
 
 type UpdateReportStatusParams struct {
@@ -458,21 +745,35 @@ type UpdateReportStatusParams struct {
 	Status ReportStatus
 }
 
-func (q *Queries) UpdateReportStatus(ctx context.Context, arg UpdateReportStatusParams) (Report, error) {
+type UpdateReportStatusRow struct {
+	ID            pgtype.UUID
+	ProjectID     pgtype.UUID
+	Title         string
+	Content       string
+	Format        ReportFormat
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	GeneratedBy   pgtype.UUID
+	GeneratedByAi pgtype.Bool
+	Status        ReportStatus
+	SourceChatID  pgtype.UUID
+}
+
+func (q *Queries) UpdateReportStatus(ctx context.Context, arg UpdateReportStatusParams) (UpdateReportStatusRow, error) {
 	row := q.db.QueryRow(ctx, updateReportStatus, arg.ID, arg.Status)
-	var i Report
+	var i UpdateReportStatusRow
 	err := row.Scan(
 		&i.ID,
 		&i.ProjectID,
 		&i.Title,
 		&i.Content,
+		&i.Format,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 		&i.GeneratedBy,
 		&i.GeneratedByAi,
 		&i.Status,
 		&i.SourceChatID,
-		&i.Format,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 	)
 	return i, err
 }

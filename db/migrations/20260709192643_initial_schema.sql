@@ -217,13 +217,17 @@ CREATE TABLE reports (
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     title VARCHAR(100) NOT NULL,
     content TEXT NOT NULL,
+    format report_format NOT NULL DEFAULT 'MARKDOWN',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE report_properties (
+    report_id UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
     generated_by UUID REFERENCES users(id) ON DELETE SET NULL,
     generated_by_ai BOOLEAN DEFAULT FALSE,
     status report_status NOT NULL DEFAULT 'READY',
     source_chat_id UUID REFERENCES chats(id) ON DELETE SET NULL,
-    format report_format NOT NULL DEFAULT 'MARKDOWN',
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    PRIMARY KEY (report_id)
 );
 CREATE TABLE activity_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -277,7 +281,13 @@ CREATE INDEX idx_flowcharts_generated_by
 ON flowcharts(generated_by);
 
 CREATE INDEX idx_reports_generated_by
-ON reports(generated_by);
+ON report_properties(generated_by);
+
+CREATE INDEX idx_report_properties_status
+ON report_properties(status);
+
+CREATE INDEX idx_report_properties_source_chat
+ON report_properties(source_chat_id);
 
 CREATE INDEX idx_file_shares_file
 ON file_shares(file_id);
@@ -347,37 +357,30 @@ ON message_file_references(file_id);
 
 CREATE INDEX idx_projects_archived
 ON projects(archived_at);
-
 -- +goose down
 
 DROP TABLE IF EXISTS activity_logs CASCADE;
+DROP TABLE IF EXISTS report_properties CASCADE;
 DROP TABLE IF EXISTS reports CASCADE;
 DROP TABLE IF EXISTS flowcharts CASCADE;
-
 DROP TABLE IF EXISTS message_file_references CASCADE;
 DROP TABLE IF EXISTS message_mentions CASCADE;
 DROP TABLE IF EXISTS chat_ai_metadata CASCADE;
 DROP TABLE IF EXISTS chat_messages CASCADE;
 DROP TABLE IF EXISTS chat_participants CASCADE;
 DROP TABLE IF EXISTS chats CASCADE;
-
 DROP TABLE IF EXISTS user_file_preferences CASCADE;
 DROP TABLE IF EXISTS project_files CASCADE;
-
 DROP TABLE IF EXISTS file_shares CASCADE;
 DROP TABLE IF EXISTS file_ai_metadata CASCADE;
 DROP TABLE IF EXISTS file_properties CASCADE;
 DROP TABLE IF EXISTS file_storage CASCADE;
 DROP TABLE IF EXISTS files CASCADE;
-
 DROP TABLE IF EXISTS folders CASCADE;
-
 DROP TABLE IF EXISTS project_members CASCADE;
 DROP TABLE IF EXISTS projects CASCADE;
-
 DROP TABLE IF EXISTS user_profiles CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
-
 DROP TYPE IF EXISTS flowchart_status;
 DROP TYPE IF EXISTS report_status;
 DROP TYPE IF EXISTS report_format;

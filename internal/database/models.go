@@ -553,17 +553,21 @@ type ProjectMember struct {
 }
 
 type Report struct {
-	ID            pgtype.UUID
-	ProjectID     pgtype.UUID
-	Title         string
-	Content       string
+	ID        pgtype.UUID
+	ProjectID pgtype.UUID
+	Title     string
+	Content   string
+	Format    ReportFormat
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+type ReportProperty struct {
+	ReportID      pgtype.UUID
 	GeneratedBy   pgtype.UUID
 	GeneratedByAi pgtype.Bool
 	Status        ReportStatus
 	SourceChatID  pgtype.UUID
-	Format        ReportFormat
-	CreatedAt     pgtype.Timestamptz
-	UpdatedAt     pgtype.Timestamptz
 }
 
 type User struct {
