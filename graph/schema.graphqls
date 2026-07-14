@@ -5,8 +5,8 @@ scalar JSON
 enum ProjectRole {
   OWNER
   ADMIN
-  EDITOR
-  VIEWER
+  EDITOR 
+  VIEWER 
 }
 
 enum ChatStatus {
@@ -413,6 +413,17 @@ input CreateFlowchartInput {
   sourceChatId: ID
 }
 
-Query {
-  
+query Me {
+  me {
+    id
+    username
+    email
+    profile{
+      firstname
+      lastname
+      bio
+    }
+  }
 }
+
+query 

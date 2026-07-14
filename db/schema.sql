@@ -171,7 +171,7 @@ CREATE TABLE chat_participants (
     chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     joined_at TIMESTAMPTZ DEFAULT NOW(),
-    PRIMARY KEY (chat_id, user_id)
+    PRIMARY KEY (chat_id, user_id) 
 );
 CREATE TABLE chat_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
