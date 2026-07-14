@@ -1,8 +1,7 @@
-# GraphQL schema example
-#
-# https://gqlgen.com/getting-started/
 scalar Time
 scalar Int64
+scalar JSON
+
 enum ProjectRole {
   OWNER
   ADMIN
@@ -58,12 +57,14 @@ enum ReportFormat {
 }
 
 type User {
-  id:ID!
-  username:String!
-  email:String!
-  profile:UserProfile
-  ownedProjects:[Project]!
-  projectMemberships:[ProjectMember!]!
+  id: ID!
+  username: String!
+  email: String!
+  profile: UserProfile
+  ownedProjects: [Project!]!
+  projectMemberships: [ProjectMember!]!
+  uploadedFiles: [File!]!
+  sharedFiles: [FileShare!]!
   createdAt: Time!
   updatedAt: Time!
 }
@@ -81,32 +82,36 @@ type UserProfile {
 type Project {
   id: ID!
   name: String!
-  description: String!
-  visibility: ProjectVisibility
+  description: String
+  visibility: ProjectVisibility!
   owner: User!
+  members: [ProjectMember!]!
+  folders: [Folder!]!
+  files: [ProjectFile!]!
+  chats: [Chat!]!
+  reports: [Report!]!
+  flowcharts: [Flowchart!]!
+  activityLogs: [ActivityLog!]!
   archivedAt: Time
   createdAt: Time!
   updatedAt: Time!
 }
 
 type ProjectMember {
-  id:ID!
+  id: ID!
   role: ProjectRole!
-  createdAt: Time!
   user: User!
   project: Project!
   createdAt: Time!
-  updatedAt: Time!  
-}
-
-type ProjectFiles {
-
+  updatedAt: Time!
 }
 
 type Folder {
   id: ID!
-  projectID: Project!
-  parentFolderId: Folder!
+  project: Project
+  parentFolder: Folder
+  childFolders: [Folder!]!
+  files: [File!]!
   name: String!
   createdAt: Time!
   updatedAt: Time!
@@ -114,45 +119,300 @@ type Folder {
 
 type File {
   id: ID!
+  folder: Folder
   name: String!
-  size: Number!
+  size: Int64!
+  storage: FileStorage
+  properties: FileProperties!
+  aiMetadata: FileAIMetadata
+  shares: [FileShare!]!
+  preferences: [FilePreference!]!
+  projectFiles: [ProjectFile!]!
   createdAt: Time!
   updatedAt: Time!
 }
 
 type FileStorage {
-
+  file: File!
+  bucketName: String!
+  objectKey: String!
+  etag: String
+  versionId: String
+  checksum: String
+  mimeType: String!
+  uploadedBy: User!
+  createdAt: Time!
+  updatedAt: Time!
 }
 
 type FileProperties {
-
+  file: File!
+  originalName: String
+  isIndexed: Boolean!
+  deletedAt: Time
+  createdAt: Time!
+  updatedAt: Time!
 }
 
-type FileShares {
-
+type FileAIMetadata {
+  file: File!
+  extractedText: String
+  embeddingModel: String
+  embeddingSynced: Boolean!
+  indexedAt: Time
+  createdAt: Time!
+  updatedAt: Time!
 }
 
-
-type Chats {
-
+type FileShare {
+  id: ID!
+  file: File!
+  sharedBy: User!
+  sharedWith: User!
+  permission: FilePermission!
+  createdAt: Time!
 }
 
-type ChatMessages {
-
+type FilePreference {
+  user: User!
+  file: File!
+  isFavorite: Boolean!
+  createdAt: Time!
+  updatedAt: Time!
 }
 
-type ChatMetaData {
-
+type ProjectFile {
+  project: Project!
+  file: File!
+  folder: Folder
+  createdAt: Time!
 }
 
-type FlowChats {
-
+type Chat {
+  id: ID!
+  project: Project!
+  title: String
+  type: ChatType!
+  status: ChatStatus!
+  lastActivityAt: Time!
+  participants: [ChatParticipant!]!
+  messages: [ChatMessage!]!
+  createdAt: Time!
+  updatedAt: Time!
 }
 
-type Reports {
-
+type ChatParticipant {
+  user: User!
+  joinedAt: Time!
 }
 
-type ActivityLogs {
+type ChatMessage {
+  id: ID!
+  chat: Chat!
+  sender: User
+  role: MessageRole!
+  content: String!
+  aiMetadata: ChatAIMetadata
+  mentionedUsers: [User!]!
+  referencedFiles: [File!]!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type ChatAIMetadata {
+  message: ChatMessage!
+  embeddingModel: String
+  embeddingSynced: Boolean!
+  indexedAt: Time
+}
+
+type Flowchart {
+  id: ID!
+  project: Project!
+  name: String!
+  data: JSON!
+  generatedBy: User
+  generatedByAI: Boolean!
+  status: FlowchartStatus!
+  sourceChat: Chat
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type Report {
+  id: ID!
+  project: Project!
+  title: String!
+  content: String!
+  format: ReportFormat!
+  properties: ReportProperties!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type ReportProperties {
+  report: Report!
+  generatedBy: User
+  generatedByAI: Boolean!
+  status: ReportStatus!
+  sourceChat: Chat
+}
+
+type ActivityLog {
+  id: ID!
+  project: Project
+  user: User
+  action: String!
+  entityType: String
+  entityId: ID
+  createdAt: Time!
+}
+
+type Query {
+  me: User
+  user(id: ID!): User
+  users(ids: [ID!]!): [User!]!
+
+  project(id: ID!): Project
+  projects: [Project!]!
+  projectMembers(projectId: ID!): [ProjectMember!]!
+
+  folder(id: ID!): Folder
+  folders(projectId: ID): [Folder!]!
+  folderContents(folderId: ID, projectId: ID): [FolderItem!]!
+
+  file(id: ID!): File
+  files(projectId: ID, folderId: ID): [File!]!
+
+  chat(id: ID!): Chat
+  chats(projectId: ID!): [Chat!]!
+  myChats(projectId: ID): [Chat!]!
+  chatMessages(chatId: ID!): [ChatMessage!]!
+
+  report(id: ID!): Report
+  reports(projectId: ID!): [Report!]!
+
+  flowchart(id: ID!): Flowchart
+  flowcharts(projectId: ID!): [Flowchart!]!
+
+  activityLogs(projectId: ID, userId: ID): [ActivityLog!]!
+}
+
+union FolderItem = Folder | File
+
+type Mutation {
+  createProject(input: CreateProjectInput!): Project!
+  updateProject(input: UpdateProjectInput!): Project!
+  archiveProject(projectId: ID!): Boolean!
+  restoreProject(projectId: ID!): Boolean!
+
+  addProjectMember(input: AddProjectMemberInput!): ProjectMember!
+  updateProjectMemberRole(input: UpdateProjectMemberRoleInput!): ProjectMember!
+  removeProjectMember(projectId: ID!, userId: ID!): Boolean!
+
+  createFolder(input: CreateFolderInput!): Folder!
+  renameFolder(folderId: ID!, name: String!): Folder!
+  moveFolder(folderId: ID!, parentFolderId: ID): Folder!
+  deleteFolder(folderId: ID!): Boolean!
+
+  createFile(input: CreateFileInput!): File!
+  renameFile(fileId: ID!, name: String!): File!
+  moveFile(input: MoveFileInput!): File!
+  deleteFile(fileId: ID!): Boolean!
+
+  createChat(input: CreateChatInput!): Chat!
+  addChatParticipant(input: AddChatParticipantInput!): ChatParticipant!
+  removeChatParticipant(chatId: ID!, userId: ID!): Boolean!
+  sendMessage(input: SendMessageInput!): ChatMessage!
+  updateChatStatus(chatId: ID!, status: ChatStatus!): Chat!
+
+  createReport(input: CreateReportInput!): Report!
+  updateReportStatus(reportId: ID!, status: ReportStatus!): Report!
+
+  createFlowchart(input: CreateFlowchartInput!): Flowchart!
+  updateFlowchartStatus(flowchartId: ID!, status: FlowchartStatus!): Flowchart!
+}
+
+input CreateProjectInput {
+  name: String!
+  description: String
+  visibility: ProjectVisibility!
+}
+
+input UpdateProjectInput {
+  projectId: ID!
+  name: String!
+  description: String
+  visibility: ProjectVisibility!
+}
+
+input AddProjectMemberInput {
+  projectId: ID!
+  userId: ID!
+  role: ProjectRole!
+}
+
+input UpdateProjectMemberRoleInput {
+  projectId: ID!
+  userId: ID!
+  role: ProjectRole!
+}
+
+input CreateFolderInput {
+  projectId: ID
+  parentFolderId: ID
+  name: String!
+}
+
+input CreateFileInput {
+  folderId: ID
+  name: String!
+  size: Int64!
+}
+
+input MoveFileInput {
+  fileId: ID!
+  folderId: ID
+  projectId: ID
+}
+
+input CreateChatInput {
+  projectId: ID!
+  title: String
+  type: ChatType!
+  participantIds: [ID!]!
+}
+
+input AddChatParticipantInput {
+  chatId: ID!
+  userId: ID!
+}
+
+input SendMessageInput {
+  chatId: ID!
+  role: MessageRole!
+  content: String!
+  mentionedUserIds: [ID!]
+  referencedFileIds: [ID!]
+}
+
+input CreateReportInput {
+  projectId: ID!
+  title: String!
+  content: String!
+  format: ReportFormat!
+  generatedByAI: Boolean!
+  sourceChatId: ID
+}
+
+input CreateFlowchartInput {
+  projectId: ID!
+  name: String!
+  data: JSON!
+  generatedByAI: Boolean!
+  sourceChatId: ID
+}
+
+Query {
   
 }
