@@ -1,0 +1,352 @@
+
+query Me {
+  me {
+    id
+    username
+    email
+    profile{
+      firstname
+      lastname
+      bio
+      avatarUrl
+    }
+    createdAt
+    updatedAt
+  }
+}
+
+query User {
+  user(id: "USER_ID"){
+    id
+    username
+    email
+    createdAt
+    updatedAt
+  }
+}
+
+query Users {
+  users(ids: ["USER_ID_1", "USER_ID_2"]) {
+    id
+    username
+    email
+  }
+}
+
+query Projects {
+  projects{
+  id
+  name
+  description
+  visibility
+  archivedAt
+  owner{
+    id
+    username
+    email   
+  }
+  createdAt
+  updatedAt
+  }
+}
+
+query Project {
+  project(id:"PROJECT_ID"){
+    id
+    name
+    owner{
+      id
+      username
+    }
+    members {
+      id
+      role
+      user {
+        id
+        username
+        email
+      }
+      createdAt
+      updatedAt
+    }
+    description
+    visibility
+    archivedAt
+  }
+}
+
+query ProjectMembers {
+  projectMembers(projectId: "PROJECT_ID") {
+    id
+    role
+    user {
+      id
+      username
+      email
+    }
+    createdAt
+    updatedAt
+  }
+}
+
+query Folder {
+  folder(id: "FOLDER_ID") {
+    id
+    name
+    project {
+      id
+      name
+    }
+    parentFolder {
+      id
+      name
+    }
+    childFolders {
+      id
+      name
+    }
+    files {
+      id
+      name
+      size
+    }
+    createdAt
+    updatedAt
+  }
+}
+
+query FoldersInProject {
+  folders(projectId: "PROJECT_ID") {
+    id
+    name
+    parentFolder {
+      id
+      name
+    }
+    createdAt
+    updatedAt
+  }
+}
+
+query StandaloneFolders {
+  folders(projectId: null) {
+    id
+    name
+    createdAt
+    updatedAt
+  }
+}
+
+query FolderContents {
+  folderContents(folderId: "FOLDER_ID", projectId: "PROJECT_ID") {
+    __typename
+    ... on Folder {
+      id
+      name
+      createdAt
+    }
+    ... on File {
+      id
+      name
+      size
+      createdAt
+    }
+  }
+}
+
+query File {
+  file(id:"FILE_ID"){
+    id
+    name
+    size
+    folder {
+      id
+      name
+    }
+    properties {
+      originalName
+      isIndexed
+      deletedAt
+    }
+    storage {
+      bucketName
+      objectKey
+      mimeType
+      uploadedBy {
+        id
+        username
+      }
+    }
+    aiMetadata {
+      extractedText
+      embeddingModel
+      embeddingSynced
+      indexedAt
+    }
+    createdAt
+    updatedAt
+  }
+}
+
+query Files {
+  files(projectId: "PROJECT_ID", folderId: "FOLDER_ID") {
+    id
+    name
+    size
+    createdAt
+    updatedAt
+  }
+}
+
+query Chat {
+  chat(id: "CHAT_ID") {
+    id
+    title
+    type
+    status
+    lastActivityAt
+    project {
+      id
+      name
+    }
+    participants {
+      user {
+        id
+        username
+        email
+      }
+      joinedAt
+    }
+    createdAt
+    updatedAt
+  }
+}
+
+query Chats {
+  chats(projectId: "PROJECT_ID") {
+    id
+    title
+    type
+    status
+    lastActivityAt
+    createdAt
+    updatedAt
+  }
+}
+
+query ChatMessages {
+  chatMessages(chatId: "CHAT_ID") {
+    id
+    role
+    content
+    sender {
+      id
+      username
+    }
+    mentionedUsers {
+      id
+      username
+    }
+    referencedFiles {
+      id
+      name
+    }
+    aiMetadata {
+      embeddingModel
+      embeddingSynced
+      indexedAt
+    }
+    createdAt
+    updatedAt
+  }
+}
+
+query Report {
+  report(id: "REPORT_ID") {
+    id
+    title
+    content
+    format
+    project {
+      id
+      name
+    }
+    properties {
+      generatedBy {
+        id
+        username
+      }
+      generatedByAI
+      status
+      sourceChat {
+        id
+        title
+      }
+    }
+    createdAt
+    updatedAt
+  }
+}
+
+query Reports {
+  reports(projectId: "PROJECT_ID") {
+    id
+    title
+    format
+    properties {
+      status
+      generatedByAI
+    }
+    createdAt
+    updatedAt
+  }
+}
+
+query Flowchart {
+  flowchart(id: "FLOWCHART_ID") {
+    id
+    name
+    data
+    status
+    generatedBy {
+      id
+      username
+    }
+    generatedByAI
+    sourceChat {
+      id
+      title
+    }
+    createdAt
+    updatedAt
+  }
+}
+
+query Flowcharts {
+  flowcharts(projectId: "PROJECT_ID") {
+    id
+    name
+    status
+    generatedByAI
+    createdAt
+    updatedAt
+  }
+}
+
+query ActivityLogs {
+  activityLogs(projectId: "PROJECT_ID", userId: null) {
+    id
+    action
+    entityType
+    entityId
+    user {
+      id
+      username
+    }
+    project {
+      id
+      name
+    }
+    createdAt
+  }
+}

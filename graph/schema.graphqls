@@ -271,6 +271,7 @@ type ActivityLog {
 type Query {
   me: User
   user(id: ID!): User
+  allUsers: [User!]!
   users(ids: [ID!]!): [User!]!
 
   project(id: ID!): Project
@@ -412,18 +413,3 @@ input CreateFlowchartInput {
   generatedByAI: Boolean!
   sourceChatId: ID
 }
-
-query Me {
-  me {
-    id
-    username
-    email
-    profile{
-      firstname
-      lastname
-      bio
-    }
-  }
-}
-
-query 
