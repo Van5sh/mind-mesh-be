@@ -32,8 +32,6 @@ func (r *UserRepository) CheckEmailExists(
 	return r.q.CheckEmailExists(ctx, email)
 }
 
-// ---------- Create ----------
-
 func (r *UserRepository) CreateUser(
 	ctx context.Context,
 	params database.CreateUserParams,
@@ -82,6 +80,7 @@ func (r *UserRepository) GetUserProfile(
 ) (database.UserProfile, error) {
 	return r.q.GetUserProfile(ctx, userID)
 }
+
 
 func (r *UserRepository) GetUserWithProfile(
 	ctx context.Context,
