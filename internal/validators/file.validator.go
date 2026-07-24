@@ -1,15 +1,17 @@
 package validators
 
+import "example/hello/internal/apperrors"
+
 func ValidateFolderName(name string) error {
 	if err := ValidateRequiredString("folder name", name); err != nil {
-		return err
+		return apperrors.Validation("Folder name is required")
 	}
 	return ValidateMaxLength("folder name", name, 100)
 }
 
 func ValidateFileName(name string) error {
 	if err := ValidateRequiredString("file name", name); err != nil {
-		return err
+		return apperrors.Validation("File name is required")
 	}
 	return ValidateMaxLength("file name", name, 255)
 }

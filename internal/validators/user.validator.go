@@ -9,17 +9,17 @@ import (
 
 func ValidateUsername(username string) error {
 	if err := ValidateRequiredString("username", username); err != nil {
-		return err
+		return apperrors.Validation("Incorrect UserName check the length")
 	}
 	return ValidateMaxLength("username", username, 50)
 }
 
 func ValidateEmail(email string) error {
 	if err := ValidateRequiredString("email", email); err != nil {
-		return err
+		return apperrors.Validation("Email is required")
 	}
 	if err := ValidateMaxLength("email", email, 100); err != nil {
-		return err
+		return apperrors.Validation("The email is too long, maximum length is 100 characters")
 	}
 	_, err := mail.ParseAddress(strings.TrimSpace(email))
 	if err != nil {
@@ -30,7 +30,7 @@ func ValidateEmail(email string) error {
 
 func ValidatePasswordHash(passwordHash string) error {
 	if err := ValidateRequiredString("password hash", passwordHash); err != nil {
-		return err
+		return apperrors.Validation("Password hash is required")
 	}
 	return ValidateMaxLength("password hash", passwordHash, 255)
 }
@@ -44,7 +44,7 @@ func ValidateFirstName(firstName string) error {
 
 func ValidateLastName(lastName string) error {
 	if err := ValidateRequiredString("last name", lastName); err != nil {
-		return err
+		return apperrors.Validation("Last name is required")
 	}
 	return ValidateMaxLength("last name", lastName, 50)
 }
