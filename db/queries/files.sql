@@ -644,3 +644,20 @@ SET
     updated_at = NOW()
 WHERE file_id = $1
 RETURNING *;
+
+-- name: FolderNameExists :one
+SELECT EXISTS (
+    SELECT 1
+    FROM folders
+    WHERE name = $1
+      AND parent_folder_id IS NOT DISTINCT FROM $2
+      AND project_id IS NOT DISTINCT FROM $3
+);
+
+-- name: FileNameExistsInFolder :one
+SELECT EXISTS (
+    SELECT 1
+    FROM files
+    WHERE folder_id IS NOT DISTINCT FROM $1
+      AND name = $2
+);

@@ -491,6 +491,27 @@ func (q *Queries) DeleteUserFilePreference(ctx context.Context, arg DeleteUserFi
 	return err
 }
 
+const fileNameExistsInFolder = `-- name: FileNameExistsInFolder :one
+SELECT EXISTS (
+    SELECT 1
+    FROM files
+    WHERE folder_id IS NOT DISTINCT FROM $1
+      AND name = $2
+)
+`
+
+type FileNameExistsInFolderParams struct {
+	FolderID pgtype.UUID
+	Name     string
+}
+
+func (q *Queries) FileNameExistsInFolder(ctx context.Context, arg FileNameExistsInFolderParams) (bool, error) {
+	row := q.db.QueryRow(ctx, fileNameExistsInFolder, arg.FolderID, arg.Name)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const fileShare = `-- name: FileShare :one
 INSERT INTO file_shares (
     id,
@@ -529,6 +550,29 @@ func (q *Queries) FileShare(ctx context.Context, arg FileShareParams) (FileShare
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const folderNameExists = `-- name: FolderNameExists :one
+SELECT EXISTS (
+    SELECT 1
+    FROM folders
+    WHERE name = $1
+      AND parent_folder_id IS NOT DISTINCT FROM $2
+      AND project_id IS NOT DISTINCT FROM $3
+)
+`
+
+type FolderNameExistsParams struct {
+	Name           string
+	ParentFolderID pgtype.UUID
+	ProjectID      pgtype.UUID
+}
+
+func (q *Queries) FolderNameExists(ctx context.Context, arg FolderNameExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, folderNameExists, arg.Name, arg.ParentFolderID, arg.ProjectID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const getChildFolders = `-- name: GetChildFolders :many

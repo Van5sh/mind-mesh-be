@@ -316,3 +316,17 @@ func (r *FileRepository) UpdateFileSize(ctx context.Context, params database.Upd
 func (r *FileRepository) UpdateFileStorage(ctx context.Context, params database.UpdateFileStorageParams) (database.FileStorage, error) {
 	return r.q.UpdateFileStorage(ctx, params)
 }
+
+func (r *FileRepository) FolderNameExists(
+	ctx context.Context,
+	params database.FolderNameExistsParams,
+) (bool, error) {
+	return r.q.FolderNameExists(ctx, params)
+}
+
+func (r *FileRepository) FileNameExistsInFolder(
+	ctx context.Context,
+	params database.FileNameExistsInFolderParams,
+) (bool, error) {
+	return r.q.FileNameExistsInFolder(ctx, params)
+}
