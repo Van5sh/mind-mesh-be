@@ -29,7 +29,6 @@ func (s *FileService) CreateFile(
 	ctx context.Context,
 	params database.CreateFileParams,
 ) (database.File, error) {
-
 	if err := validators.ValidateUUID("file id", params.ID); err != nil {
 		return database.File{}, err
 	}
@@ -54,6 +53,7 @@ func (s *FileService) CreateFile(
 				apperrors.NotFoundError("destination folder not found")
 		}
 	}
+
 	name, err := s.resolveFileName(
 		ctx,
 		params.FolderID,
@@ -77,7 +77,6 @@ func (s *FileService) GetFileByID(
 	ctx context.Context,
 	id pgtype.UUID,
 ) (database.File, error) {
-
 	if err := validators.ValidateUUID("file id", id); err != nil {
 		return database.File{}, err
 	}
@@ -95,7 +94,6 @@ func (s *FileService) GetFilesByProjectID(
 	ctx context.Context,
 	projectID pgtype.UUID,
 ) ([]database.File, error) {
-
 	if err := validators.ValidateUUID(
 		"project id",
 		projectID,
@@ -111,11 +109,33 @@ func (s *FileService) GetFilesByProjectID(
 	return files, nil
 }
 
+func (s *FileService) GetFilesByFolderID(
+	ctx context.Context,
+	folderID pgtype.UUID,
+) ([]database.File, error) {
+	if err := validators.ValidateUUID("folder id", folderID); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.guards.EnsureFolderExists(ctx, folderID); err != nil {
+		return nil, apperrors.NotFoundError("folder not found")
+	}
+
+	files, err := s.repo.GetFilesByFolderID(ctx, folderID)
+	if err != nil {
+		return nil, apperrors.InternalError(
+			"failed to get files by folder",
+			err,
+		)
+	}
+
+	return files, nil
+}
+
 func (s *FileService) DeleteFile(
 	ctx context.Context,
 	id pgtype.UUID,
 ) error {
-
 	if err := validators.ValidateUUID("file id", id); err != nil {
 		return err
 	}
@@ -130,17 +150,16 @@ func (s *FileService) DeleteFile(
 
 	return nil
 }
+
 func (s *FileService) resolveFileName(
 	ctx context.Context,
 	folderID pgtype.UUID,
 	name string,
 ) (string, error) {
-
 	originalName := name
 	candidate := name
 
 	for i := 1; ; i++ {
-
 		exists, err := s.repo.FileNameExistsInFolder(
 			ctx,
 			database.FileNameExistsInFolderParams{
@@ -167,14 +186,12 @@ func (s *FileService) CreateFolder(
 	ctx context.Context,
 	params database.CreateFolderParams,
 ) (database.Folder, error) {
-
 	if err := validators.ValidateUUID(
 		"folder id",
 		params.ID,
 	); err != nil {
 		return database.Folder{}, err
 	}
-
 
 	if err := validators.ValidateFolderName(
 		params.Name,
@@ -189,11 +206,9 @@ func (s *FileService) CreateFolder(
 		); err != nil {
 			return database.Folder{}, err
 		}
-
 	}
 
 	if params.ParentFolderID.Valid {
-
 		if err := validators.ValidateUUID(
 			"parent folder id",
 			params.ParentFolderID,
@@ -213,7 +228,6 @@ func (s *FileService) CreateFolder(
 		if params.ProjectID.Valid &&
 			parent.ProjectID.Valid &&
 			parent.ProjectID.Bytes != params.ProjectID.Bytes {
-
 			return database.Folder{},
 				apperrors.ConflictError(
 					"parent folder belongs to another project",
@@ -245,7 +259,6 @@ func (s *FileService) GetFolderByID(
 	ctx context.Context,
 	id pgtype.UUID,
 ) (database.Folder, error) {
-
 	if err := validators.ValidateUUID(
 		"folder id",
 		id,
@@ -266,7 +279,6 @@ func (s *FileService) DeleteFolder(
 	ctx context.Context,
 	id pgtype.UUID,
 ) error {
-
 	if err := validators.ValidateUUID(
 		"folder id",
 		id,
@@ -294,12 +306,10 @@ func (s *FileService) resolveFolderName(
 	parentFolderID pgtype.UUID,
 	name string,
 ) (string, error) {
-
 	originalName := name
 	candidate := name
 
 	for i := 1; ; i++ {
-
 		exists, err := s.repo.FolderNameExists(
 			ctx,
 			database.FolderNameExistsParams{
@@ -321,4 +331,365 @@ func (s *FileService) resolveFolderName(
 			i,
 		)
 	}
+}
+
+func (s *FileService) GetFoldersByProjectID(
+	ctx context.Context,
+	projectID pgtype.UUID,
+) ([]database.Folder, error) {
+	if err := validators.ValidateUUID(
+		"project id",
+		projectID,
+	); err != nil {
+		return nil, err
+	}
+
+	folders, err := s.repo.GetFoldersByProjectID(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	return folders, nil
+}
+
+func (s *FileService) SetFavorite(
+	ctx context.Context,
+	params database.SetFavoriteParams,
+) (database.UserFilePreference, error) {
+	if err := validators.ValidateUUID(
+		"file id",
+		params.FileID,
+	); err != nil {
+		return database.UserFilePreference{}, err
+	}
+
+	if err := validators.ValidateUUID(
+		"user id",
+		params.UserID,
+	); err != nil {
+		return database.UserFilePreference{}, err
+	}
+
+	if _, err := s.guards.EnsureFileExists(
+		ctx,
+		params.FileID,
+	); err != nil {
+		return database.UserFilePreference{},
+			apperrors.NotFoundError("file not found")
+	}
+
+	favorite, err := s.repo.SetFavorite(ctx, params)
+	if err != nil {
+		return database.UserFilePreference{},
+			apperrors.InternalError("failed to set favorite", err)
+	}
+
+	return favorite, nil
+}
+
+func (s *FileService) GetFavorite(
+	ctx context.Context,
+	params database.GetUserFilePreferenceParams,
+) (database.UserFilePreference, error) {
+	if err := validators.ValidateUUID(
+		"file id",
+		params.FileID,
+	); err != nil {
+		return database.UserFilePreference{}, err
+	}
+
+	if err := validators.ValidateUUID(
+		"user id",
+		params.UserID,
+	); err != nil {
+		return database.UserFilePreference{}, err
+	}
+
+	if _, err := s.guards.EnsureFileExists(
+		ctx,
+		params.FileID,
+	); err != nil {
+		return database.UserFilePreference{},
+			apperrors.NotFoundError("file not found")
+	}
+
+	favorite, err := s.repo.GetUserFilePreference(ctx, params)
+	if err != nil {
+		return database.UserFilePreference{},
+			apperrors.InternalError("failed to get favorite", err)
+	}
+
+	return favorite, nil
+}
+
+func (s *FileService) MoveFile(
+	ctx context.Context,
+	params database.MoveFileParams,
+) (database.File, error) {
+	if err := validators.ValidateUUID(
+		"file id",
+		params.ID,
+	); err != nil {
+		return database.File{}, err
+	}
+
+	if err := validators.ValidateUUID(
+		"destination folder id",
+		params.FolderID,
+	); err != nil {
+		return database.File{}, err
+	}
+
+	if _, err := s.guards.EnsureFileExists(
+		ctx,
+		params.ID,
+	); err != nil {
+		return database.File{},
+			apperrors.NotFoundError("file not found")
+	}
+
+	if _, err := s.guards.EnsureFolderExists(
+		ctx,
+		params.FolderID,
+	); err != nil {
+		return database.File{},
+			apperrors.NotFoundError("destination folder not found")
+	}
+
+	file, err := s.repo.MoveFile(ctx, params)
+	if err != nil {
+		return database.File{},
+			apperrors.InternalError("failed to move file", err)
+	}
+
+	return file, nil
+}
+
+func (s *FileService) RenameFile(
+	ctx context.Context,
+	params database.RenameFileParams,
+) (database.File, error) {
+	if err := validators.ValidateUUID(
+		"file id",
+		params.ID,
+	); err != nil {
+		return database.File{}, err
+	}
+
+	if err := validators.ValidateFileName(params.Name); err != nil {
+		return database.File{}, err
+	}
+
+	file, err := s.guards.EnsureFileExists(ctx, params.ID)
+	if err != nil {
+		return database.File{},
+			apperrors.NotFoundError("file not found")
+	}
+
+	name, err := s.resolveFileName(
+		ctx,
+		file.FolderID,
+		params.Name,
+	)
+	if err != nil {
+		return database.File{}, err
+	}
+
+	params.Name = name
+
+	renamed, err := s.repo.RenameFile(ctx, params)
+	if err != nil {
+		return database.File{},
+			apperrors.InternalError("failed to rename file", err)
+	}
+
+	return renamed, nil
+}
+
+func (s *FileService) MoveFolder(
+	ctx context.Context,
+	params database.MoveFolderParams,
+) (database.Folder, error) {
+	if err := validators.ValidateUUID(
+		"folder id",
+		params.ID,
+	); err != nil {
+		return database.Folder{}, err
+	}
+
+	if params.ParentFolderID.Valid {
+		if err := validators.ValidateUUID(
+			"parent folder id",
+			params.ParentFolderID,
+		); err != nil {
+			return database.Folder{}, err
+		}
+
+		if _, err := s.guards.EnsureFolderExists(
+			ctx,
+			params.ParentFolderID,
+		); err != nil {
+			return database.Folder{},
+				apperrors.NotFoundError("parent folder not found")
+		}
+	}
+
+	if _, err := s.guards.EnsureFolderExists(
+		ctx,
+		params.ID,
+	); err != nil {
+		return database.Folder{},
+			apperrors.NotFoundError("folder not found")
+	}
+
+	folder, err := s.repo.MoveFolder(ctx, params)
+	if err != nil {
+		return database.Folder{},
+			apperrors.InternalError("failed to move folder", err)
+	}
+
+	return folder, nil
+}
+
+func (s *FileService) RenameFolder(
+	ctx context.Context,
+	params database.RenameFolderParams,
+) (database.Folder, error) {
+	if err := validators.ValidateUUID(
+		"folder id",
+		params.ID,
+	); err != nil {
+		return database.Folder{}, err
+	}
+
+	if err := validators.ValidateFolderName(params.Name); err != nil {
+		return database.Folder{}, err
+	}
+
+	folder, err := s.guards.EnsureFolderExists(ctx, params.ID)
+	if err != nil {
+		return database.Folder{},
+			apperrors.NotFoundError("folder not found")
+	}
+
+	name, err := s.resolveFolderName(
+		ctx,
+		folder.ProjectID,
+		folder.ParentFolderID,
+		params.Name,
+	)
+	if err != nil {
+		return database.Folder{}, err
+	}
+
+	params.Name = name
+
+	renamed, err := s.repo.RenameFolder(ctx, params)
+	if err != nil {
+		return database.Folder{},
+			apperrors.InternalError("failed to rename folder", err)
+	}
+
+	return renamed, nil
+}
+
+func (s *FileService) GetRootFiles(
+	ctx context.Context,
+	projectID pgtype.UUID,
+) ([]database.File, error) {
+	if err := validators.ValidateUUID(
+		"project id",
+		projectID,
+	); err != nil {
+		return nil, err
+	}
+
+	files, err := s.repo.GetRootFiles(ctx, projectID)
+	if err != nil {
+		return nil,
+			apperrors.InternalError("failed to get root files", err)
+	}
+
+	return files, nil
+}
+
+func (s *FileService) GetRootFolders(
+	ctx context.Context,
+	projectID pgtype.UUID,
+) ([]database.Folder, error) {
+	if err := validators.ValidateUUID(
+		"project id",
+		projectID,
+	); err != nil {
+		return nil, err
+	}
+
+	folders, err := s.repo.GetRootFolders(ctx, projectID)
+	if err != nil {
+		return nil,
+			apperrors.InternalError("failed to get root folders", err)
+	}
+
+	return folders, nil
+}
+
+func (s *FileService) GetFoldersByParentFolderID(
+	ctx context.Context,
+	parentFolderID pgtype.UUID,
+) ([]database.Folder, error) {
+	if err := validators.ValidateUUID(
+		"parent folder id",
+		parentFolderID,
+	); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.guards.EnsureFolderExists(
+		ctx,
+		parentFolderID,
+	); err != nil {
+		return nil, apperrors.NotFoundError("parent folder not found")
+	}
+
+	folders, err := s.repo.GetChildFolders(
+		ctx,
+		parentFolderID,
+	)
+	if err != nil {
+		return nil,
+			apperrors.InternalError("failed to get child folders", err)
+	}
+
+	return folders, nil
+}
+
+func (s *FileService) GetFolderPath(
+	ctx context.Context,
+	folderID pgtype.UUID,
+) ([]database.Folder, error) {
+	if err := validators.ValidateUUID(
+		"folder id",
+		folderID,
+	); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.guards.EnsureFolderExists(
+		ctx,
+		folderID,
+	); err != nil {
+		return nil, apperrors.NotFoundError("folder not found")
+	}
+
+	if folderID.Status == pgtype.Null {
+		return []database.Folder{}, nil
+	}
+
+	path, err := s.repo.GetFolderPath(ctx, folderID)
+	if err != nil {
+		return nil,
+			apperrors.InternalError("failed to get folder path", err)
+	}
+
+	return path, nil
 }
