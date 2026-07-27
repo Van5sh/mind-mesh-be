@@ -4,6 +4,7 @@ go 1.25.1
 
 require (
 	github.com/99designs/gqlgen v0.17.93
+	github.com/jackc/pgx/v5 v5.10.0
 	github.com/valyala/fasthttp v1.16.0
 	github.com/vektah/gqlparser/v2 v2.5.35
 )
@@ -15,7 +16,6 @@ require (
 	github.com/gorilla/schema v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/pgx/v5 v5.10.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect

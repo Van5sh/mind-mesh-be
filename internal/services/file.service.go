@@ -67,7 +67,7 @@ func (s *FileService) CreateFile(
 
 	file, err := s.repo.CreateFile(ctx, params)
 	if err != nil {
-		return database.File{}, err
+		return database.File{}, apperrors.InternalError("failed to create file", err)
 	}
 
 	return file, nil
@@ -103,7 +103,7 @@ func (s *FileService) GetFilesByProjectID(
 
 	files, err := s.repo.GetFilesByProjectID(ctx, projectID)
 	if err != nil {
-		return nil, err
+		return nil, apperrors.InternalError("failed to get files by project", err)
 	}
 
 	return files, nil
@@ -145,7 +145,7 @@ func (s *FileService) DeleteFile(
 	}
 
 	if err := s.repo.DeleteFile(ctx, id); err != nil {
-		return err
+		return apperrors.InternalError("failed to delete file", err)
 	}
 
 	return nil
@@ -168,7 +168,7 @@ func (s *FileService) resolveFileName(
 			},
 		)
 		if err != nil {
-			return "", err
+			return "", apperrors.InternalError("failed to resolve file name", err)
 		}
 
 		if !exists {
@@ -249,7 +249,7 @@ func (s *FileService) CreateFolder(
 
 	folder, err := s.repo.CreateFolder(ctx, params)
 	if err != nil {
-		return database.Folder{}, err
+		return database.Folder{}, apperrors.InternalError("failed to create folder", err)
 	}
 
 	return folder, nil
@@ -294,7 +294,7 @@ func (s *FileService) DeleteFolder(
 	}
 
 	if err := s.repo.DeleteFolder(ctx, id); err != nil {
-		return err
+		return apperrors.InternalError("failed to delete folder", err)
 	}
 
 	return nil
@@ -319,7 +319,7 @@ func (s *FileService) resolveFolderName(
 			},
 		)
 		if err != nil {
-			return "", err
+			return "", apperrors.InternalError("failed to resolve folder name", err)
 		}
 
 		if !exists {
@@ -346,7 +346,7 @@ func (s *FileService) GetFoldersByProjectID(
 
 	folders, err := s.repo.GetFoldersByProjectID(ctx, projectID)
 	if err != nil {
-		return nil, err
+		return nil, apperrors.InternalError("failed to get folders by project", err)
 	}
 
 	return folders, nil
@@ -681,14 +681,17 @@ func (s *FileService) GetFolderPath(
 		return nil, apperrors.NotFoundError("folder not found")
 	}
 
-	if folderID.Status == pgtype.Null {
-		return []database.Folder{}, nil
-	}
+	path := make([]database.Folder, 0)
+	currentID := folderID
 
-	path, err := s.repo.GetFolderPath(ctx, folderID)
-	if err != nil {
-		return nil,
-			apperrors.InternalError("failed to get folder path", err)
+	for currentID.Valid {
+		folder, err := s.repo.GetFolderByID(ctx, currentID)
+		if err != nil {
+			return nil, apperrors.InternalError("failed to get folder path", err)
+		}
+
+		path = append([]database.Folder{folder}, path...)
+		currentID = folder.ParentFolderID
 	}
 
 	return path, nil

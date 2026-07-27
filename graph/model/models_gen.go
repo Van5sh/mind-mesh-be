@@ -81,9 +81,10 @@ type CreateChatInput struct {
 }
 
 type CreateFileInput struct {
-	FolderID *string `json:"folderId,omitempty"`
-	Name     string  `json:"name"`
-	Size     int     `json:"size"`
+	ProjectID *string `json:"projectId,omitempty"`
+	FolderID  *string `json:"folderId,omitempty"`
+	Name      string  `json:"name"`
+	Size      int     `json:"size"`
 }
 
 type CreateFlowchartInput struct {
@@ -113,6 +114,20 @@ type CreateReportInput struct {
 	Format        ReportFormat `json:"format"`
 	GeneratedByAi bool         `json:"generatedByAI"`
 	SourceChatID  *string      `json:"sourceChatId,omitempty"`
+}
+
+type CreateUserInput struct {
+	Username     string `json:"username"`
+	Email        string `json:"email"`
+	PasswordHash string `json:"passwordHash"`
+}
+
+type CreateUserProfileInput struct {
+	UserID    string  `json:"userId"`
+	FirstName string  `json:"firstName"`
+	LastName  string  `json:"lastName"`
+	Bio       *string `json:"bio,omitempty"`
+	AvatarURL *string `json:"avatarUrl,omitempty"`
 }
 
 type File struct {
@@ -280,6 +295,27 @@ type SendMessageInput struct {
 	ReferencedFileIds []string    `json:"referencedFileIds,omitempty"`
 }
 
+type SetFileFavoriteInput struct {
+	UserID     string `json:"userId"`
+	FileID     string `json:"fileId"`
+	IsFavorite bool   `json:"isFavorite"`
+}
+
+type ShareFileInput struct {
+	FileID     string         `json:"fileId"`
+	SharedBy   string         `json:"sharedBy"`
+	SharedWith string         `json:"sharedWith"`
+	Permission FilePermission `json:"permission"`
+}
+
+type UpdateFlowchartInput struct {
+	FlowchartID   string  `json:"flowchartId"`
+	Name          string  `json:"name"`
+	Data          string  `json:"data"`
+	GeneratedByAi bool    `json:"generatedByAI"`
+	SourceChatID  *string `json:"sourceChatId,omitempty"`
+}
+
 type UpdateProjectInput struct {
 	ProjectID   string            `json:"projectId"`
 	Name        string            `json:"name"`
@@ -291,6 +327,32 @@ type UpdateProjectMemberRoleInput struct {
 	ProjectID string      `json:"projectId"`
 	UserID    string      `json:"userId"`
 	Role      ProjectRole `json:"role"`
+}
+
+type UpdateReportInput struct {
+	ReportID string       `json:"reportId"`
+	Title    string       `json:"title"`
+	Content  string       `json:"content"`
+	Format   ReportFormat `json:"format"`
+}
+
+type UpdateUserInput struct {
+	UserID   string `json:"userId"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+}
+
+type UpdateUserPasswordInput struct {
+	UserID       string `json:"userId"`
+	PasswordHash string `json:"passwordHash"`
+}
+
+type UpdateUserProfileInput struct {
+	UserID    string  `json:"userId"`
+	FirstName string  `json:"firstName"`
+	LastName  string  `json:"lastName"`
+	Bio       *string `json:"bio,omitempty"`
+	AvatarURL *string `json:"avatarUrl,omitempty"`
 }
 
 type User struct {

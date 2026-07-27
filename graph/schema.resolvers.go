@@ -11,6 +11,41 @@ import (
 	"fmt"
 )
 
+// CreateUser is the resolver for the createUser field.
+func (r *mutationResolver) CreateUser(ctx context.Context, input model.CreateUserInput) (*model.User, error) {
+	panic(fmt.Errorf("not implemented: CreateUser - createUser"))
+}
+
+// UpdateUser is the resolver for the updateUser field.
+func (r *mutationResolver) UpdateUser(ctx context.Context, input model.UpdateUserInput) (*model.User, error) {
+	panic(fmt.Errorf("not implemented: UpdateUser - updateUser"))
+}
+
+// UpdateUserPassword is the resolver for the updateUserPassword field.
+func (r *mutationResolver) UpdateUserPassword(ctx context.Context, input model.UpdateUserPasswordInput) (bool, error) {
+	panic(fmt.Errorf("not implemented: UpdateUserPassword - updateUserPassword"))
+}
+
+// DeleteUser is the resolver for the deleteUser field.
+func (r *mutationResolver) DeleteUser(ctx context.Context, userID string) (bool, error) {
+	panic(fmt.Errorf("not implemented: DeleteUser - deleteUser"))
+}
+
+// CreateUserProfile is the resolver for the createUserProfile field.
+func (r *mutationResolver) CreateUserProfile(ctx context.Context, input model.CreateUserProfileInput) (*model.UserProfile, error) {
+	panic(fmt.Errorf("not implemented: CreateUserProfile - createUserProfile"))
+}
+
+// UpdateUserProfile is the resolver for the updateUserProfile field.
+func (r *mutationResolver) UpdateUserProfile(ctx context.Context, input model.UpdateUserProfileInput) (*model.UserProfile, error) {
+	panic(fmt.Errorf("not implemented: UpdateUserProfile - updateUserProfile"))
+}
+
+// UpdateUserAvatar is the resolver for the updateUserAvatar field.
+func (r *mutationResolver) UpdateUserAvatar(ctx context.Context, userID string, avatarURL *string) (*model.UserProfile, error) {
+	panic(fmt.Errorf("not implemented: UpdateUserAvatar - updateUserAvatar"))
+}
+
 // CreateProject is the resolver for the createProject field.
 func (r *mutationResolver) CreateProject(ctx context.Context, input model.CreateProjectInput) (*model.Project, error) {
 	panic(fmt.Errorf("not implemented: CreateProject - createProject"))
@@ -86,9 +121,44 @@ func (r *mutationResolver) DeleteFile(ctx context.Context, fileID string) (bool,
 	panic(fmt.Errorf("not implemented: DeleteFile - deleteFile"))
 }
 
+// ShareFile is the resolver for the shareFile field.
+func (r *mutationResolver) ShareFile(ctx context.Context, input model.ShareFileInput) (*model.FileShare, error) {
+	panic(fmt.Errorf("not implemented: ShareFile - shareFile"))
+}
+
+// UpdateFileSharePermission is the resolver for the updateFileSharePermission field.
+func (r *mutationResolver) UpdateFileSharePermission(ctx context.Context, fileShareID string, permission model.FilePermission) (*model.FileShare, error) {
+	panic(fmt.Errorf("not implemented: UpdateFileSharePermission - updateFileSharePermission"))
+}
+
+// DeleteFileShare is the resolver for the deleteFileShare field.
+func (r *mutationResolver) DeleteFileShare(ctx context.Context, fileShareID string) (bool, error) {
+	panic(fmt.Errorf("not implemented: DeleteFileShare - deleteFileShare"))
+}
+
+// SetFileFavorite is the resolver for the setFileFavorite field.
+func (r *mutationResolver) SetFileFavorite(ctx context.Context, input model.SetFileFavoriteInput) (*model.FilePreference, error) {
+	panic(fmt.Errorf("not implemented: SetFileFavorite - setFileFavorite"))
+}
+
 // CreateChat is the resolver for the createChat field.
 func (r *mutationResolver) CreateChat(ctx context.Context, input model.CreateChatInput) (*model.Chat, error) {
 	panic(fmt.Errorf("not implemented: CreateChat - createChat"))
+}
+
+// RenameChat is the resolver for the renameChat field.
+func (r *mutationResolver) RenameChat(ctx context.Context, chatID string, title string) (*model.Chat, error) {
+	panic(fmt.Errorf("not implemented: RenameChat - renameChat"))
+}
+
+// UpdateChatType is the resolver for the updateChatType field.
+func (r *mutationResolver) UpdateChatType(ctx context.Context, chatID string, typeArg model.ChatType) (*model.Chat, error) {
+	panic(fmt.Errorf("not implemented: UpdateChatType - updateChatType"))
+}
+
+// DeleteChat is the resolver for the deleteChat field.
+func (r *mutationResolver) DeleteChat(ctx context.Context, chatID string) (bool, error) {
+	panic(fmt.Errorf("not implemented: DeleteChat - deleteChat"))
 }
 
 // AddChatParticipant is the resolver for the addChatParticipant field.
@@ -106,6 +176,16 @@ func (r *mutationResolver) SendMessage(ctx context.Context, input model.SendMess
 	panic(fmt.Errorf("not implemented: SendMessage - sendMessage"))
 }
 
+// UpdateChatMessage is the resolver for the updateChatMessage field.
+func (r *mutationResolver) UpdateChatMessage(ctx context.Context, messageID string, content string) (*model.ChatMessage, error) {
+	panic(fmt.Errorf("not implemented: UpdateChatMessage - updateChatMessage"))
+}
+
+// DeleteChatMessage is the resolver for the deleteChatMessage field.
+func (r *mutationResolver) DeleteChatMessage(ctx context.Context, messageID string) (bool, error) {
+	panic(fmt.Errorf("not implemented: DeleteChatMessage - deleteChatMessage"))
+}
+
 // UpdateChatStatus is the resolver for the updateChatStatus field.
 func (r *mutationResolver) UpdateChatStatus(ctx context.Context, chatID string, status model.ChatStatus) (*model.Chat, error) {
 	panic(fmt.Errorf("not implemented: UpdateChatStatus - updateChatStatus"))
@@ -116,9 +196,19 @@ func (r *mutationResolver) CreateReport(ctx context.Context, input model.CreateR
 	panic(fmt.Errorf("not implemented: CreateReport - createReport"))
 }
 
+// UpdateReport is the resolver for the updateReport field.
+func (r *mutationResolver) UpdateReport(ctx context.Context, input model.UpdateReportInput) (*model.Report, error) {
+	panic(fmt.Errorf("not implemented: UpdateReport - updateReport"))
+}
+
 // UpdateReportStatus is the resolver for the updateReportStatus field.
 func (r *mutationResolver) UpdateReportStatus(ctx context.Context, reportID string, status model.ReportStatus) (*model.Report, error) {
 	panic(fmt.Errorf("not implemented: UpdateReportStatus - updateReportStatus"))
+}
+
+// DeleteReport is the resolver for the deleteReport field.
+func (r *mutationResolver) DeleteReport(ctx context.Context, reportID string) (bool, error) {
+	panic(fmt.Errorf("not implemented: DeleteReport - deleteReport"))
 }
 
 // CreateFlowchart is the resolver for the createFlowchart field.
@@ -126,9 +216,19 @@ func (r *mutationResolver) CreateFlowchart(ctx context.Context, input model.Crea
 	panic(fmt.Errorf("not implemented: CreateFlowchart - createFlowchart"))
 }
 
+// UpdateFlowchart is the resolver for the updateFlowchart field.
+func (r *mutationResolver) UpdateFlowchart(ctx context.Context, input model.UpdateFlowchartInput) (*model.Flowchart, error) {
+	panic(fmt.Errorf("not implemented: UpdateFlowchart - updateFlowchart"))
+}
+
 // UpdateFlowchartStatus is the resolver for the updateFlowchartStatus field.
 func (r *mutationResolver) UpdateFlowchartStatus(ctx context.Context, flowchartID string, status model.FlowchartStatus) (*model.Flowchart, error) {
 	panic(fmt.Errorf("not implemented: UpdateFlowchartStatus - updateFlowchartStatus"))
+}
+
+// DeleteFlowchart is the resolver for the deleteFlowchart field.
+func (r *mutationResolver) DeleteFlowchart(ctx context.Context, flowchartID string) (bool, error) {
+	panic(fmt.Errorf("not implemented: DeleteFlowchart - deleteFlowchart"))
 }
 
 // Me is the resolver for the me field.
@@ -139,6 +239,11 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 // User is the resolver for the user field.
 func (r *queryResolver) User(ctx context.Context, id string) (*model.User, error) {
 	panic(fmt.Errorf("not implemented: User - user"))
+}
+
+// UserProfile is the resolver for the userProfile field.
+func (r *queryResolver) UserProfile(ctx context.Context, userID string) (*model.UserProfile, error) {
+	panic(fmt.Errorf("not implemented: UserProfile - userProfile"))
 }
 
 // AllUsers is the resolver for the allUsers field.
@@ -161,6 +266,11 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*model.Project, error) 
 	panic(fmt.Errorf("not implemented: Projects - projects"))
 }
 
+// ArchivedProjects is the resolver for the archivedProjects field.
+func (r *queryResolver) ArchivedProjects(ctx context.Context) ([]*model.Project, error) {
+	panic(fmt.Errorf("not implemented: ArchivedProjects - archivedProjects"))
+}
+
 // ProjectMembers is the resolver for the projectMembers field.
 func (r *queryResolver) ProjectMembers(ctx context.Context, projectID string) ([]*model.ProjectMember, error) {
 	panic(fmt.Errorf("not implemented: ProjectMembers - projectMembers"))
@@ -181,6 +291,16 @@ func (r *queryResolver) FolderContents(ctx context.Context, folderID *string, pr
 	panic(fmt.Errorf("not implemented: FolderContents - folderContents"))
 }
 
+// FolderPath is the resolver for the folderPath field.
+func (r *queryResolver) FolderPath(ctx context.Context, folderID string) ([]*model.Folder, error) {
+	panic(fmt.Errorf("not implemented: FolderPath - folderPath"))
+}
+
+// RootFolders is the resolver for the rootFolders field.
+func (r *queryResolver) RootFolders(ctx context.Context, projectID string) ([]*model.Folder, error) {
+	panic(fmt.Errorf("not implemented: RootFolders - rootFolders"))
+}
+
 // File is the resolver for the file field.
 func (r *queryResolver) File(ctx context.Context, id string) (*model.File, error) {
 	panic(fmt.Errorf("not implemented: File - file"))
@@ -189,6 +309,31 @@ func (r *queryResolver) File(ctx context.Context, id string) (*model.File, error
 // Files is the resolver for the files field.
 func (r *queryResolver) Files(ctx context.Context, projectID *string, folderID *string) ([]*model.File, error) {
 	panic(fmt.Errorf("not implemented: Files - files"))
+}
+
+// RootFiles is the resolver for the rootFiles field.
+func (r *queryResolver) RootFiles(ctx context.Context, projectID string) ([]*model.File, error) {
+	panic(fmt.Errorf("not implemented: RootFiles - rootFiles"))
+}
+
+// FavoriteFiles is the resolver for the favoriteFiles field.
+func (r *queryResolver) FavoriteFiles(ctx context.Context, userID string, projectID *string) ([]*model.File, error) {
+	panic(fmt.Errorf("not implemented: FavoriteFiles - favoriteFiles"))
+}
+
+// FileShare is the resolver for the fileShare field.
+func (r *queryResolver) FileShare(ctx context.Context, id string) (*model.FileShare, error) {
+	panic(fmt.Errorf("not implemented: FileShare - fileShare"))
+}
+
+// FileShares is the resolver for the fileShares field.
+func (r *queryResolver) FileShares(ctx context.Context, fileID string) ([]*model.FileShare, error) {
+	panic(fmt.Errorf("not implemented: FileShares - fileShares"))
+}
+
+// SharedWithMe is the resolver for the sharedWithMe field.
+func (r *queryResolver) SharedWithMe(ctx context.Context, userID string) ([]*model.FileShare, error) {
+	panic(fmt.Errorf("not implemented: SharedWithMe - sharedWithMe"))
 }
 
 // Chat is the resolver for the chat field.

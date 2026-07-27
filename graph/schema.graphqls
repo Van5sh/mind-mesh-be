@@ -271,19 +271,28 @@ type ActivityLog {
 type Query {
   me: User
   user(id: ID!): User
+  userProfile(userId: ID!): UserProfile
   allUsers: [User!]!
   users(ids: [ID!]!): [User!]!
 
   project(id: ID!): Project
   projects: [Project!]!
+  archivedProjects: [Project!]!
   projectMembers(projectId: ID!): [ProjectMember!]!
 
   folder(id: ID!): Folder
   folders(projectId: ID): [Folder!]!
   folderContents(folderId: ID, projectId: ID): [FolderItem!]!
+  folderPath(folderId: ID!): [Folder!]!
+  rootFolders(projectId: ID!): [Folder!]!
 
   file(id: ID!): File
   files(projectId: ID, folderId: ID): [File!]!
+  rootFiles(projectId: ID!): [File!]!
+  favoriteFiles(userId: ID!, projectId: ID): [File!]!
+  fileShare(id: ID!): FileShare
+  fileShares(fileId: ID!): [FileShare!]!
+  sharedWithMe(userId: ID!): [FileShare!]!
 
   chat(id: ID!): Chat
   chats(projectId: ID!): [Chat!]!
@@ -302,6 +311,14 @@ type Query {
 union FolderItem = Folder | File
 
 type Mutation {
+  createUser(input: CreateUserInput!): User!
+  updateUser(input: UpdateUserInput!): User!
+  updateUserPassword(input: UpdateUserPasswordInput!): Boolean!
+  deleteUser(userId: ID!): Boolean!
+  createUserProfile(input: CreateUserProfileInput!): UserProfile!
+  updateUserProfile(input: UpdateUserProfileInput!): UserProfile!
+  updateUserAvatar(userId: ID!, avatarUrl: String): UserProfile!
+
   createProject(input: CreateProjectInput!): Project!
   updateProject(input: UpdateProjectInput!): Project!
   archiveProject(projectId: ID!): Boolean!
@@ -320,18 +337,64 @@ type Mutation {
   renameFile(fileId: ID!, name: String!): File!
   moveFile(input: MoveFileInput!): File!
   deleteFile(fileId: ID!): Boolean!
+  shareFile(input: ShareFileInput!): FileShare!
+  updateFileSharePermission(fileShareId: ID!, permission: FilePermission!): FileShare!
+  deleteFileShare(fileShareId: ID!): Boolean!
+  setFileFavorite(input: SetFileFavoriteInput!): FilePreference!
 
   createChat(input: CreateChatInput!): Chat!
+  renameChat(chatId: ID!, title: String!): Chat!
+  updateChatType(chatId: ID!, type: ChatType!): Chat!
+  deleteChat(chatId: ID!): Boolean!
   addChatParticipant(input: AddChatParticipantInput!): ChatParticipant!
   removeChatParticipant(chatId: ID!, userId: ID!): Boolean!
   sendMessage(input: SendMessageInput!): ChatMessage!
+  updateChatMessage(messageId: ID!, content: String!): ChatMessage!
+  deleteChatMessage(messageId: ID!): Boolean!
   updateChatStatus(chatId: ID!, status: ChatStatus!): Chat!
 
   createReport(input: CreateReportInput!): Report!
+  updateReport(input: UpdateReportInput!): Report!
   updateReportStatus(reportId: ID!, status: ReportStatus!): Report!
+  deleteReport(reportId: ID!): Boolean!
 
   createFlowchart(input: CreateFlowchartInput!): Flowchart!
+  updateFlowchart(input: UpdateFlowchartInput!): Flowchart!
   updateFlowchartStatus(flowchartId: ID!, status: FlowchartStatus!): Flowchart!
+  deleteFlowchart(flowchartId: ID!): Boolean!
+}
+
+input CreateUserInput {
+  username: String!
+  email: String!
+  passwordHash: String!
+}
+
+input UpdateUserInput {
+  userId: ID!
+  username: String!
+  email: String!
+}
+
+input UpdateUserPasswordInput {
+  userId: ID!
+  passwordHash: String!
+}
+
+input CreateUserProfileInput {
+  userId: ID!
+  firstName: String!
+  lastName: String!
+  bio: String
+  avatarUrl: String
+}
+
+input UpdateUserProfileInput {
+  userId: ID!
+  firstName: String!
+  lastName: String!
+  bio: String
+  avatarUrl: String
 }
 
 input CreateProjectInput {
@@ -366,6 +429,7 @@ input CreateFolderInput {
 }
 
 input CreateFileInput {
+  projectId: ID
   folderId: ID
   name: String!
   size: Int64!
@@ -375,6 +439,19 @@ input MoveFileInput {
   fileId: ID!
   folderId: ID
   projectId: ID
+}
+
+input ShareFileInput {
+  fileId: ID!
+  sharedBy: ID!
+  sharedWith: ID!
+  permission: FilePermission!
+}
+
+input SetFileFavoriteInput {
+  userId: ID!
+  fileId: ID!
+  isFavorite: Boolean!
 }
 
 input CreateChatInput {
@@ -406,8 +483,23 @@ input CreateReportInput {
   sourceChatId: ID
 }
 
+input UpdateReportInput {
+  reportId: ID!
+  title: String!
+  content: String!
+  format: ReportFormat!
+}
+
 input CreateFlowchartInput {
   projectId: ID!
+  name: String!
+  data: JSON!
+  generatedByAI: Boolean!
+  sourceChatId: ID
+}
+
+input UpdateFlowchartInput {
+  flowchartId: ID!
   name: String!
   data: JSON!
   generatedByAI: Boolean!
