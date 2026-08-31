@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"example/hello/graph"
+	"example/hello/internal/services/aws"
 	"log"
 	"net/http"
 	"os"
@@ -17,6 +19,14 @@ import (
 const defaultPort = "8080"
 
 func main() {
+	ctx := context.Background()
+
+	// Initialize AWS configuration
+	awsConfig, err := aws.InitializeAWSConfig(ctx)
+	if err != nil {
+		log.Fatalf("Failed to initialize AWS configuration: %v", err)
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = defaultPort
@@ -38,6 +48,10 @@ func main() {
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	http.Handle("/query", srv)
 
+	log.Printf("AWS configuration initialized successfully")
+	log.Printf("S3 Bucket: %s", awsConfig.S3Bucket)
+	log.Printf("DynamoDB Table: %s", awsConfig.DynamoDBTable)
+	log.Printf("SES From Email: %s", awsConfig.SESFromEmail)
 	log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
