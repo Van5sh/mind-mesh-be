@@ -21,8 +21,7 @@ func NewFlowchartService(
 	repo *repository.FlowchartRepository,
 	guard *guards.FlowchartGuard,
 ) *FlowchartService {
-	return &FlowchartService{
-		repo:  repo,
+	return &FlowchartService{		repo:  repo,
 		guard: guard,
 	}
 }
