@@ -54,7 +54,6 @@ func (s *S3Service) S3Delete(
 	if err != nil {
 		return fmt.Errorf("failed to delete file from S3: %w", err)
 	}
-
 	return nil
 }
 
