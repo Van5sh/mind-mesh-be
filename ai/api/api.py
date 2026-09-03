@@ -1,14 +1,25 @@
+from fastapi import FastAPI
+
 from config.settings import get_settings
 
 
-def main() -> None:
-    settings = get_settings()
+settings = get_settings()
 
-    print(f"Starting MeshMind AI worker")
-    print(f"Environment: {settings.app_env}")
-    print(f"SQS queue: {settings.sqs_queue_url}")
-    print(f"S3 bucket: {settings.s3_bucket}")
+app = FastAPI(
+    title="MeshMind AI API",
+    version="0.1.0",
+)
 
 
-if __name__ == "__main__":
-    main()
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {
+        "status": "ok",
+    }
+
+
+@app.get("/ready")
+def ready() -> dict[str, str]:
+    return {
+        "status": "ready",
+    }
