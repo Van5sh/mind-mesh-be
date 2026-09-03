@@ -1,20 +1,28 @@
-from extraction.base import BaseExtractor
+from pathlib import Path
+from docx import Document
+from .base import BaseExtractor, ExtractedDocument
 
 
 class DocxExtractor(BaseExtractor):
-    def extract(self, file_path: str) -> str:
-        from docx import Document
+    extensions = (".docx",)
 
-        doc = Document(file_path)
-        text = "\n".join([para.text for para in doc.paragraphs])
-        return text
+    def extract(self, path: Path) -> ExtractedDocument:
+        doc = Document(str(path))
+        parts = []
 
-    def extract_from_bytes(self, file_bytes: bytes) -> str:
-        from io import BytesIO
+        for paragraph in doc.paragraphs:
+            if paragraph.text.strip():
+                parts.append(paragraph.text.strip())
 
-        from docx import Document
+        for table in doc.tables:
+            for row in table.rows:
+                parts.append(" | ".join(cell.text.strip() for cell in row.cells))
 
-        with BytesIO(file_bytes) as file_stream:
-            doc = Document(file_stream)
-            text = "\n".join([para.text for para in doc.paragraphs])
-            return text
+        return ExtractedDocument(
+            text="\n".join(parts),
+            filename=path.name,
+            content_type=(
+                "application/vnd.openxmlformats-officedocument."
+                "wordprocessingml.document"
+            ),
+        )

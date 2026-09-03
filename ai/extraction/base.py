@@ -1,11 +1,18 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass
+class ExtractedDocument:
+    text: str
+    filename: str
+    content_type: str | None = None
 
 
 class BaseExtractor(ABC):
-    @abstractmethod
-    def extract(self, file_path: str) -> str:
-        raise NotImplementedError("Subclasses must implement the extract method.")
+    extensions: tuple[str, ...] = ()
 
     @abstractmethod
-    def extract_from_bytes(self, file_bytes: bytes) -> str:
-        raise NotImplementedError("Subclasses must implement the extract_from_bytes method.")
+    def extract(self, path: Path) -> ExtractedDocument:
+        raise NotImplementedError

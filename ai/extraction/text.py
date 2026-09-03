@@ -1,10 +1,14 @@
-from extraction.base import BaseExtractor
+from pathlib import Path
+from .base import BaseExtractor, ExtractedDocument
 
 
-class TxtExtractor(BaseExtractor):
-    def extract(self, file_path: str) -> str:
-        with open(file_path, "r", encoding="utf-8", errors="replace") as file:
-            return file.read()
+class TextExtractor(BaseExtractor):
+    extensions = (".txt", ".md", ".csv", ".json", ".py", ".log")
 
-    def extract_from_bytes(self, file_bytes: bytes) -> str:
-        return file_bytes.decode("utf-8", errors="replace")
+    def extract(self, path: Path) -> ExtractedDocument:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        return ExtractedDocument(
+            text=text,
+            filename=path.name,
+            content_type="text/plain",
+        )
