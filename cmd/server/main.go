@@ -16,7 +16,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 	"github.com/vektah/gqlparser/v2/ast"
-	"gorm.io/driver/postgres"
+	// "gorm.io/driver/postgres"
 )
 
 const defaultPort = "8080"
@@ -26,7 +26,7 @@ func StartServer() {
 		log.Println("Warning: .env file not found, using system environment variables")
 	}
 
-	postgres.InitDB()
+	// postgres.InitDB()
 	log.Println("Database initialized successfully")
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -36,7 +36,7 @@ func StartServer() {
 	app := fiber.New()
 
 	resolver := &graph.Resolver{
-		UsersData: postgres.UsersRepo{},
+		// UsersData: postgres.UsersRepo{},
 	}
 
 	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: resolver}))
