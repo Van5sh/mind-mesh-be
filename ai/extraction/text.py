@@ -11,5 +11,5 @@ class TextExtractor:
 
         if not path.is_file():
             raise ValueError(f"Path is not a file: {file_path}")
-
+        
         return path.read_text(encoding="utf-8")
