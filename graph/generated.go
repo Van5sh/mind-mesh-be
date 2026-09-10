@@ -192,6 +192,7 @@ type ComplexityRoot struct {
 		DeleteFileShare           func(childComplexity int, fileShareID string) int
 		DeleteFlowchart           func(childComplexity int, flowchartID string) int
 		DeleteFolder              func(childComplexity int, folderID string) int
+		DeleteProject             func(childComplexity int, projectID string) int
 		DeleteReport              func(childComplexity int, reportID string) int
 		DeleteUser                func(childComplexity int, userID string) int
 		Empty                     func(childComplexity int) int
@@ -206,6 +207,7 @@ type ComplexityRoot struct {
 		SendMessage               func(childComplexity int, input model.SendMessageInput) int
 		SetFileFavorite           func(childComplexity int, input model.SetFileFavoriteInput) int
 		ShareFile                 func(childComplexity int, input model.ShareFileInput) int
+		TransferProjectOwnership  func(childComplexity int, input model.TransferProjectOwnershipInput) int
 		UpdateChatMessage         func(childComplexity int, messageID string, content string) int
 		UpdateChatStatus          func(childComplexity int, chatID string, status model.ChatStatus) int
 		UpdateChatType            func(childComplexity int, chatID string, typeArg model.ChatType) int
@@ -257,37 +259,47 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		ActivityLogs     func(childComplexity int, projectID *string, userID *string) int
-		AllUsers         func(childComplexity int) int
-		ArchivedProjects func(childComplexity int) int
-		Chat             func(childComplexity int, id string) int
-		ChatMessages     func(childComplexity int, chatID string) int
-		Chats            func(childComplexity int, projectID string) int
-		Empty            func(childComplexity int) int
-		FavoriteFiles    func(childComplexity int, userID string, projectID *string) int
-		File             func(childComplexity int, id string) int
-		FileShare        func(childComplexity int, id string) int
-		FileShares       func(childComplexity int, fileID string) int
-		Files            func(childComplexity int, projectID *string, folderID *string) int
-		Flowchart        func(childComplexity int, id string) int
-		Flowcharts       func(childComplexity int, projectID string) int
-		Folder           func(childComplexity int, id string) int
-		FolderContents   func(childComplexity int, folderID *string, projectID *string) int
-		FolderPath       func(childComplexity int, folderID string) int
-		Folders          func(childComplexity int, projectID *string) int
-		Me               func(childComplexity int) int
-		MyChats          func(childComplexity int, projectID *string) int
-		Project          func(childComplexity int, id string) int
-		ProjectMembers   func(childComplexity int, projectID string) int
-		Projects         func(childComplexity int) int
-		Report           func(childComplexity int, id string) int
-		Reports          func(childComplexity int, projectID string) int
-		RootFiles        func(childComplexity int, projectID string) int
-		RootFolders      func(childComplexity int, projectID string) int
-		SharedWithMe     func(childComplexity int, userID string) int
-		User             func(childComplexity int, id string) int
-		UserProfile      func(childComplexity int, userID string) int
-		Users            func(childComplexity int, ids []string) int
+		ActivityLogs            func(childComplexity int, projectID *string, userID *string) int
+		AiReports               func(childComplexity int, projectID string) int
+		AllUsers                func(childComplexity int) int
+		ArchivedProjectsByOwner func(childComplexity int, ownerID string) int
+		ArchivedProjectsForUser func(childComplexity int, userID string) int
+		Chat                    func(childComplexity int, id string) int
+		ChatMessages            func(childComplexity int, chatID string) int
+		Chats                   func(childComplexity int, projectID string) int
+		Empty                   func(childComplexity int) int
+		FavoriteFiles           func(childComplexity int, userID string, projectID *string) int
+		File                    func(childComplexity int, id string) int
+		FileShare               func(childComplexity int, id string) int
+		FileShares              func(childComplexity int, fileID string) int
+		Files                   func(childComplexity int, projectID *string, folderID *string) int
+		Flowchart               func(childComplexity int, id string) int
+		Flowcharts              func(childComplexity int, projectID string) int
+		Folder                  func(childComplexity int, id string) int
+		FolderContents          func(childComplexity int, folderID *string, projectID *string) int
+		FolderPath              func(childComplexity int, folderID string) int
+		Folders                 func(childComplexity int, projectID *string) int
+		Me                      func(childComplexity int) int
+		MyChats                 func(childComplexity int, projectID *string) int
+		Project                 func(childComplexity int, id string) int
+		ProjectMembers          func(childComplexity int, projectID string) int
+		Projects                func(childComplexity int) int
+		ProjectsByOwner         func(childComplexity int, ownerID string) int
+		ProjectsForUser         func(childComplexity int, userID string) int
+		Report                  func(childComplexity int, id string) int
+		Reports                 func(childComplexity int, projectID string) int
+		ReportsByChat           func(childComplexity int, sourceChatID string) int
+		ReportsByFormat         func(childComplexity int, format model.ReportFormat) int
+		ReportsByGenerator      func(childComplexity int, generatedByID string) int
+		ReportsByStatus         func(childComplexity int, status model.ReportStatus) int
+		RootFiles               func(childComplexity int, projectID string) int
+		RootFolders             func(childComplexity int, projectID string) int
+		SharedWithMe            func(childComplexity int, userID string) int
+		User                    func(childComplexity int, id string) int
+		UserByEmail             func(childComplexity int, email string) int
+		UserByUsername          func(childComplexity int, username string) int
+		UserProfile             func(childComplexity int, userID string) int
+		Users                   func(childComplexity int, ids []string) int
 	}
 
 	Report struct {
@@ -369,6 +381,8 @@ type MutationResolver interface {
 	UpdateProject(ctx context.Context, input model.UpdateProjectInput) (*model.Project, error)
 	ArchiveProject(ctx context.Context, projectID string) (bool, error)
 	RestoreProject(ctx context.Context, projectID string) (bool, error)
+	DeleteProject(ctx context.Context, projectID string) (bool, error)
+	TransferProjectOwnership(ctx context.Context, input model.TransferProjectOwnershipInput) (*model.Project, error)
 	AddProjectMember(ctx context.Context, input model.AddProjectMemberInput) (*model.ProjectMember, error)
 	UpdateProjectMemberRole(ctx context.Context, input model.UpdateProjectMemberRoleInput) (*model.ProjectMember, error)
 	RemoveProjectMember(ctx context.Context, projectID string, userID string) (bool, error)
@@ -407,12 +421,22 @@ type QueryResolver interface {
 	Flowcharts(ctx context.Context, projectID string) ([]*model.Flowchart, error)
 	Project(ctx context.Context, id string) (*model.Project, error)
 	Projects(ctx context.Context) ([]*model.Project, error)
-	ArchivedProjects(ctx context.Context) ([]*model.Project, error)
+	ProjectsByOwner(ctx context.Context, ownerID string) ([]*model.Project, error)
+	ProjectsForUser(ctx context.Context, userID string) ([]*model.Project, error)
+	ArchivedProjectsByOwner(ctx context.Context, ownerID string) ([]*model.Project, error)
+	ArchivedProjectsForUser(ctx context.Context, userID string) ([]*model.Project, error)
 	ProjectMembers(ctx context.Context, projectID string) ([]*model.ProjectMember, error)
 	Report(ctx context.Context, id string) (*model.Report, error)
 	Reports(ctx context.Context, projectID string) ([]*model.Report, error)
+	ReportsByChat(ctx context.Context, sourceChatID string) ([]*model.Report, error)
+	ReportsByGenerator(ctx context.Context, generatedByID string) ([]*model.Report, error)
+	ReportsByFormat(ctx context.Context, format model.ReportFormat) ([]*model.Report, error)
+	ReportsByStatus(ctx context.Context, status model.ReportStatus) ([]*model.Report, error)
+	AiReports(ctx context.Context, projectID string) ([]*model.Report, error)
 	Me(ctx context.Context) (*model.User, error)
 	User(ctx context.Context, id string) (*model.User, error)
+	UserByEmail(ctx context.Context, email string) (*model.User, error)
+	UserByUsername(ctx context.Context, username string) (*model.User, error)
 	UserProfile(ctx context.Context, userID string) (*model.UserProfile, error)
 	AllUsers(ctx context.Context) ([]*model.User, error)
 	Users(ctx context.Context, ids []string) ([]*model.User, error)
@@ -1218,6 +1242,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeleteFolder(childComplexity, args["folderId"].(string)), true
+	case "Mutation.deleteProject":
+		if e.ComplexityRoot.Mutation.DeleteProject == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteProject_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeleteProject(childComplexity, args["projectId"].(string)), true
 	case "Mutation.deleteReport":
 		if e.ComplexityRoot.Mutation.DeleteReport == nil {
 			break
@@ -1367,6 +1402,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.ShareFile(childComplexity, args["input"].(model.ShareFileInput)), true
+	case "Mutation.transferProjectOwnership":
+		if e.ComplexityRoot.Mutation.TransferProjectOwnership == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_transferProjectOwnership_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.TransferProjectOwnership(childComplexity, args["input"].(model.TransferProjectOwnershipInput)), true
 	case "Mutation.updateChatMessage":
 		if e.ComplexityRoot.Mutation.UpdateChatMessage == nil {
 			break
@@ -1686,18 +1732,45 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.ActivityLogs(childComplexity, args["projectId"].(*string), args["userId"].(*string)), true
+	case "Query.aiReports":
+		if e.ComplexityRoot.Query.AiReports == nil {
+			break
+		}
+
+		args, err := ec.field_Query_aiReports_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.AiReports(childComplexity, args["projectId"].(string)), true
 	case "Query.allUsers":
 		if e.ComplexityRoot.Query.AllUsers == nil {
 			break
 		}
 
 		return e.ComplexityRoot.Query.AllUsers(childComplexity), true
-	case "Query.archivedProjects":
-		if e.ComplexityRoot.Query.ArchivedProjects == nil {
+	case "Query.archivedProjectsByOwner":
+		if e.ComplexityRoot.Query.ArchivedProjectsByOwner == nil {
 			break
 		}
 
-		return e.ComplexityRoot.Query.ArchivedProjects(childComplexity), true
+		args, err := ec.field_Query_archivedProjectsByOwner_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ArchivedProjectsByOwner(childComplexity, args["ownerId"].(string)), true
+	case "Query.archivedProjectsForUser":
+		if e.ComplexityRoot.Query.ArchivedProjectsForUser == nil {
+			break
+		}
+
+		args, err := ec.field_Query_archivedProjectsForUser_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ArchivedProjectsForUser(childComplexity, args["userId"].(string)), true
 	case "Query.chat":
 		if e.ComplexityRoot.Query.Chat == nil {
 			break
@@ -1904,6 +1977,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Projects(childComplexity), true
+	case "Query.projectsByOwner":
+		if e.ComplexityRoot.Query.ProjectsByOwner == nil {
+			break
+		}
+
+		args, err := ec.field_Query_projectsByOwner_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ProjectsByOwner(childComplexity, args["ownerId"].(string)), true
+	case "Query.projectsForUser":
+		if e.ComplexityRoot.Query.ProjectsForUser == nil {
+			break
+		}
+
+		args, err := ec.field_Query_projectsForUser_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ProjectsForUser(childComplexity, args["userId"].(string)), true
 	case "Query.report":
 		if e.ComplexityRoot.Query.Report == nil {
 			break
@@ -1926,6 +2021,50 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Reports(childComplexity, args["projectId"].(string)), true
+	case "Query.reportsByChat":
+		if e.ComplexityRoot.Query.ReportsByChat == nil {
+			break
+		}
+
+		args, err := ec.field_Query_reportsByChat_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ReportsByChat(childComplexity, args["sourceChatId"].(string)), true
+	case "Query.reportsByFormat":
+		if e.ComplexityRoot.Query.ReportsByFormat == nil {
+			break
+		}
+
+		args, err := ec.field_Query_reportsByFormat_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ReportsByFormat(childComplexity, args["format"].(model.ReportFormat)), true
+	case "Query.reportsByGenerator":
+		if e.ComplexityRoot.Query.ReportsByGenerator == nil {
+			break
+		}
+
+		args, err := ec.field_Query_reportsByGenerator_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ReportsByGenerator(childComplexity, args["generatedById"].(string)), true
+	case "Query.reportsByStatus":
+		if e.ComplexityRoot.Query.ReportsByStatus == nil {
+			break
+		}
+
+		args, err := ec.field_Query_reportsByStatus_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ReportsByStatus(childComplexity, args["status"].(model.ReportStatus)), true
 	case "Query.rootFiles":
 		if e.ComplexityRoot.Query.RootFiles == nil {
 			break
@@ -1970,6 +2109,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.User(childComplexity, args["id"].(string)), true
+	case "Query.userByEmail":
+		if e.ComplexityRoot.Query.UserByEmail == nil {
+			break
+		}
+
+		args, err := ec.field_Query_userByEmail_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.UserByEmail(childComplexity, args["email"].(string)), true
+	case "Query.userByUsername":
+		if e.ComplexityRoot.Query.UserByUsername == nil {
+			break
+		}
+
+		args, err := ec.field_Query_userByUsername_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.UserByUsername(childComplexity, args["username"].(string)), true
 	case "Query.userProfile":
 		if e.ComplexityRoot.Query.UserProfile == nil {
 			break
@@ -2199,6 +2360,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputSendMessageInput,
 		ec.unmarshalInputSetFileFavoriteInput,
 		ec.unmarshalInputShareFileInput,
+		ec.unmarshalInputTransferProjectOwnershipInput,
 		ec.unmarshalInputUpdateFlowchartInput,
 		ec.unmarshalInputUpdateProjectInput,
 		ec.unmarshalInputUpdateProjectMemberRoleInput,
@@ -3087,6 +3249,20 @@ func (ec *executionContext) field_Mutation_deleteFolder_args(ctx context.Context
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_deleteProject_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "projectId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["projectId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_deleteReport_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -3309,6 +3485,20 @@ func (ec *executionContext) field_Mutation_shareFile_args(ctx context.Context, r
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.ShareFileInput, error) {
 			return ec.unmarshalNShareFileInput2exampleᚋhelloᚋgraphᚋmodelᚐShareFileInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_transferProjectOwnership_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.TransferProjectOwnershipInput, error) {
+			return ec.unmarshalNTransferProjectOwnershipInput2exampleᚋhelloᚋgraphᚋmodelᚐTransferProjectOwnershipInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -3605,6 +3795,48 @@ func (ec *executionContext) field_Query_activityLogs_args(ctx context.Context, r
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_aiReports_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "projectId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["projectId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_archivedProjectsByOwner_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "ownerId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["ownerId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_archivedProjectsForUser_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "userId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["userId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_chatMessages_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -3867,6 +4099,34 @@ func (ec *executionContext) field_Query_project_args(ctx context.Context, rawArg
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_projectsByOwner_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "ownerId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["ownerId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_projectsForUser_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "userId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["userId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_report_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -3878,6 +4138,62 @@ func (ec *executionContext) field_Query_report_args(ctx context.Context, rawArgs
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_reportsByChat_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "sourceChatId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["sourceChatId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_reportsByFormat_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "format",
+		func(ctx context.Context, v any) (model.ReportFormat, error) {
+			return ec.unmarshalNReportFormat2exampleᚋhelloᚋgraphᚋmodelᚐReportFormat(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["format"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_reportsByGenerator_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "generatedById",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["generatedById"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_reportsByStatus_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "status",
+		func(ctx context.Context, v any) (model.ReportStatus, error) {
+			return ec.unmarshalNReportStatus2exampleᚋhelloᚋgraphᚋmodelᚐReportStatus(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["status"] = arg0
 	return args, nil
 }
 
@@ -3934,6 +4250,34 @@ func (ec *executionContext) field_Query_sharedWithMe_args(ctx context.Context, r
 		return nil, err
 	}
 	args["userId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_userByEmail_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "email",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["email"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_userByUsername_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "username",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["username"] = arg0
 	return args, nil
 }
 
@@ -7928,6 +8272,94 @@ func (ec *executionContext) fieldContext_Mutation_restoreProject(ctx context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_deleteProject(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_deleteProject(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeleteProject(ctx, fc.Args["projectId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_deleteProject(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteProject_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_transferProjectOwnership(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_transferProjectOwnership(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().TransferProjectOwnership(ctx, fc.Args["input"].(model.TransferProjectOwnershipInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Project) graphql.Marshaler {
+			return ec.marshalNProject2ᚖexampleᚋhelloᚋgraphᚋmodelᚐProject(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_transferProjectOwnership(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Project(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_transferProjectOwnership_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_addProjectMember(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -10171,16 +10603,17 @@ func (ec *executionContext) fieldContext_Query_projects(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_archivedProjects(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Query_projectsByOwner(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Query_archivedProjects(ctx, field)
+			return ec.fieldContext_Query_projectsByOwner(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.Query().ArchivedProjects(ctx)
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ProjectsByOwner(ctx, fc.Args["ownerId"].(string))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v []*model.Project) graphql.Marshaler {
@@ -10190,7 +10623,7 @@ func (ec *executionContext) _Query_archivedProjects(ctx context.Context, field g
 		true,
 	)
 }
-func (ec *executionContext) fieldContext_Query_archivedProjects(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_projectsByOwner(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -10199,6 +10632,149 @@ func (ec *executionContext) fieldContext_Query_archivedProjects(_ context.Contex
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_Project(ctx, field)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_projectsByOwner_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_projectsForUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_projectsForUser(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ProjectsForUser(ctx, fc.Args["userId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.Project) graphql.Marshaler {
+			return ec.marshalNProject2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐProjectᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_projectsForUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Project(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_projectsForUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_archivedProjectsByOwner(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_archivedProjectsByOwner(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ArchivedProjectsByOwner(ctx, fc.Args["ownerId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.Project) graphql.Marshaler {
+			return ec.marshalNProject2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐProjectᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_archivedProjectsByOwner(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Project(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_archivedProjectsByOwner_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_archivedProjectsForUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_archivedProjectsForUser(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ArchivedProjectsForUser(ctx, fc.Args["userId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.Project) graphql.Marshaler {
+			return ec.marshalNProject2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐProjectᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_archivedProjectsForUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Project(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_archivedProjectsForUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -10335,6 +10911,226 @@ func (ec *executionContext) fieldContext_Query_reports(ctx context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_reportsByChat(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_reportsByChat(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ReportsByChat(ctx, fc.Args["sourceChatId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.Report) graphql.Marshaler {
+			return ec.marshalNReport2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐReportᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_reportsByChat(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Report(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_reportsByChat_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_reportsByGenerator(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_reportsByGenerator(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ReportsByGenerator(ctx, fc.Args["generatedById"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.Report) graphql.Marshaler {
+			return ec.marshalNReport2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐReportᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_reportsByGenerator(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Report(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_reportsByGenerator_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_reportsByFormat(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_reportsByFormat(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ReportsByFormat(ctx, fc.Args["format"].(model.ReportFormat))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.Report) graphql.Marshaler {
+			return ec.marshalNReport2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐReportᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_reportsByFormat(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Report(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_reportsByFormat_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_reportsByStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_reportsByStatus(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ReportsByStatus(ctx, fc.Args["status"].(model.ReportStatus))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.Report) graphql.Marshaler {
+			return ec.marshalNReport2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐReportᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_reportsByStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Report(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_reportsByStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_aiReports(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_aiReports(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().AiReports(ctx, fc.Args["projectId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.Report) graphql.Marshaler {
+			return ec.marshalNReport2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐReportᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_aiReports(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Report(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_aiReports_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_me(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -10405,6 +11201,94 @@ func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field g
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_user_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_userByEmail(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_userByEmail(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().UserByEmail(ctx, fc.Args["email"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.User) graphql.Marshaler {
+			return ec.marshalOUser2ᚖexampleᚋhelloᚋgraphᚋmodelᚐUser(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Query_userByEmail(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_User(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_userByEmail_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_userByUsername(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_userByUsername(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().UserByUsername(ctx, fc.Args["username"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.User) graphql.Marshaler {
+			return ec.marshalOUser2ᚖexampleᚋhelloᚋgraphᚋmodelᚐUser(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Query_userByUsername(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_User(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_userByUsername_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -13176,6 +14060,43 @@ func (ec *executionContext) unmarshalInputShareFileInput(ctx context.Context, ob
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputTransferProjectOwnershipInput(ctx context.Context, obj any) (model.TransferProjectOwnershipInput, error) {
+	var it model.TransferProjectOwnershipInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"projectId", "ownerId"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "projectId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("projectId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ProjectID = data
+		case "ownerId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ownerId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OwnerID = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputUpdateFlowchartInput(ctx context.Context, obj any) (model.UpdateFlowchartInput, error) {
 	var it model.UpdateFlowchartInput
 	if obj == nil {
@@ -14698,6 +15619,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "deleteProject":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteProject(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "transferProjectOwnership":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_transferProjectOwnership(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "addProjectMember":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_addProjectMember(ctx, field)
@@ -15545,7 +16480,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "archivedProjects":
+		case "projectsByOwner":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -15554,7 +16489,73 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_archivedProjects(ctx, field)
+				res = ec._Query_projectsByOwner(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "projectsForUser":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_projectsForUser(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "archivedProjectsByOwner":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_archivedProjectsByOwner(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "archivedProjectsForUser":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_archivedProjectsForUser(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -15633,6 +16634,116 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "reportsByChat":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_reportsByChat(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "reportsByGenerator":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_reportsByGenerator(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "reportsByFormat":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_reportsByFormat(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "reportsByStatus":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_reportsByStatus(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "aiReports":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_aiReports(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "me":
 			field := field
 
@@ -15665,6 +16776,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_user(ctx, field)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "userByEmail":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_userByEmail(ctx, field)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "userByUsername":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_userByUsername(ctx, field)
 				if res == graphql.RequiredNull {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -16504,10 +17659,6 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) marshalNChat2exampleᚋhelloᚋgraphᚋmodelᚐChat(ctx context.Context, sel ast.SelectionSet, v model.Chat) graphql.Marshaler {
-	return ec._Chat(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNChat2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐChatᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Chat) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -16534,10 +17685,6 @@ func (ec *executionContext) marshalNChat2ᚖexampleᚋhelloᚋgraphᚋmodelᚐCh
 	return ec._Chat(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNChatMessage2exampleᚋhelloᚋgraphᚋmodelᚐChatMessage(ctx context.Context, sel ast.SelectionSet, v model.ChatMessage) graphql.Marshaler {
-	return ec._ChatMessage(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNChatMessage2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐChatMessageᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ChatMessage) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -16562,10 +17709,6 @@ func (ec *executionContext) marshalNChatMessage2ᚖexampleᚋhelloᚋgraphᚋmod
 		return graphql.Null
 	}
 	return ec._ChatMessage(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalNChatParticipant2exampleᚋhelloᚋgraphᚋmodelᚐChatParticipant(ctx context.Context, sel ast.SelectionSet, v model.ChatParticipant) graphql.Marshaler {
-	return ec._ChatParticipant(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNChatParticipant2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐChatParticipantᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ChatParticipant) graphql.Marshaler {
@@ -16654,10 +17797,6 @@ func (ec *executionContext) unmarshalNCreateUserProfileInput2exampleᚋhelloᚋg
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNFile2exampleᚋhelloᚋgraphᚋmodelᚐFile(ctx context.Context, sel ast.SelectionSet, v model.File) graphql.Marshaler {
-	return ec._File(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNFile2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐFileᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.File) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -16692,10 +17831,6 @@ func (ec *executionContext) unmarshalNFilePermission2exampleᚋhelloᚋgraphᚋm
 
 func (ec *executionContext) marshalNFilePermission2exampleᚋhelloᚋgraphᚋmodelᚐFilePermission(ctx context.Context, sel ast.SelectionSet, v model.FilePermission) graphql.Marshaler {
 	return v
-}
-
-func (ec *executionContext) marshalNFilePreference2exampleᚋhelloᚋgraphᚋmodelᚐFilePreference(ctx context.Context, sel ast.SelectionSet, v model.FilePreference) graphql.Marshaler {
-	return ec._FilePreference(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNFilePreference2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐFilePreferenceᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.FilePreference) graphql.Marshaler {
@@ -16734,10 +17869,6 @@ func (ec *executionContext) marshalNFileProperties2ᚖexampleᚋhelloᚋgraphᚋ
 	return ec._FileProperties(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNFileShare2exampleᚋhelloᚋgraphᚋmodelᚐFileShare(ctx context.Context, sel ast.SelectionSet, v model.FileShare) graphql.Marshaler {
-	return ec._FileShare(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNFileShare2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐFileShareᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.FileShare) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -16762,10 +17893,6 @@ func (ec *executionContext) marshalNFileShare2ᚖexampleᚋhelloᚋgraphᚋmodel
 		return graphql.Null
 	}
 	return ec._FileShare(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalNFlowchart2exampleᚋhelloᚋgraphᚋmodelᚐFlowchart(ctx context.Context, sel ast.SelectionSet, v model.Flowchart) graphql.Marshaler {
-	return ec._Flowchart(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNFlowchart2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐFlowchartᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Flowchart) graphql.Marshaler {
@@ -16802,10 +17929,6 @@ func (ec *executionContext) unmarshalNFlowchartStatus2exampleᚋhelloᚋgraphᚋ
 
 func (ec *executionContext) marshalNFlowchartStatus2exampleᚋhelloᚋgraphᚋmodelᚐFlowchartStatus(ctx context.Context, sel ast.SelectionSet, v model.FlowchartStatus) graphql.Marshaler {
 	return v
-}
-
-func (ec *executionContext) marshalNFolder2exampleᚋhelloᚋgraphᚋmodelᚐFolder(ctx context.Context, sel ast.SelectionSet, v model.Folder) graphql.Marshaler {
-	return ec._Folder(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNFolder2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐFolderᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Folder) graphql.Marshaler {
@@ -16877,8 +18000,7 @@ func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.Selec
 }
 
 func (ec *executionContext) unmarshalNID2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]string, len(vSlice))
 	for i := range vSlice {
@@ -16953,10 +18075,6 @@ func (ec *executionContext) unmarshalNMoveFileInput2exampleᚋhelloᚋgraphᚋmo
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNProject2exampleᚋhelloᚋgraphᚋmodelᚐProject(ctx context.Context, sel ast.SelectionSet, v model.Project) graphql.Marshaler {
-	return ec._Project(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNProject2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐProjectᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Project) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -17009,10 +18127,6 @@ func (ec *executionContext) marshalNProjectFile2ᚖexampleᚋhelloᚋgraphᚋmod
 	return ec._ProjectFile(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNProjectMember2exampleᚋhelloᚋgraphᚋmodelᚐProjectMember(ctx context.Context, sel ast.SelectionSet, v model.ProjectMember) graphql.Marshaler {
-	return ec._ProjectMember(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNProjectMember2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐProjectMemberᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ProjectMember) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -17057,10 +18171,6 @@ func (ec *executionContext) unmarshalNProjectVisibility2exampleᚋhelloᚋgraph�
 
 func (ec *executionContext) marshalNProjectVisibility2exampleᚋhelloᚋgraphᚋmodelᚐProjectVisibility(ctx context.Context, sel ast.SelectionSet, v model.ProjectVisibility) graphql.Marshaler {
 	return v
-}
-
-func (ec *executionContext) marshalNReport2exampleᚋhelloᚋgraphᚋmodelᚐReport(ctx context.Context, sel ast.SelectionSet, v model.Report) graphql.Marshaler {
-	return ec._Report(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNReport2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐReportᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Report) graphql.Marshaler {
@@ -17166,6 +18276,11 @@ func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel as
 	return res
 }
 
+func (ec *executionContext) unmarshalNTransferProjectOwnershipInput2exampleᚋhelloᚋgraphᚋmodelᚐTransferProjectOwnershipInput(ctx context.Context, v any) (model.TransferProjectOwnershipInput, error) {
+	res, err := ec.unmarshalInputTransferProjectOwnershipInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNUpdateFlowchartInput2exampleᚋhelloᚋgraphᚋmodelᚐUpdateFlowchartInput(ctx context.Context, v any) (model.UpdateFlowchartInput, error) {
 	res, err := ec.unmarshalInputUpdateFlowchartInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -17201,10 +18316,6 @@ func (ec *executionContext) unmarshalNUpdateUserProfileInput2exampleᚋhelloᚋg
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNUser2exampleᚋhelloᚋgraphᚋmodelᚐUser(ctx context.Context, sel ast.SelectionSet, v model.User) graphql.Marshaler {
-	return ec._User(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNUser2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐUserᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.User) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -17229,10 +18340,6 @@ func (ec *executionContext) marshalNUser2ᚖexampleᚋhelloᚋgraphᚋmodelᚐUs
 		return graphql.Null
 	}
 	return ec._User(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalNUserProfile2exampleᚋhelloᚋgraphᚋmodelᚐUserProfile(ctx context.Context, sel ast.SelectionSet, v model.UserProfile) graphql.Marshaler {
-	return ec._UserProfile(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNUserProfile2ᚖexampleᚋhelloᚋgraphᚋmodelᚐUserProfile(ctx context.Context, sel ast.SelectionSet, v *model.UserProfile) graphql.Marshaler {
@@ -17282,8 +18389,7 @@ func (ec *executionContext) marshalN__DirectiveLocation2string(ctx context.Conte
 }
 
 func (ec *executionContext) unmarshalN__DirectiveLocation2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]string, len(vSlice))
 	for i := range vSlice {
@@ -17476,8 +18582,7 @@ func (ec *executionContext) unmarshalOID2ᚕstringᚄ(ctx context.Context, v any
 	if v == nil {
 		return nil, nil
 	}
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]string, len(vSlice))
 	for i := range vSlice {

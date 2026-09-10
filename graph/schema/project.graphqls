@@ -26,21 +26,44 @@ type ProjectMember {
 }
 
 extend type Query {
+  # Single project
   project(id: ID!): Project
+
+  # Projects
   projects: [Project!]!
-  archivedProjects: [Project!]!
+  projectsByOwner(ownerId: ID!): [Project!]!
+  projectsForUser(userId: ID!): [Project!]!
+
+  # Archived projects
+  archivedProjectsByOwner(ownerId: ID!): [Project!]!
+  archivedProjectsForUser(userId: ID!): [Project!]!
+
+  # Members
   projectMembers(projectId: ID!): [ProjectMember!]!
 }
 
 extend type Mutation {
+  # Project
   createProject(input: CreateProjectInput!): Project!
   updateProject(input: UpdateProjectInput!): Project!
   archiveProject(projectId: ID!): Boolean!
   restoreProject(projectId: ID!): Boolean!
+  deleteProject(projectId: ID!): Boolean!
 
+  # Ownership
+  transferProjectOwnership(
+    input: TransferProjectOwnershipInput!
+  ): Project!
+
+  # Members
   addProjectMember(input: AddProjectMemberInput!): ProjectMember!
-  updateProjectMemberRole(input: UpdateProjectMemberRoleInput!): ProjectMember!
-  removeProjectMember(projectId: ID!, userId: ID!): Boolean!
+  updateProjectMemberRole(
+    input: UpdateProjectMemberRoleInput!
+  ): ProjectMember!
+  removeProjectMember(
+    projectId: ID!
+    userId: ID!
+  ): Boolean!
 }
 
 input CreateProjectInput {
@@ -67,4 +90,9 @@ input UpdateProjectMemberRoleInput {
   projectId: ID!
   userId: ID!
   role: ProjectRole!
+}
+
+input TransferProjectOwnershipInput {
+  projectId: ID!
+  ownerId: ID!
 }

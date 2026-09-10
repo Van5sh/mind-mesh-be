@@ -312,6 +312,11 @@ type ShareFileInput struct {
 	Permission FilePermission `json:"permission"`
 }
 
+type TransferProjectOwnershipInput struct {
+	ProjectID string `json:"projectId"`
+	OwnerID   string `json:"ownerId"`
+}
+
 type UpdateFlowchartInput struct {
 	FlowchartID   string `json:"flowchartId"`
 	Name          string `json:"name"`
@@ -421,7 +426,7 @@ func (e *ChatStatus) UnmarshalGQL(v any) error {
 }
 
 func (e ChatStatus) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *ChatStatus) UnmarshalJSON(b []byte) error {
@@ -476,7 +481,7 @@ func (e *ChatType) UnmarshalGQL(v any) error {
 }
 
 func (e ChatType) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *ChatType) UnmarshalJSON(b []byte) error {
@@ -531,7 +536,7 @@ func (e *FilePermission) UnmarshalGQL(v any) error {
 }
 
 func (e FilePermission) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *FilePermission) UnmarshalJSON(b []byte) error {
@@ -590,7 +595,7 @@ func (e *FlowchartStatus) UnmarshalGQL(v any) error {
 }
 
 func (e FlowchartStatus) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *FlowchartStatus) UnmarshalJSON(b []byte) error {
@@ -647,7 +652,7 @@ func (e *MessageRole) UnmarshalGQL(v any) error {
 }
 
 func (e MessageRole) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *MessageRole) UnmarshalJSON(b []byte) error {
@@ -706,7 +711,7 @@ func (e *ProjectRole) UnmarshalGQL(v any) error {
 }
 
 func (e ProjectRole) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *ProjectRole) UnmarshalJSON(b []byte) error {
@@ -761,7 +766,7 @@ func (e *ProjectVisibility) UnmarshalGQL(v any) error {
 }
 
 func (e ProjectVisibility) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *ProjectVisibility) UnmarshalJSON(b []byte) error {
@@ -818,7 +823,7 @@ func (e *ReportFormat) UnmarshalGQL(v any) error {
 }
 
 func (e ReportFormat) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *ReportFormat) UnmarshalJSON(b []byte) error {
@@ -877,7 +882,7 @@ func (e *ReportStatus) UnmarshalGQL(v any) error {
 }
 
 func (e ReportStatus) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *ReportStatus) UnmarshalJSON(b []byte) error {

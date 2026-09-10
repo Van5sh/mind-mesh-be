@@ -2,11 +2,14 @@ type User {
   id: ID!
   username: String!
   email: String!
+
   profile: UserProfile
+
   ownedProjects: [Project!]!
   projectMemberships: [ProjectMember!]!
   uploadedFiles: [File!]!
   sharedFiles: [FileShare!]!
+
   createdAt: Time!
   updatedAt: Time!
 }
@@ -22,22 +25,36 @@ type UserProfile {
 }
 
 extend type Query {
+  # Current authenticated user
   me: User
+
+  # Single user lookups
   user(id: ID!): User
+  userByEmail(email: String!): User
+  userByUsername(username: String!): User
+
+  # User profile
   userProfile(userId: ID!): UserProfile
+
+  # User collections
   allUsers: [User!]!
   users(ids: [ID!]!): [User!]!
 }
 
 extend type Mutation {
+  # User
   createUser(input: CreateUserInput!): User!
   updateUser(input: UpdateUserInput!): User!
   updateUserPassword(input: UpdateUserPasswordInput!): Boolean!
   deleteUser(userId: ID!): Boolean!
 
+  # User profile
   createUserProfile(input: CreateUserProfileInput!): UserProfile!
   updateUserProfile(input: UpdateUserProfileInput!): UserProfile!
-  updateUserAvatar(userId: ID!, avatarUrl: String): UserProfile!
+  updateUserAvatar(
+    userId: ID!
+    avatarUrl: String
+  ): UserProfile!
 }
 
 input CreateUserInput {
