@@ -1,9 +1,15 @@
-class EmbeddingBase:
-    def __init__(self, model):
-        self.model = model
+from abc import ABC, abstractmethod
 
-    def embed(self, text: str) -> list:
-        # Implement the embedding logic using the model
-        # For example, you can use the model to generate embeddings for the text
-        embedding = self.model.generate_embedding(text)
-        return embedding
+
+class BaseEmbedder(ABC):
+    """Base class for embedding models."""
+
+    @abstractmethod
+    def embed(self, text: str) -> list[float]:
+        """
+        Generate embedding for text.
+
+        Returns:
+            List of floats representing the embedding vector
+        """
+        pass

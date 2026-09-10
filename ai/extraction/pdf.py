@@ -1,17 +1,30 @@
-from pathlib import Path
+import logging
+
 from pypdf import PdfReader
 
-class PDFExtractor:
+from ai.extraction.base import BaseExtractor
+
+logger = logging.getLogger(__name__)
+
+
+class PDFExtractor(BaseExtractor):
+    """Extract text from PDF files."""
+
     def extract(self, file_path: str) -> str:
-        path = Path(file_path)
-        if not path.exists():
-            raise FileNotFoundError(f"File not found: {file_path}")
-        if not path.is_file():
-            raise ValueError(f"Path is not a file: {file_path}")
-        reader = PdfReader(path)
-        pages = []
-        for page in reader.pages:
-            text = page.extract_text()
-            if text:
-                pages.append(text)
-        return "\n\n".join(pages)
+        """Extract text from PDF."""
+        try:
+            reader = PdfReader(file_path)
+            text_parts = []
+
+            for page_num, page in enumerate(reader.pages):
+                text = page.extract_text()
+                if text:
+                    text_parts.append(text)
+
+            full_text = "\n".join(text_parts)
+            logger.info(f"Extracted {len(full_text)} chars from PDF")
+            return full_text
+
+        except Exception as e:
+            logger.error(f"Error extracting PDF: {e}")
+            raise

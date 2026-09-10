@@ -1,43 +1,81 @@
-from qdrant_client import QdrantClient
-from qdrant_client.models import PointStruct
+import logging
+import uuid
 
-from config.settings import get_settings
+from qdrant_client import QdrantClient as QdrantBaseClient
+from qdrant_client.models import Distance, VectorParams, PointStruct
+
+from ai.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 
-class QdrantService:
+class QdrantClient:
+    """Client for storing and retrieving vectors from Qdrant."""
 
-    def __init__(self) -> None:
-        settings = get_settings()
-
-        self.client = QdrantClient(
-            url=settings.qdrant_url,
-            api_key=settings.qdrant_api_key,
+    def __init__(self):
+        self.client = QdrantBaseClient(
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY,
         )
+        self.collection_name = settings.QDRANT_COLLECTION
 
-        self.collection_name = settings.qdrant_collection
+        # Ensure collection exists
+        self._ensure_collection()
 
-    def upsert(
+    def _ensure_collection(self):
+        """Create collection if it doesn't exist."""
+        try:
+            self.client.get_collection(self.collection_name)
+        except Exception:
+            logger.info(f"Creating Qdrant collection: {self.collection_name}")
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=VectorParams(
+                    size=settings.EMBEDDING_DIMENSION,
+                    distance=Distance.COSINE,
+                ),
+            )
+
+    def store_document(
         self,
-        points: list[PointStruct],
+        file_id: str,
+        project_id: str,
+        summary: str,
+        chunks: list[dict],
     ) -> None:
-        self.client.upsert(
-            collection_name=self.collection_name,
-            points=points,
-        )
+        """
+        Store document chunks as vectors in Qdrant.
 
-    def delete_by_file_id(self, file_id: str) -> None:
-        self.client.delete(
-            collection_name=self.collection_name,
-            points_selector={
-                "filter": {
-                    "must": [
-                        {
-                            "key": "file_id",
-                            "match": {
-                                "value": file_id,
-                            },
-                        }
-                    ]
-                }
-            },
-        )
+        Args:
+            file_id: File ID
+            project_id: Project ID
+            summary: Document summary
+            chunks: List of {"chunk_index", "text", "embedding"}
+        """
+        try:
+            points = []
+            for chunk in chunks:
+                point_id = str(uuid.uuid4())
+                points.append(
+                    PointStruct(
+                        id=point_id,
+                        vector=chunk["embedding"],
+                        payload={
+                            "file_id": file_id,
+                            "project_id": project_id,
+                            "chunk_index": chunk["chunk_index"],
+                            "text": chunk["text"],
+                            "summary": summary,
+                        },
+                    )
+                )
+
+            self.client.upsert(
+                collection_name=self.collection_name,
+                points=points,
+            )
+            logger.info(f"Stored {len(points)} vectors for file {file_id}")
+
+        except Exception as e:
+            logger.error(f"Error storing vectors in Qdrant: {e}")
+            raise

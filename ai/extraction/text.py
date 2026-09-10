@@ -1,15 +1,20 @@
-from pathlib import Path
+import logging
+
+from ai.extraction.base import BaseExtractor
+
+logger = logging.getLogger(__name__)
 
 
-class TextExtractor:
+class TextExtractor(BaseExtractor):
+    """Extract text from plain text files."""
 
     def extract(self, file_path: str) -> str:
-        path = Path(file_path)
-
-        if not path.exists():
-            raise FileNotFoundError(f"File not found: {file_path}")
-
-        if not path.is_file():
-            raise ValueError(f"Path is not a file: {file_path}")
-        
-        return path.read_text(encoding="utf-8")
+        """Extract text from TXT file."""
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                text = f.read()
+            logger.info(f"Extracted {len(text)} chars from TXT")
+            return text
+        except Exception as e:
+            logger.error(f"Error extracting TXT: {e}")
+            raise
