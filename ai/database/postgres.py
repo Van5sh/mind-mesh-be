@@ -33,7 +33,7 @@ class PostgresClient:
     ) -> None:
         """
         Update file processing status.
-        
+
         Args:
             file_id: File ID
             project_id: Project ID
@@ -80,4 +80,51 @@ class PostgresClient:
 
         except Exception as e:
             logger.error(f"Error updating file status: {e}")
+            raise
+
+    def get_file_status(self, file_id: str, project_id: str) -> dict:
+        """
+        Get file processing status.
+
+        Args:
+            file_id: File ID
+            project_id: Project ID
+
+        Returns:
+            Dictionary with file status and metadata
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+            query = """
+                SELECT id, file_id, project_id, processing_status, 
+                       summary, error_message, processed_at
+                FROM files
+                WHERE id = %s AND project_id = %s
+            """
+
+            cursor.execute(query, (file_id, project_id))
+            result = cursor.fetchone()
+
+            cursor.close()
+            conn.close()
+
+            return dict(result) if result else None
+
+        except Exception as e:
+            logger.error(f"Error fetching file status: {e}")
+            raise
+
+    def check_connectivity(self) -> bool:
+        """Check if PostgreSQL is reachable."""
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.close()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"PostgreSQL connectivity check failed: {e}")
             raise

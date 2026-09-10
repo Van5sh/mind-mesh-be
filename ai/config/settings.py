@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "mistral"
     OLLAMA_EMBEDDING_MODEL: str = "nomic-embed-text"
 
+    # API
+    API_HOST: str = "0.0.0.0"
+    API_PORT: int = 8000
+
     class Config:
         env_file = ".env"
 
