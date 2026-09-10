@@ -7,7 +7,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// newUUID creates a valid PostgreSQL UUID for INSERT parameters.
 func newUUID() pgtype.UUID {
 	return pgtype.UUID{
 		Bytes: uuid.New(),
@@ -15,7 +14,6 @@ func newUUID() pgtype.UUID {
 	}
 }
 
-// parseUUID converts a GraphQL ID value to a valid PostgreSQL UUID.
 func parseUUID(value string) (pgtype.UUID, error) {
 	id, err := uuid.Parse(value)
 	if err != nil {
@@ -28,7 +26,6 @@ func parseUUID(value string) (pgtype.UUID, error) {
 	}, nil
 }
 
-// uuidString converts a PostgreSQL UUID to the GraphQL ID representation.
 func uuidString(id pgtype.UUID) string {
 	if !id.Valid {
 		return ""
@@ -36,4 +33,3 @@ func uuidString(id pgtype.UUID) string {
 
 	return uuid.UUID(id.Bytes).String()
 }
-

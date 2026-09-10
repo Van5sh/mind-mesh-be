@@ -95,8 +95,6 @@ func (s *UserService) CreateUserProfile(
 		return database.UserProfile{}, err
 	}
 
-	// Profiles are created together with users. Keep this method compatible
-	// with the public mutation by treating it as the initial profile update.
 	if _, err := s.guard.EnsureUserProfileExists(ctx, params.UserID); err == nil {
 		profile, updateErr := s.repo.UpdateUserProfile(ctx, database.UpdateUserProfileParams(params))
 		if updateErr != nil {
