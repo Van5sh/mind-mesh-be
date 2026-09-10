@@ -34,7 +34,9 @@ input CreateReportInput {
   title: String!
   content: String!
   format: ReportFormat!
+  generatedById: ID!
   generatedByAI: Boolean!
+  status: ReportStatus!
   sourceChatId: ID
 }
 

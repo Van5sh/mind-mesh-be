@@ -81,18 +81,19 @@ type CreateChatInput struct {
 }
 
 type CreateFileInput struct {
-	ProjectID *string `json:"projectId,omitempty"`
-	FolderID  *string `json:"folderId,omitempty"`
-	Name      string  `json:"name"`
-	Size      int     `json:"size"`
+	FolderID *string `json:"folderId,omitempty"`
+	Name     string  `json:"name"`
+	Size     int     `json:"size"`
 }
 
 type CreateFlowchartInput struct {
-	ProjectID     string  `json:"projectId"`
-	Name          string  `json:"name"`
-	Data          string  `json:"data"`
-	GeneratedByAi bool    `json:"generatedByAI"`
-	SourceChatID  *string `json:"sourceChatId,omitempty"`
+	ProjectID     string          `json:"projectId"`
+	Name          string          `json:"name"`
+	Data          string          `json:"data"`
+	GeneratedByID string          `json:"generatedById"`
+	GeneratedByAi bool            `json:"generatedByAI"`
+	Status        FlowchartStatus `json:"status"`
+	SourceChatID  *string         `json:"sourceChatId,omitempty"`
 }
 
 type CreateFolderInput struct {
@@ -103,6 +104,7 @@ type CreateFolderInput struct {
 
 type CreateProjectInput struct {
 	Name        string            `json:"name"`
+	OwnerID     string            `json:"ownerId"`
 	Description *string           `json:"description,omitempty"`
 	Visibility  ProjectVisibility `json:"visibility"`
 }
@@ -112,7 +114,9 @@ type CreateReportInput struct {
 	Title         string       `json:"title"`
 	Content       string       `json:"content"`
 	Format        ReportFormat `json:"format"`
+	GeneratedByID string       `json:"generatedById"`
 	GeneratedByAi bool         `json:"generatedByAI"`
+	Status        ReportStatus `json:"status"`
 	SourceChatID  *string      `json:"sourceChatId,omitempty"`
 }
 
@@ -223,9 +227,8 @@ type Folder struct {
 func (Folder) IsFolderItem() {}
 
 type MoveFileInput struct {
-	FileID    string  `json:"fileId"`
-	FolderID  *string `json:"folderId,omitempty"`
-	ProjectID *string `json:"projectId,omitempty"`
+	FileID   string  `json:"fileId"`
+	FolderID *string `json:"folderId,omitempty"`
 }
 
 type Mutation struct {
@@ -289,6 +292,7 @@ type ReportProperties struct {
 
 type SendMessageInput struct {
 	ChatID            string      `json:"chatId"`
+	SenderID          *string     `json:"senderId,omitempty"`
 	Role              MessageRole `json:"role"`
 	Content           string      `json:"content"`
 	MentionedUserIds  []string    `json:"mentionedUserIds,omitempty"`
@@ -309,11 +313,10 @@ type ShareFileInput struct {
 }
 
 type UpdateFlowchartInput struct {
-	FlowchartID   string  `json:"flowchartId"`
-	Name          string  `json:"name"`
-	Data          string  `json:"data"`
-	GeneratedByAi bool    `json:"generatedByAI"`
-	SourceChatID  *string `json:"sourceChatId,omitempty"`
+	FlowchartID   string `json:"flowchartId"`
+	Name          string `json:"name"`
+	Data          string `json:"data"`
+	GeneratedByAi bool   `json:"generatedByAI"`
 }
 
 type UpdateProjectInput struct {

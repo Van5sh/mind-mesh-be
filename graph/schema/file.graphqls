@@ -127,7 +127,6 @@ input CreateFolderInput {
 }
 
 input CreateFileInput {
-  projectId: ID
   folderId: ID
   name: String!
   size: Int64!
@@ -136,7 +135,6 @@ input CreateFileInput {
 input MoveFileInput {
   fileId: ID!
   folderId: ID
-  projectId: ID
 }
 
 input ShareFileInput {

@@ -14,3 +14,4 @@ type Resolver struct {
 func NewResolver(application *app.App) *Resolver {
 	return &Resolver{App: application}
 }
+

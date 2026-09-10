@@ -12598,20 +12598,13 @@ func (ec *executionContext) unmarshalInputCreateFileInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"projectId", "folderId", "name", "size"}
+	fieldsInOrder := [...]string{"folderId", "name", "size"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "projectId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("projectId"))
-			data, err := ec.unmarshalOID2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.ProjectID = data
 		case "folderId":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("folderId"))
 			data, err := ec.unmarshalOID2ᚖstring(ctx, v)
@@ -12649,7 +12642,7 @@ func (ec *executionContext) unmarshalInputCreateFlowchartInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"projectId", "name", "data", "generatedByAI", "sourceChatId"}
+	fieldsInOrder := [...]string{"projectId", "name", "data", "generatedById", "generatedByAI", "status", "sourceChatId"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12677,6 +12670,13 @@ func (ec *executionContext) unmarshalInputCreateFlowchartInput(ctx context.Conte
 				return it, err
 			}
 			it.Data = data
+		case "generatedById":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("generatedById"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.GeneratedByID = data
 		case "generatedByAI":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("generatedByAI"))
 			data, err := ec.unmarshalNBoolean2bool(ctx, v)
@@ -12684,6 +12684,13 @@ func (ec *executionContext) unmarshalInputCreateFlowchartInput(ctx context.Conte
 				return it, err
 			}
 			it.GeneratedByAi = data
+		case "status":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("status"))
+			data, err := ec.unmarshalNFlowchartStatus2exampleᚋhelloᚋgraphᚋmodelᚐFlowchartStatus(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Status = data
 		case "sourceChatId":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sourceChatId"))
 			data, err := ec.unmarshalOID2ᚖstring(ctx, v)
@@ -12751,7 +12758,7 @@ func (ec *executionContext) unmarshalInputCreateProjectInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"name", "description", "visibility"}
+	fieldsInOrder := [...]string{"name", "ownerId", "description", "visibility"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12765,6 +12772,13 @@ func (ec *executionContext) unmarshalInputCreateProjectInput(ctx context.Context
 				return it, err
 			}
 			it.Name = data
+		case "ownerId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ownerId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OwnerID = data
 		case "description":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -12795,7 +12809,7 @@ func (ec *executionContext) unmarshalInputCreateReportInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"projectId", "title", "content", "format", "generatedByAI", "sourceChatId"}
+	fieldsInOrder := [...]string{"projectId", "title", "content", "format", "generatedById", "generatedByAI", "status", "sourceChatId"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12830,6 +12844,13 @@ func (ec *executionContext) unmarshalInputCreateReportInput(ctx context.Context,
 				return it, err
 			}
 			it.Format = data
+		case "generatedById":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("generatedById"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.GeneratedByID = data
 		case "generatedByAI":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("generatedByAI"))
 			data, err := ec.unmarshalNBoolean2bool(ctx, v)
@@ -12837,6 +12858,13 @@ func (ec *executionContext) unmarshalInputCreateReportInput(ctx context.Context,
 				return it, err
 			}
 			it.GeneratedByAi = data
+		case "status":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("status"))
+			data, err := ec.unmarshalNReportStatus2exampleᚋhelloᚋgraphᚋmodelᚐReportStatus(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Status = data
 		case "sourceChatId":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sourceChatId"))
 			data, err := ec.unmarshalOID2ᚖstring(ctx, v)
@@ -12962,7 +12990,7 @@ func (ec *executionContext) unmarshalInputMoveFileInput(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"fileId", "folderId", "projectId"}
+	fieldsInOrder := [...]string{"fileId", "folderId"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12983,13 +13011,6 @@ func (ec *executionContext) unmarshalInputMoveFileInput(ctx context.Context, obj
 				return it, err
 			}
 			it.FolderID = data
-		case "projectId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("projectId"))
-			data, err := ec.unmarshalOID2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.ProjectID = data
 		}
 	}
 	return it, nil
@@ -13006,7 +13027,7 @@ func (ec *executionContext) unmarshalInputSendMessageInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"chatId", "role", "content", "mentionedUserIds", "referencedFileIds"}
+	fieldsInOrder := [...]string{"chatId", "senderId", "role", "content", "mentionedUserIds", "referencedFileIds"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -13020,6 +13041,13 @@ func (ec *executionContext) unmarshalInputSendMessageInput(ctx context.Context, 
 				return it, err
 			}
 			it.ChatID = data
+		case "senderId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("senderId"))
+			data, err := ec.unmarshalOID2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SenderID = data
 		case "role":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
 			data, err := ec.unmarshalNMessageRole2exampleᚋhelloᚋgraphᚋmodelᚐMessageRole(ctx, v)
@@ -13159,7 +13187,7 @@ func (ec *executionContext) unmarshalInputUpdateFlowchartInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"flowchartId", "name", "data", "generatedByAI", "sourceChatId"}
+	fieldsInOrder := [...]string{"flowchartId", "name", "data", "generatedByAI"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -13194,13 +13222,6 @@ func (ec *executionContext) unmarshalInputUpdateFlowchartInput(ctx context.Conte
 				return it, err
 			}
 			it.GeneratedByAi = data
-		case "sourceChatId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sourceChatId"))
-			data, err := ec.unmarshalOID2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.SourceChatID = data
 		}
 	}
 	return it, nil

@@ -45,6 +45,7 @@ extend type Mutation {
 
 input CreateProjectInput {
   name: String!
+  ownerId: ID!
   description: String
   visibility: ProjectVisibility!
 }

@@ -11,16 +11,20 @@ import (
 	"fmt"
 )
 
+// Empty is the resolver for the _empty field.
 func (r *mutationResolver) Empty(ctx context.Context) (*bool, error) {
 	panic(fmt.Errorf("not implemented: Empty - _empty"))
 }
 
+// Empty is the resolver for the _empty field.
 func (r *queryResolver) Empty(ctx context.Context) (*bool, error) {
 	panic(fmt.Errorf("not implemented: Empty - _empty"))
 }
 
+// Mutation returns graph.MutationResolver implementation.
 func (r *Resolver) Mutation() graph.MutationResolver { return &mutationResolver{r} }
 
+// Query returns graph.QueryResolver implementation.
 func (r *Resolver) Query() graph.QueryResolver { return &queryResolver{r} }
 
 type (

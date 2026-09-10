@@ -73,6 +73,7 @@ input AddChatParticipantInput {
 
 input SendMessageInput {
   chatId: ID!
+  senderId: ID
   role: MessageRole!
   content: String!
   mentionedUserIds: [ID!]

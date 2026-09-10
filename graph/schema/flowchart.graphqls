@@ -30,7 +30,9 @@ input CreateFlowchartInput {
   projectId: ID!
   name: String!
   data: JSON!
+  generatedById: ID!
   generatedByAI: Boolean!
+  status: FlowchartStatus!
   sourceChatId: ID
 }
 
@@ -39,5 +41,4 @@ input UpdateFlowchartInput {
   name: String!
   data: JSON!
   generatedByAI: Boolean!
-  sourceChatId: ID
 }
