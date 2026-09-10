@@ -28,12 +28,15 @@ func (s *UserService) CreateUser(
 	ctx context.Context,
 	params database.CreateUserParams,
 ) (database.User, error) {
+
 	if err := validators.ValidateUsername(params.Username); err != nil {
 		return database.User{}, err
 	}
+
 	if err := validators.ValidateEmail(params.Email); err != nil {
 		return database.User{}, err
 	}
+
 	if err := validators.ValidatePasswordHash(params.PasswordHash); err != nil {
 		return database.User{}, err
 	}
@@ -41,13 +44,31 @@ func (s *UserService) CreateUser(
 	if err := s.guard.EnsureUsernameAvailable(ctx, params.Username); err != nil {
 		return database.User{}, err
 	}
+
 	if err := s.guard.EnsureEmailAvailable(ctx, params.Email); err != nil {
 		return database.User{}, err
 	}
 
 	user, err := s.repo.CreateUser(ctx, params)
 	if err != nil {
-		return database.User{}, apperrors.InternalError("failed to create user", err)
+		return database.User{}, apperrors.InternalError(
+			"failed to create user",
+			err,
+		)
+	}
+
+	_, err = s.repo.CreateUserProfile(ctx, database.CreateUserProfileParams{
+		UserID:    user.ID,
+		FirstName: "",
+		LastName:  "",
+		Bio:       pgtype.Text{Valid: false},
+		AvatarUrl: pgtype.Text{Valid: false},
+	})
+	if err != nil {
+		return database.User{}, apperrors.InternalError(
+			"failed to create user profile",
+			err,
+		)
 	}
 
 	return user, nil
