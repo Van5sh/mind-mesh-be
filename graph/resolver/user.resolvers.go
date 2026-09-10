@@ -8,12 +8,27 @@ package graph
 import (
 	"context"
 	"example/hello/graph/model"
+	"example/hello/internal/database"
 	"fmt"
 )
 
 // CreateUser is the resolver for the createUser field.
 func (r *mutationResolver) CreateUser(ctx context.Context, input model.CreateUserInput) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: CreateUser - createUser"))
+	dbUser, err := r.App.Services.User.CreateUser(ctx, database.CreateUserParams{
+		ID:           newUUID(),
+		Username:     input.Username,
+		Email:        input.Email,
+		PasswordHash: input.PasswordHash,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+
+	return &model.User{
+		ID:       dbUser.ID.String(),
+		Username: dbUser.Username,
+		Email:    dbUser.Email,
+	}, nil
 }
 
 // UpdateUser is the resolver for the updateUser field.
