@@ -203,4 +203,3 @@ func textPointer(value pgtype.Text) *string {
 	}
 	return &value.String
 }
-
