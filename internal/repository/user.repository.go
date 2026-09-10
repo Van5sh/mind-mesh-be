@@ -6,15 +6,18 @@ import (
 	"example/hello/internal/database"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type UserRepository struct {
-	q *database.Queries
+	db *pgxpool.Pool
+	q  *database.Queries
 }
 
-func NewUserRepository(q *database.Queries) *UserRepository {
+func NewUserRepository(db *pgxpool.Pool, q *database.Queries) *UserRepository {
 	return &UserRepository{
-		q: q,
+		db: db,
+		q:  q,
 	}
 }
 
@@ -36,7 +39,34 @@ func (r *UserRepository) CreateUser(
 	ctx context.Context,
 	params database.CreateUserParams,
 ) (database.User, error) {
-	return r.q.CreateUser(ctx, params)
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return database.User{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	queries := r.q.WithTx(tx)
+	user, err := queries.CreateUser(ctx, params)
+	if err != nil {
+		return database.User{}, err
+	}
+
+	// Registration does not collect a person's name. Use the username as the
+	// initial profile name; it can be replaced with UpdateUserProfile after
+	// registration.
+	if _, err := queries.CreateUserProfile(ctx, database.CreateUserProfileParams{
+		UserID:    user.ID,
+		FirstName: user.Username,
+		LastName:  user.Username,
+	}); err != nil {
+		return database.User{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return database.User{}, err
+	}
+
+	return user, nil
 }
 
 func (r *UserRepository) CreateUserProfile(
@@ -74,13 +104,16 @@ func (r *UserRepository) GetUsersByIDs(
 	return r.q.GetUsersByIDs(ctx, ids)
 }
 
+func (r *UserRepository) GetAllUsers(ctx context.Context) ([]database.User, error) {
+	return r.q.GetAllUsers(ctx)
+}
+
 func (r *UserRepository) GetUserProfile(
 	ctx context.Context,
 	userID pgtype.UUID,
 ) (database.UserProfile, error) {
 	return r.q.GetUserProfile(ctx, userID)
 }
-
 
 func (r *UserRepository) GetUserWithProfile(
 	ctx context.Context,

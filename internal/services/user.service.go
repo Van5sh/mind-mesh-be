@@ -74,12 +74,32 @@ func (s *UserService) CreateUserProfile(
 		return database.UserProfile{}, err
 	}
 
+	// Profiles are created together with users. Keep this method compatible
+	// with the public mutation by treating it as the initial profile update.
+	if _, err := s.guard.EnsureUserProfileExists(ctx, params.UserID); err == nil {
+		profile, updateErr := s.repo.UpdateUserProfile(ctx, database.UpdateUserProfileParams(params))
+		if updateErr != nil {
+			return database.UserProfile{}, apperrors.InternalError("failed to update user profile", updateErr)
+		}
+		return profile, nil
+	} else if !apperrors.IsCode(err, apperrors.NotFound) {
+		return database.UserProfile{}, err
+	}
+
 	profile, err := s.repo.CreateUserProfile(ctx, params)
 	if err != nil {
 		return database.UserProfile{}, apperrors.InternalError("failed to create user profile", err)
 	}
 
 	return profile, nil
+}
+
+func (s *UserService) GetAllUsers(ctx context.Context) ([]database.User, error) {
+	users, err := s.repo.GetAllUsers(ctx)
+	if err != nil {
+		return nil, apperrors.InternalError("failed to fetch users", err)
+	}
+	return users, nil
 }
 
 func (s *UserService) GetUserByID(

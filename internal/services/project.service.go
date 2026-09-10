@@ -101,7 +101,7 @@ func (s *ProjectService) ArchiveProject(ctx context.Context, projectID pgtype.UU
 	}
 	_, err := s.projectGuard.EnsureProjectExists(ctx, projectID)
 	if err != nil {
-		return apperrors.Validation("Already exists")
+		return err
 	}
 	project, err := s.repo.GetProjectByID(ctx, projectID)
 	if err != nil {
@@ -125,7 +125,7 @@ func (s *ProjectService) DeleteProject(ctx context.Context, projectID pgtype.UUI
 	}
 	_, err := s.projectGuard.EnsureProjectExists(ctx, projectID)
 	if err != nil {
-		return apperrors.Validation("Already exists")
+		return err
 	}
 	err = s.repo.DeleteProject(ctx, projectID)
 	if err != nil {
@@ -184,6 +184,15 @@ func (s *ProjectService) UpdateProject(ctx context.Context, params database.Upda
 	if err := validators.ValidateUUID("project id", params.ID); err != nil {
 		return database.Project{}, err
 	}
+	if err := validators.ValidateProjectName(params.Name); err != nil {
+		return database.Project{}, err
+	}
+	if err := validators.ValidateProjectDescription(params.Description.String); err != nil {
+		return database.Project{}, err
+	}
+	if _, err := s.projectGuard.EnsureProjectExists(ctx, params.ID); err != nil {
+		return database.Project{}, err
+	}
 	project, err := s.repo.UpdateProject(ctx, params)
 	if err != nil {
 		return database.Project{}, apperrors.InternalError("failed to update project", err)
@@ -198,7 +207,17 @@ func (s *ProjectService) RemoveProjectMember(ctx context.Context, params databas
 	if err := validators.ValidateUUID("user id", params.UserID); err != nil {
 		return err
 	}
-	err := s.repo.RemoveProjectMember(ctx, params)
+	project, err := s.projectGuard.EnsureProjectExists(ctx, params.ProjectID)
+	if err != nil {
+		return err
+	}
+	if project.OwnerID == params.UserID {
+		return apperrors.ForbiddenError("cannot remove the project owner")
+	}
+	if _, err := s.projectGuard.EnsureProjectMember(ctx, params.ProjectID, params.UserID); err != nil {
+		return err
+	}
+	err = s.repo.RemoveProjectMember(ctx, params)
 	if err != nil {
 		return apperrors.InternalError("failed to remove project member", err)
 	}
@@ -223,7 +242,14 @@ func (s *ProjectService) RestoreProject(ctx context.Context, projectID pgtype.UU
 	if err := validators.ValidateUUID("project id", projectID); err != nil {
 		return err
 	}
-	err := s.repo.RestoreProject(ctx, projectID)
+	project, err := s.projectGuard.EnsureProjectExists(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if !project.ArchivedAt.Valid {
+		return apperrors.ConflictError("project is not archived")
+	}
+	err = s.repo.RestoreProject(ctx, projectID)
 	if err != nil {
 		return apperrors.InternalError("failed to restore project", err)
 	}
@@ -235,6 +261,12 @@ func (s *ProjectService) TransferOwnership(ctx context.Context, params database.
 		return database.Project{}, err
 	}
 	if err := validators.ValidateUUID("new owner id", params.OwnerID); err != nil {
+		return database.Project{}, err
+	}
+	if _, err := s.projectGuard.EnsureProjectExists(ctx, params.ID); err != nil {
+		return database.Project{}, err
+	}
+	if _, err := s.userGuard.EnsureUserExists(ctx, params.OwnerID); err != nil {
 		return database.Project{}, err
 	}
 	project, err := s.repo.TransferOwnership(ctx, params)

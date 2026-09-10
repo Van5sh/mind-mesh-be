@@ -33,6 +33,11 @@ FROM users
 WHERE id = ANY($1::UUID[])
 ORDER BY username;
 
+-- name: GetAllUsers :many
+SELECT *
+FROM users
+ORDER BY username;
+
 
 -- name: UpdateUser :one
 UPDATE users

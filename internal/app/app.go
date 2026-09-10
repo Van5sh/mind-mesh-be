@@ -70,9 +70,9 @@ func New(ctx context.Context, databaseURL string) (*App, error) {
 		Chat:      repository.NewChatRepository(queries),
 		File:      repository.NewFileRepository(queries),
 		Flowchart: repository.NewFlowchartRepository(queries),
-		Project:   repository.NewProjectRepository(queries),
+		Project:   repository.NewProjectRepository(db, queries),
 		Report:    repository.NewReportRepository(queries),
-		User:      repository.NewUserRepository(queries),
+		User:      repository.NewUserRepository(db, queries),
 	}
 	appGuards := Guards{
 		Activity:  guards.NewActivityGuard(repositories.Activity),

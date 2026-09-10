@@ -4,16 +4,20 @@ import (
 	"context"
 	"example/hello/internal/database"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type ProjectRepository struct {
-	q *database.Queries
+	db *pgxpool.Pool
+	q  *database.Queries
 }
 
-func NewProjectRepository(q *database.Queries) *ProjectRepository {
+func NewProjectRepository(db *pgxpool.Pool, q *database.Queries) *ProjectRepository {
 	return &ProjectRepository{
-		q: q,
+		db: db,
+		q:  q,
 	}
 }
 
@@ -26,7 +30,29 @@ func (r *ProjectRepository) ArchiveProject(ctx context.Context, id pgtype.UUID) 
 }
 
 func (r *ProjectRepository) CreateProject(ctx context.Context, params database.CreateProjectParams) (database.Project, error) {
-	return r.q.CreateProject(ctx, params)
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return database.Project{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	queries := r.q.WithTx(tx)
+	project, err := queries.CreateProject(ctx, params)
+	if err != nil {
+		return database.Project{}, err
+	}
+	if _, err := queries.AddProjectMember(ctx, database.AddProjectMemberParams{
+		ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+		ProjectID: project.ID,
+		UserID:    project.OwnerID,
+		Role:      database.ProjectRoleOWNER,
+	}); err != nil {
+		return database.Project{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return database.Project{}, err
+	}
+	return project, nil
 }
 
 func (r *ProjectRepository) DeleteProject(ctx context.Context, id pgtype.UUID) error {
