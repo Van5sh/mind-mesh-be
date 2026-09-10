@@ -279,6 +279,5 @@ func (s *ReportService) UpdateReportStatus(
 			err,
 		)
 	}
-
 	return report, nil
 }

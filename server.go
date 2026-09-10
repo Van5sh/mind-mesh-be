@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"example/hello/graph"
+	graphresolver "example/hello/graph/resolver"
+	"example/hello/internal/app"
 	"example/hello/internal/services/aws"
 	"log"
 	"net/http"
@@ -13,6 +15,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/joho/godotenv"
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
@@ -20,6 +23,9 @@ const defaultPort = "8080"
 
 func main() {
 	ctx := context.Background()
+	if err := godotenv.Load(); err != nil {
+		log.Println("Warning: .env file not found, using system environment variables")
+	}
 
 	// Initialize AWS configuration
 	awsConfig, err := aws.InitializeAWSConfig(ctx)
@@ -32,7 +38,13 @@ func main() {
 		port = defaultPort
 	}
 
-	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{}}))
+	application, err := app.New(ctx, os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Fatalf("initialize application: %v", err)
+	}
+	defer application.Close()
+
+	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: graphresolver.NewResolver(application)}))
 
 	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.GET{})

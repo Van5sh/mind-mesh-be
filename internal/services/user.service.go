@@ -17,10 +17,10 @@ type UserService struct {
 	guard *guards.UserGuard
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
+func NewUserService(repo *repository.UserRepository, guard *guards.UserGuard) *UserService {
 	return &UserService{
 		repo:  repo,
-		guard: guards.NewUserGuard(repo),
+		guard: guard,
 	}
 }
 

@@ -20,12 +20,13 @@ type ProjectService struct {
 
 func NewProjectService(
 	repo *repository.ProjectRepository,
-	userRepo *repository.UserRepository,
+	userGuard *guards.UserGuard,
+	projectGuard *guards.ProjectGuard,
 ) *ProjectService {
 	return &ProjectService{
 		repo:         repo,
-		userGuard:    guards.NewUserGuard(userRepo),
-		projectGuard: guards.NewProjectGuard(repo),
+		userGuard:    userGuard,
+		projectGuard: projectGuard,
 	}
 }
 

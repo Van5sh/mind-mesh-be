@@ -17,10 +17,10 @@ type ChatService struct {
 	guard *guards.ChatGuard
 }
 
-func NewChatService(repo *repository.ChatRepository) *ChatService {
+func NewChatService(repo *repository.ChatRepository, guard *guards.ChatGuard) *ChatService {
 	return &ChatService{
 		repo:  repo,
-		guard: guards.NewChatGuard(repo),
+		guard: guard,
 	}
 }
 

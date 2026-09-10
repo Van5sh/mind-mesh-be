@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 
 	"example/hello/graph"
+	graphresolver "example/hello/graph/resolver"
+	"example/hello/internal/app"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
@@ -26,20 +29,21 @@ func StartServer() {
 		log.Println("Warning: .env file not found, using system environment variables")
 	}
 
-	// postgres.InitDB()
-	log.Println("Database initialized successfully")
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = defaultPort
 	}
 
-	app := fiber.New()
-
-	resolver := &graph.Resolver{
-		// UsersData: postgres.UsersRepo{},
+	application, err := app.New(context.Background(), os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Fatalf("initialize application: %v", err)
 	}
+	defer application.Close()
+	log.Println("Application initialized successfully")
 
-	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: resolver}))
+	server := fiber.New()
+
+	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: graphresolver.NewResolver(application)}))
 
 	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.GET{})
@@ -54,24 +58,26 @@ func StartServer() {
 
 	playgroundHandler := playground.Handler("GraphQL Playground", "/query")
 
-	app.Get("/", func(c *fiber.Ctx) {
+	server.Get("/", func(c *fiber.Ctx) {
 		fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			playgroundHandler.ServeHTTP(w, r)
 		}))(c.Fasthttp)
 	})
 
-	app.Post("/query", func(c *fiber.Ctx) {
+	server.Post("/query", func(c *fiber.Ctx) {
 		fasthttpadaptor.NewFastHTTPHandler(srv)(c.Fasthttp)
 	})
 
-	app.Get("/query", func(c *fiber.Ctx) {
+	server.Get("/query", func(c *fiber.Ctx) {
 		fasthttpadaptor.NewFastHTTPHandler(srv)(c.Fasthttp)
 	})
 
 	log.Printf("🚀 Server ready at http://localhost:%s/", port)
 	log.Printf("🔍 GraphQL Playground at http://localhost:%s/", port)
 	log.Printf("📡 GraphQL endpoint at http://localhost:%s/query", port)
-	app.Listen(port)
+	if err := server.Listen(":" + port); err != nil {
+		log.Fatalf("start server: %v", err)
+	}
 }
 
 func main() {

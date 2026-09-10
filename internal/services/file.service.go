@@ -18,10 +18,10 @@ type FileService struct {
 	guards *guards.FileGuard
 }
 
-func NewFileService(repo *repository.FileRepository) *FileService {
+func NewFileService(repo *repository.FileRepository, guard *guards.FileGuard) *FileService {
 	return &FileService{
 		repo:   repo,
-		guards: guards.NewFileGuard(repo),
+		guards: guard,
 	}
 }
 
