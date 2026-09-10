@@ -1,0 +1,16 @@
+type ActivityLog {
+  id: ID!
+  project: Project
+  user: User
+  action: String!
+  entityType: String
+  entityId: ID
+  createdAt: Time!
+}
+
+extend type Query {
+  activityLogs(
+    projectId: ID
+    userId: ID
+  ): [ActivityLog!]!
+}

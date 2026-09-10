@@ -1,0 +1,46 @@
+type Report {
+  id: ID!
+  project: Project!
+  title: String!
+  content: String!
+  format: ReportFormat!
+  properties: ReportProperties!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type ReportProperties {
+  report: Report!
+  generatedBy: User!
+  generatedByAI: Boolean!
+  status: ReportStatus!
+  sourceChat: Chat
+}
+
+extend type Query {
+  report(id: ID!): Report
+  reports(projectId: ID!): [Report!]!
+}
+
+extend type Mutation {
+  createReport(input: CreateReportInput!): Report!
+  updateReport(input: UpdateReportInput!): Report!
+  updateReportStatus(reportId: ID!, status: ReportStatus!): Report!
+  deleteReport(reportId: ID!): Boolean!
+}
+
+input CreateReportInput {
+  projectId: ID!
+  title: String!
+  content: String!
+  format: ReportFormat!
+  generatedByAI: Boolean!
+  sourceChatId: ID
+}
+
+input UpdateReportInput {
+  reportId: ID!
+  title: String!
+  content: String!
+  format: ReportFormat!
+}

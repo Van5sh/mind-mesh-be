@@ -1,0 +1,74 @@
+type User {
+  id: ID!
+  username: String!
+  email: String!
+  profile: UserProfile
+  ownedProjects: [Project!]!
+  projectMemberships: [ProjectMember!]!
+  uploadedFiles: [File!]!
+  sharedFiles: [FileShare!]!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type UserProfile {
+  user: User!
+  firstName: String!
+  lastName: String!
+  bio: String
+  avatarUrl: String
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+extend type Query {
+  me: User
+  user(id: ID!): User
+  userProfile(userId: ID!): UserProfile
+  allUsers: [User!]!
+  users(ids: [ID!]!): [User!]!
+}
+
+extend type Mutation {
+  createUser(input: CreateUserInput!): User!
+  updateUser(input: UpdateUserInput!): User!
+  updateUserPassword(input: UpdateUserPasswordInput!): Boolean!
+  deleteUser(userId: ID!): Boolean!
+
+  createUserProfile(input: CreateUserProfileInput!): UserProfile!
+  updateUserProfile(input: UpdateUserProfileInput!): UserProfile!
+  updateUserAvatar(userId: ID!, avatarUrl: String): UserProfile!
+}
+
+input CreateUserInput {
+  username: String!
+  email: String!
+  passwordHash: String!
+}
+
+input UpdateUserInput {
+  userId: ID!
+  username: String!
+  email: String!
+}
+
+input UpdateUserPasswordInput {
+  userId: ID!
+  passwordHash: String!
+}
+
+input CreateUserProfileInput {
+  userId: ID!
+  firstName: String!
+  lastName: String!
+  bio: String
+  avatarUrl: String
+}
+
+input UpdateUserProfileInput {
+  userId: ID!
+  firstName: String!
+  lastName: String!
+  bio: String
+  avatarUrl: String
+}

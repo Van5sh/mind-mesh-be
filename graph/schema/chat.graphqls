@@ -1,0 +1,80 @@
+type Chat {
+  id: ID!
+  project: Project!
+  title: String
+  type: ChatType!
+  status: ChatStatus!
+  lastActivityAt: Time!
+  participants: [ChatParticipant!]!
+  messages: [ChatMessage!]!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type ChatParticipant {
+  user: User!
+  joinedAt: Time!
+}
+
+type ChatMessage {
+  id: ID!
+  chat: Chat!
+  sender: User
+  role: MessageRole!
+  content: String!
+  aiMetadata: ChatAIMetadata
+  mentionedUsers: [User!]!
+  referencedFiles: [File!]!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type ChatAIMetadata {
+  message: ChatMessage!
+  embeddingModel: String
+  embeddingSynced: Boolean!
+  indexedAt: Time
+}
+
+extend type Query {
+  chat(id: ID!): Chat
+  chats(projectId: ID!): [Chat!]!
+  myChats(projectId: ID): [Chat!]!
+  chatMessages(chatId: ID!): [ChatMessage!]!
+}
+
+extend type Mutation {
+  createChat(input: CreateChatInput!): Chat!
+  renameChat(chatId: ID!, title: String!): Chat!
+  updateChatType(chatId: ID!, type: ChatType!): Chat!
+  deleteChat(chatId: ID!): Boolean!
+
+  addChatParticipant(input: AddChatParticipantInput!): ChatParticipant!
+  removeChatParticipant(chatId: ID!, userId: ID!): Boolean!
+
+  sendMessage(input: SendMessageInput!): ChatMessage!
+  updateChatMessage(messageId: ID!, content: String!): ChatMessage!
+  deleteChatMessage(messageId: ID!): Boolean!
+
+  updateChatStatus(chatId: ID!, status: ChatStatus!): Chat!
+}
+
+input CreateChatInput {
+  projectId: ID!
+  title: String
+  type: ChatType!
+  participantIds: [ID!]!
+}
+
+input AddChatParticipantInput {
+  chatId: ID!
+  userId: ID!
+}
+
+input SendMessageInput {
+  chatId: ID!
+  role: MessageRole!
+  content: String!
+  mentionedUserIds: [ID!]
+  referencedFileIds: [ID!]
+}

@@ -1,0 +1,153 @@
+type Folder {
+  id: ID!
+  project: Project
+  parentFolder: Folder
+  childFolders: [Folder!]!
+  files: [File!]!
+  name: String!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type File {
+  id: ID!
+  folder: Folder
+  name: String!
+  size: Int64!
+  storage: FileStorage
+  properties: FileProperties!
+  aiMetadata: FileAIMetadata
+  shares: [FileShare!]!
+  preferences: [FilePreference!]!
+  projectFiles: [ProjectFile!]!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type FileStorage {
+  file: File!
+  bucketName: String!
+  objectKey: String!
+  etag: String
+  versionId: String
+  checksum: String
+  mimeType: String!
+  uploadedBy: User!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type FileProperties {
+  file: File!
+  originalName: String
+  isIndexed: Boolean!
+  deletedAt: Time
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type FileAIMetadata {
+  file: File!
+  extractedText: String
+  embeddingModel: String
+  embeddingSynced: Boolean!
+  indexedAt: Time
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type FileShare {
+  id: ID!
+  file: File!
+  sharedBy: User!
+  sharedWith: User!
+  permission: FilePermission!
+  createdAt: Time!
+}
+
+type FilePreference {
+  user: User!
+  file: File!
+  isFavorite: Boolean!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type ProjectFile {
+  project: Project!
+  file: File!
+  folder: Folder
+  createdAt: Time!
+}
+
+union FolderItem = Folder | File
+
+extend type Query {
+  folder(id: ID!): Folder
+  folders(projectId: ID): [Folder!]!
+  folderContents(folderId: ID, projectId: ID): [FolderItem!]!
+  folderPath(folderId: ID!): [Folder!]!
+  rootFolders(projectId: ID!): [Folder!]!
+
+  file(id: ID!): File
+  files(projectId: ID, folderId: ID): [File!]!
+  rootFiles(projectId: ID!): [File!]!
+  favoriteFiles(userId: ID!, projectId: ID): [File!]!
+
+  fileShare(id: ID!): FileShare
+  fileShares(fileId: ID!): [FileShare!]!
+  sharedWithMe(userId: ID!): [FileShare!]!
+}
+
+extend type Mutation {
+  createFolder(input: CreateFolderInput!): Folder!
+  renameFolder(folderId: ID!, name: String!): Folder!
+  moveFolder(folderId: ID!, parentFolderId: ID): Folder!
+  deleteFolder(folderId: ID!): Boolean!
+
+  createFile(input: CreateFileInput!): File!
+  renameFile(fileId: ID!, name: String!): File!
+  moveFile(input: MoveFileInput!): File!
+  deleteFile(fileId: ID!): Boolean!
+
+  shareFile(input: ShareFileInput!): FileShare!
+  updateFileSharePermission(
+    fileShareId: ID!
+    permission: FilePermission!
+  ): FileShare!
+  deleteFileShare(fileShareId: ID!): Boolean!
+
+  setFileFavorite(input: SetFileFavoriteInput!): FilePreference!
+}
+
+input CreateFolderInput {
+  projectId: ID
+  parentFolderId: ID
+  name: String!
+}
+
+input CreateFileInput {
+  projectId: ID
+  folderId: ID
+  name: String!
+  size: Int64!
+}
+
+input MoveFileInput {
+  fileId: ID!
+  folderId: ID
+  projectId: ID
+}
+
+input ShareFileInput {
+  fileId: ID!
+  sharedBy: ID!
+  sharedWith: ID!
+  permission: FilePermission!
+}
+
+input SetFileFavoriteInput {
+  userId: ID!
+  fileId: ID!
+  isFavorite: Boolean!
+}

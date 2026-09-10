@@ -59,7 +59,6 @@ async def process_file(request: ProcessFileRequest):
                 detail=f"Unsupported content type: {request.content_type}",
             )
 
-        # Send job to SQS
         message_id = sqs_service.send_job(request)
         logger.info(f"Job queued: {request.job_id} (SQS MessageId: {message_id})")
 

@@ -281,7 +281,7 @@ type Report struct {
 
 type ReportProperties struct {
 	Report        *Report      `json:"report"`
-	GeneratedBy   *User        `json:"generatedBy,omitempty"`
+	GeneratedBy   *User        `json:"generatedBy"`
 	GeneratedByAi bool         `json:"generatedByAI"`
 	Status        ReportStatus `json:"status"`
 	SourceChat    *Chat        `json:"sourceChat,omitempty"`

@@ -1,0 +1,43 @@
+type Flowchart {
+  id: ID!
+  project: Project!
+  name: String!
+  data: JSON!
+  generatedBy: User
+  generatedByAI: Boolean!
+  status: FlowchartStatus!
+  sourceChat: Chat
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+extend type Query {
+  flowchart(id: ID!): Flowchart
+  flowcharts(projectId: ID!): [Flowchart!]!
+}
+
+extend type Mutation {
+  createFlowchart(input: CreateFlowchartInput!): Flowchart!
+  updateFlowchart(input: UpdateFlowchartInput!): Flowchart!
+  updateFlowchartStatus(
+    flowchartId: ID!
+    status: FlowchartStatus!
+  ): Flowchart!
+  deleteFlowchart(flowchartId: ID!): Boolean!
+}
+
+input CreateFlowchartInput {
+  projectId: ID!
+  name: String!
+  data: JSON!
+  generatedByAI: Boolean!
+  sourceChatId: ID
+}
+
+input UpdateFlowchartInput {
+  flowchartId: ID!
+  name: String!
+  data: JSON!
+  generatedByAI: Boolean!
+  sourceChatId: ID
+}
