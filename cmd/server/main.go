@@ -60,10 +60,6 @@ func StartServer() {
 		"Application initialized successfully",
 	)
 
-	// ============================================================
-	// OAuth HTTP Handler
-	// ============================================================
-
 	oauthHandler, err :=
 		auth.NewOAuthHandlerFromEnvironment(
 			application.Repositories.User,
@@ -89,10 +85,6 @@ func StartServer() {
 		),
 	)
 
-	// ------------------------------------------------------------
-	// GraphQL transports
-	// ------------------------------------------------------------
-
 	srv.AddTransport(
 		transport.Options{},
 	)
@@ -105,17 +97,9 @@ func StartServer() {
 		transport.POST{},
 	)
 
-	// ------------------------------------------------------------
-	// GraphQL query cache
-	// ------------------------------------------------------------
-
 	srv.SetQueryCache(
 		lru.New[*ast.QueryDocument](1000),
 	)
-
-	// ------------------------------------------------------------
-	// GraphQL extensions
-	// ------------------------------------------------------------
 
 	srv.Use(
 		extension.Introspection{},

@@ -8,65 +8,200 @@ package graph
 import (
 	"context"
 	"example/hello/graph/model"
+	"example/hello/internal/database"
 	"fmt"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // CreateUser is the resolver for the createUser field.
 func (r *mutationResolver) CreateUser(ctx context.Context, input model.CreateUserInput) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: CreateUser - createUser"))
+	dbUser, err := r.App.Services.User.CreateUser(ctx, database.CreateUserParams{
+		Username: input.Username,
+		Email:    input.Email,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+	return &model.User{
+		ID:       dbUser.ID.String(),
+		Username: dbUser.Username,
+		Email:    dbUser.Email,
+	}, nil
 }
 
 // UpdateUser is the resolver for the updateUser field.
 func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input model.UpdateUserInput) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: UpdateUser - updateUser"))
+	userId, err := parseUUID(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+	dbUser, err := r.App.Services.User.UpdateUser(ctx, database.UpdateUserParams{
+		ID:       userId,
+		Username: input.Username,
+		Email:    input.Email,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to update user: %w", err)
+	}
+	return &model.User{
+		ID:       dbUser.ID.String(),
+		Username: dbUser.Username,
+		Email:    dbUser.Email,
+	}, nil
 }
 
-// DeleteUser is the resolver for the deleteUser field.
 func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (bool, error) {
-	panic(fmt.Errorf("not implemented: DeleteUser - deleteUser"))
+	userId, err := parseUUID(id)
+	if err != nil {
+		return false, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	err = r.App.Services.User.DeleteUser(ctx, userId)
+	if err != nil {
+		return false, fmt.Errorf("failed to delete user: %w", err)
+	}
+	return true, nil
 }
 
-// UpdateUserProfile is the resolver for the updateUserProfile field.
 func (r *mutationResolver) UpdateUserProfile(ctx context.Context, id string, input model.UpdateUserProfileInput) (*model.UserProfile, error) {
-	panic(fmt.Errorf("not implemented: UpdateUserProfile - updateUserProfile"))
+	userId, err := parseUUID(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	// convert nullable GraphQL fields to pgtype.Text
+	bio := pgtype.Text{}
+	if input.Bio != nil {
+		bio.String = *input.Bio
+		bio.Valid = true
+	}
+
+	dbProfile, err := r.App.Services.User.UpdateUserProfile(ctx, database.UpdateUserProfileParams{
+		UserID:    userId,
+		FirstName: input.FirstName,
+		LastName:  input.LastName,
+		Bio:       bio,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to update user profile: %w", err)
+	}
+	return &model.UserProfile{
+		FirstName: dbProfile.FirstName,
+		LastName:  dbProfile.LastName,
+	}, nil
 }
 
-// UpdateUserAvatar is the resolver for the updateUserAvatar field.
 func (r *mutationResolver) UpdateUserAvatar(ctx context.Context, id string, input model.UpdateUserAvatarInput) (*model.UserProfile, error) {
-	panic(fmt.Errorf("not implemented: UpdateUserAvatar - updateUserAvatar"))
+	userId, err := parseUUID(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	avatar := pgtype.Text{}
+	if input.AvatarURL == "" {
+		avatar.String = input.AvatarURL
+		avatar.Valid = true
+	}
+
+	dbProfile, err := r.App.Services.User.UpdateUserAvatar(ctx, database.UpdateUserAvatarParams{
+		UserID:    userId,
+		AvatarUrl: avatar,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to update user avatar: %w", err)
+	}
+	return &model.UserProfile{
+		User:      &model.User{},
+		FirstName: dbProfile.FirstName,
+		LastName:  dbProfile.LastName,
+		Bio:       &dbProfile.Bio.String,
+		AvatarURL: &dbProfile.AvatarUrl.String,
+	}, nil
 }
 
-// Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: Me - me"))
+	return nil, fmt.Errorf("not implemented: Me - me")
 }
 
-// User is the resolver for the user field.
 func (r *queryResolver) User(ctx context.Context, id string) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: User - user"))
+	userId, err := parseUUID(id)
+	if err != nil {
+		fmt.Printf("error")
+	}
+	user, err := r.App.Services.User.GetUserByID(ctx, userId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+	return &model.User{
+		ID:       user.ID.String(),
+		Username: user.Username,
+		Email:    user.Email,
+	}, nil
 }
 
-// UserByEmail is the resolver for the userByEmail field.
 func (r *queryResolver) UserByEmail(ctx context.Context, email string) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: UserByEmail - userByEmail"))
+	user, err := r.App.Services.User.GetUserByEmail(ctx, email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user by email: %w", err)
+	}
+	return &model.User{
+		ID:       user.ID.String(),
+		Username: user.Username,
+		Email:    user.Email,
+	}, nil
 }
 
-// UserByUsername is the resolver for the userByUsername field.
 func (r *queryResolver) UserByUsername(ctx context.Context, username string) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: UserByUsername - userByUsername"))
+	user, err := r.App.Services.User.GetUserByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user by username: %w", err)
+	}
+	return &model.User{
+		ID:       user.ID.String(),
+		Username: user.Username,
+		Email:    user.Email,
+	}, nil
 }
 
-// UserProfile is the resolver for the userProfile field.
 func (r *queryResolver) UserProfile(ctx context.Context, userID string) (*model.UserProfile, error) {
-	panic(fmt.Errorf("not implemented: UserProfile - userProfile"))
+	userId, err := parseUUID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	profile, err := r.App.Services.User.GetUserProfile(ctx, userId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user profile: %w", err)
+	}
+	return &model.UserProfile{
+		User:      &model.User{ID: profile.UserID.String()},
+		FirstName: profile.FirstName,
+		LastName:  profile.LastName,
+		Bio:       &profile.Bio.String,
+		AvatarURL: &profile.AvatarUrl.String,
+	}, nil
 }
 
-// AllUsers is the resolver for the allUsers field.
 func (r *queryResolver) AllUsers(ctx context.Context) ([]*model.User, error) {
-	panic(fmt.Errorf("not implemented: AllUsers - allUsers"))
+	users, err := r.App.Services.User.GetAllUsers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all users: %w", err)
+	}
+
+	var result []*model.User
+	for _, user := range users {
+		result = append(result, &model.User{
+			ID:       user.ID.String(),
+			Username: user.Username,
+			Email:    user.Email,
+		})
+	}
+	return result, nil
 }
 
-// Users is the resolver for the users field.
+// Users is the resolver for the users field
 func (r *queryResolver) Users(ctx context.Context, ids []string) ([]*model.User, error) {
 	panic(fmt.Errorf("not implemented: Users - users"))
 }

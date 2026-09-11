@@ -154,9 +154,6 @@ func (s *Service) LoginWithOAuth(
 		)
 	}
 
-	// --------------------------------------------------------
-	// 2. Check whether user already exists by email
-	// --------------------------------------------------------
 
 	user, err := s.userRepo.GetUserByEmail(
 		ctx,

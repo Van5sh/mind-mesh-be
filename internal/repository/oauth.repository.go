@@ -18,8 +18,6 @@ func NewOAuthRepository(queries *database.Queries) *OAuthRepository {
 	}
 }
 
-// GetOAuthAccount finds an OAuth account using the provider
-// and the user's ID from that provider.
 func (r *OAuthRepository) GetOAuthAccount(
 	ctx context.Context,
 	provider string,
@@ -31,8 +29,6 @@ func (r *OAuthRepository) GetOAuthAccount(
 	})
 }
 
-// GetOAuthAccountByUserAndProvider finds an OAuth account
-// belonging to a specific user and provider.
 func (r *OAuthRepository) GetOAuthAccountByUserAndProvider(
 	ctx context.Context,
 	userID pgtype.UUID,

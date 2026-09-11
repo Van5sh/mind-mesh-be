@@ -35,11 +35,6 @@ func Middleware(
 
 		return http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-
-				// ------------------------------------------------
-				// Get session cookie
-				// ------------------------------------------------
-
 				cookie, err := r.Cookie(sessionCookieName)
 
 				if err != nil {
@@ -67,21 +62,11 @@ func Middleware(
 					next.ServeHTTP(w, r)
 					return
 				}
-
-				// ------------------------------------------------
-				// Store user in context
-				// ------------------------------------------------
-
 				ctx := context.WithValue(
 					r.Context(),
 					userContextKey,
 					user,
 				)
-
-				// ------------------------------------------------
-				// Store session in context
-				// ------------------------------------------------
-
 				ctx = context.WithValue(
 					ctx,
 					sessionContextKey,
@@ -90,11 +75,6 @@ func Middleware(
 						Valid: sessionID.Valid,
 					},
 				)
-
-				// ------------------------------------------------
-				// Continue request
-				// ------------------------------------------------
-
 				next.ServeHTTP(
 					w,
 					r.WithContext(ctx),
@@ -103,10 +83,6 @@ func Middleware(
 		)
 	}
 }
-
-// ============================================================
-// Session ID
-// ============================================================
 
 func parseSessionID(
 	value string,
@@ -124,13 +100,6 @@ func parseSessionID(
 	}, nil
 }
 
-// ============================================================
-// User Context
-// ============================================================
-
-// UserFromContext returns the authenticated user.
-//
-// The second return value is false when the request is anonymous.
 func UserFromContext(
 	ctx context.Context,
 ) (database.User, bool) {
@@ -142,13 +111,7 @@ func UserFromContext(
 	return user, ok
 }
 
-// ============================================================
-// Session Context
-// ============================================================
 
-// SessionFromContext returns the current session.
-//
-// The second return value is false when the request is anonymous.
 func SessionFromContext(
 	ctx context.Context,
 ) (pgtype.UUID, bool) {
@@ -164,11 +127,6 @@ func SessionFromContext(
 	return *session, true
 }
 
-// ============================================================
-// User ID
-// ============================================================
-
-// UserIDFromContext returns the authenticated user's ID.
 func UserIDFromContext(
 	ctx context.Context,
 ) (pgtype.UUID, bool) {
@@ -182,11 +140,6 @@ func UserIDFromContext(
 	return user.ID, true
 }
 
-// ============================================================
-// Session ID
-// ============================================================
-
-// SessionIDFromContext returns the current session ID.
 func SessionIDFromContext(
 	ctx context.Context,
 ) (pgtype.UUID, bool) {
@@ -200,13 +153,6 @@ func SessionIDFromContext(
 	return session, true
 }
 
-// ============================================================
-// Require Authentication
-// ============================================================
-
-// RequireAuth rejects anonymous requests.
-//
-// Use this for routes/resolvers that require a logged-in user.
 func RequireAuth(
 	next http.Handler,
 ) http.Handler {

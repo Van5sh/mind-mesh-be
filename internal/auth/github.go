@@ -52,14 +52,10 @@ func NewGitHubProvider(
 	}
 }
 
-// AuthURL creates the URL where the user is redirected
-// to authenticate with GitHub.
 func (p *GitHubProvider) AuthURL(state string) string {
 	return p.Config.AuthCodeURL(state)
 }
 
-// Exchange exchanges the authorization code for a GitHub
-// access token and retrieves the user's identity.
 func (p *GitHubProvider) Exchange(
 	ctx context.Context,
 	code string,
@@ -80,8 +76,6 @@ func (p *GitHubProvider) Exchange(
 		return nil, err
 	}
 
-	// GitHub may not return an email in /user.
-	// Retrieve the user's verified primary email.
 	if user.Email == "" {
 		email, err := getGitHubPrimaryEmail(ctx, client)
 		if err != nil {
