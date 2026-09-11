@@ -1,3 +1,5 @@
+cloud.google.com/go/compute/metadata v0.3.0 h1:Tz+eQXMEqDIKRsmY3cHTL6FVaynIjX2QxYC4trgAKZc=
+cloud.google.com/go/compute/metadata v0.3.0/go.mod h1:zFmK7XCadkQkj6TtorcaGlCW1hT1fIilQDwofLpJ20k=
 github.com/99designs/gqlgen v0.17.95 h1:882h7F5iJImgtyUVttc4MOK2NbzbMYc2oyNeHqkjpP4=
 github.com/99designs/gqlgen v0.17.95/go.mod h1:kHYPrpwOXDU1OQyxIg3Z7nVXSnlUoHVWBY7CMJCAM4M=
 github.com/agnivade/levenshtein v1.2.1 h1:EHBY3UOn1gwdy/VbFwgo4cxecRznFk7fKWN1KOX7eoM=
