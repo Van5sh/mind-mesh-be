@@ -53,20 +53,6 @@ func (s *UserService) CreateUser(
 		)
 	}
 
-	_, err = s.repo.CreateUserProfile(ctx, database.CreateUserProfileParams{
-		UserID:    user.ID,
-		FirstName: "",
-		LastName:  "",
-		Bio:       pgtype.Text{Valid: false},
-		AvatarUrl: pgtype.Text{Valid: false},
-	})
-	if err != nil {
-		return database.User{}, apperrors.InternalError(
-			"failed to create user profile",
-			err,
-		)
-	}
-
 	return user, nil
 }
 

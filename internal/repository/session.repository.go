@@ -31,7 +31,8 @@ func (r *SessionRepository) CreateSession(
 		database.CreateSessionParams{
 			UserID: userID,
 			ExpiresAt: pgtype.Timestamptz{
-				Time: expiresAt,
+				Time:  expiresAt,
+				Valid: true,
 			},
 		},
 	)

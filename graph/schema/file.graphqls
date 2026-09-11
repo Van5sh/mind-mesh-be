@@ -121,7 +121,7 @@ extend type Mutation {
 }
 
 input CreateFolderInput {
-  projectId: ID!
+  projectId: ID!w
   parentFolderId: ID
   name: String!
 }

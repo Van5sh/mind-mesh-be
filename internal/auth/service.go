@@ -2,7 +2,9 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"example/hello/internal/apperrors"
 	"example/hello/internal/database"
@@ -10,6 +12,7 @@ import (
 	"example/hello/internal/services"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -141,6 +144,12 @@ func (s *Service) LoginWithOAuth(
 
 		return user, session, nil
 	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return database.User{}, database.Session{}, apperrors.InternalError(
+			"failed to look up OAuth account",
+			err,
+		)
+	}
 
 	// --------------------------------------------------------
 	// 2. Check whether user already exists by email
@@ -180,6 +189,12 @@ func (s *Service) LoginWithOAuth(
 
 		return user, session, nil
 	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return database.User{}, database.Session{}, apperrors.InternalError(
+			"failed to look up user by OAuth email",
+			err,
+		)
+	}
 
 	// --------------------------------------------------------
 	// 3. Create a new user
@@ -196,13 +211,22 @@ func (s *Service) LoginWithOAuth(
 
 	userID := newUUID()
 
-	user, err = s.userRepo.CreateUser(
+	user, session, err := s.userRepo.CreateOAuthUser(
 		ctx,
 		database.CreateUserParams{
 			ID:       userID,
 			Username: username,
 			Email:    oauthUser.Email,
 		},
+		oauthUser.Provider,
+		oauthUser.ProviderUserID,
+		database.CreateUserProfileParams{
+			FirstName: oauthUser.FirstName,
+			LastName:  oauthUser.LastName,
+			Bio:       textFromString(""),
+			AvatarUrl: textFromString(oauthUser.AvatarURL),
+		},
+		time.Now().Add(7*24*time.Hour),
 	)
 
 	if err != nil {
@@ -211,61 +235,6 @@ func (s *Service) LoginWithOAuth(
 				"failed to create OAuth user",
 				err,
 			)
-	}
-
-	// --------------------------------------------------------
-	// 4. Create OAuth account
-	// --------------------------------------------------------
-
-	_, err = s.oauthRepo.CreateOAuthAccount(
-		ctx,
-		user.ID,
-		oauthUser.Provider,
-		oauthUser.ProviderUserID,
-	)
-
-	if err != nil {
-		return database.User{}, database.Session{},
-			apperrors.InternalError(
-				"failed to create OAuth account",
-				err,
-			)
-	}
-
-	// --------------------------------------------------------
-	// 5. Populate the profile that CreateUser creates.
-	// --------------------------------------------------------
-
-	_, err = s.userRepo.UpdateUserProfile(
-		ctx,
-		database.UpdateUserProfileParams{
-			UserID:    user.ID,
-			FirstName: oauthUser.FirstName,
-			LastName:  oauthUser.LastName,
-			Bio:       textFromString(""),
-			AvatarUrl: textFromString(oauthUser.AvatarURL),
-		},
-	)
-
-	if err != nil {
-		return database.User{}, database.Session{},
-			apperrors.InternalError(
-				"failed to update OAuth user profile",
-				err,
-			)
-	}
-
-	// --------------------------------------------------------
-	// 6. Create session
-	// --------------------------------------------------------
-
-	session, err := s.sessionSvc.CreateSession(
-		ctx,
-		user.ID,
-	)
-
-	if err != nil {
-		return database.User{}, database.Session{}, err
 	}
 
 	return user, session, nil

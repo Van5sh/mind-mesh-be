@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"example/hello/internal/database"
 
@@ -12,6 +13,59 @@ import (
 type UserRepository struct {
 	db *pgxpool.Pool
 	q  *database.Queries
+}
+
+// CreateOAuthUser atomically provisions a user, profile, provider link, and
+// initial session. A failed step rolls back every preceding write.
+func (r *UserRepository) CreateOAuthUser(
+	ctx context.Context,
+	userParams database.CreateUserParams,
+	provider string,
+	providerUserID string,
+	profileParams database.CreateUserProfileParams,
+	sessionExpiresAt time.Time,
+) (database.User, database.Session, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return database.User{}, database.Session{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	queries := r.q.WithTx(tx)
+	user, err := queries.CreateUser(ctx, userParams)
+	if err != nil {
+		return database.User{}, database.Session{}, err
+	}
+
+	profileParams.UserID = user.ID
+	if _, err := queries.CreateUserProfile(ctx, profileParams); err != nil {
+		return database.User{}, database.Session{}, err
+	}
+
+	if _, err := queries.CreateOAuthAccount(ctx, database.CreateOAuthAccountParams{
+		UserID:         user.ID,
+		Provider:       provider,
+		ProviderUserID: providerUserID,
+	}); err != nil {
+		return database.User{}, database.Session{}, err
+	}
+
+	session, err := queries.CreateSession(ctx, database.CreateSessionParams{
+		UserID: user.ID,
+		ExpiresAt: pgtype.Timestamptz{
+			Time:  sessionExpiresAt,
+			Valid: true,
+		},
+	})
+	if err != nil {
+		return database.User{}, database.Session{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return database.User{}, database.Session{}, err
+	}
+
+	return user, session, nil
 }
 
 func NewUserRepository(db *pgxpool.Pool, q *database.Queries) *UserRepository {
@@ -128,7 +182,6 @@ func (r *UserRepository) UpdateUser(
 ) (database.User, error) {
 	return r.q.UpdateUser(ctx, params)
 }
-
 
 func (r *UserRepository) UpdateUserAvatar(
 	ctx context.Context,
