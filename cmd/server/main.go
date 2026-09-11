@@ -42,10 +42,6 @@ func StartServer() {
 		port = defaultPort
 	}
 
-	// ============================================================
-	// Application
-	// ============================================================
-
 	application, err := app.New(
 		context.Background(),
 		os.Getenv("DATABASE_URL"),
@@ -131,10 +127,6 @@ func StartServer() {
 		},
 	)
 
-	// ============================================================
-	// Authentication Middleware
-	// ============================================================
-
 	graphqlHandler := oauthHandler.Middleware(
 		srv,
 	)
@@ -142,10 +134,6 @@ func StartServer() {
 	graphqlHandler = oauthHandler.CORS(
 		graphqlHandler,
 	)
-
-	// ============================================================
-	// GraphQL Playground
-	// ============================================================
 
 	playgroundHandler := playground.Handler(
 		"GraphQL Playground",
@@ -169,10 +157,6 @@ func StartServer() {
 		},
 	)
 
-	// ============================================================
-	// GraphQL Endpoint
-	// ============================================================
-
 	server.All(
 		"/query",
 		func(c *fiber.Ctx) {
@@ -182,10 +166,6 @@ func StartServer() {
 			)(c.Fasthttp)
 		},
 	)
-
-	// ============================================================
-	// Google OAuth
-	// ============================================================
 
 	server.Get(
 		"/auth/google",
@@ -211,10 +191,6 @@ func StartServer() {
 		},
 	)
 
-	// ============================================================
-	// GitHub OAuth
-	// ============================================================
-
 	server.Get(
 		"/auth/github",
 		func(c *fiber.Ctx) {
@@ -238,10 +214,6 @@ func StartServer() {
 			)(c.Fasthttp)
 		},
 	)
-
-	// ============================================================
-	// Server
-	// ============================================================
 
 	log.Printf(
 		"🚀 Server ready at http://localhost:%s/",
