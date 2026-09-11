@@ -28,6 +28,7 @@ type Repositories struct {
 	Project   *repository.ProjectRepository
 	Report    *repository.ReportRepository
 	User      *repository.UserRepository
+	Session   *repository.SessionRepository
 }
 
 type Guards struct {
@@ -48,6 +49,7 @@ type Services struct {
 	Project   *services.ProjectService
 	Report    *services.ReportService
 	User      *services.UserService
+	Session   *services.SessionService
 }
 
 func New(ctx context.Context, databaseURL string) (*App, error) {
