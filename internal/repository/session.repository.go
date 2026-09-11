@@ -29,9 +29,11 @@ func (r *SessionRepository) CreateSession(
 	return r.queries.CreateSession(
 		ctx,
 		database.CreateSessionParams{
-			ID:        id,
-			UserID:    userID,
-			ExpiresAt: expiresAt,
+			ID:     id,
+			UserID: userID,
+			ExpiresAt: pgtype.Timestamptz{
+				Time: expiresAt,
+			},
 		},
 	)
 }
