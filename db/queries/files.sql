@@ -1,11 +1,10 @@
 -- name: CreateFile :one
 INSERT INTO files (
-    id,
     folder_id,
     name,
     size
 )
-VALUES ($1, $2, $3, $4)
+VALUES ($1, $2, $3)
 RETURNING *;
 
 -- name: GetFileByID :one
@@ -169,12 +168,11 @@ WHERE project_id = $1
 
 -- name: CreateFolder :one
 INSERT INTO folders (
-    id,
     project_id,
     parent_folder_id,
     name
 )
-VALUES ($1, $2, $3, $4)
+VALUES ($1, $2, $3)
 RETURNING *;
 
 -- name: GetFolderByID :one
@@ -547,13 +545,12 @@ ORDER BY fp.deleted_at DESC;
 
 -- name: FileShare :one
 INSERT INTO file_shares (
-    id,
     file_id,
     shared_by,
     shared_with,
     permission
 )
-VALUES ($1, $2, $3, $4, $5)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 

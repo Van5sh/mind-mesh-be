@@ -4,14 +4,12 @@
 
 -- name: CreateSession :one
 INSERT INTO sessions (
-    id,
     user_id,
     expires_at
 )
 VALUES (
     $1,
-    $2,
-    $3
+    $2
 )
 RETURNING
     id,

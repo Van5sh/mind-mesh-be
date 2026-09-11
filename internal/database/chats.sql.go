@@ -34,29 +34,22 @@ func (q *Queries) CheckUserInChat(ctx context.Context, arg CheckUserInChatParams
 
 const createChat = `-- name: CreateChat :one
 INSERT INTO chats (
-    id,
     project_id,
     title,
     type
 )
-VALUES ($1, $2, $3, $4)
+VALUES ($1, $2, $3)
 RETURNING id, project_id, title, type, last_activity_at, status, created_at, updated_at
 `
 
 type CreateChatParams struct {
-	ID        pgtype.UUID
 	ProjectID pgtype.UUID
 	Title     pgtype.Text
 	Type      ChatType
 }
 
 func (q *Queries) CreateChat(ctx context.Context, arg CreateChatParams) (Chat, error) {
-	row := q.db.QueryRow(ctx, createChat,
-		arg.ID,
-		arg.ProjectID,
-		arg.Title,
-		arg.Type,
-	)
+	row := q.db.QueryRow(ctx, createChat, arg.ProjectID, arg.Title, arg.Type)
 	var i Chat
 	err := row.Scan(
 		&i.ID,
@@ -108,18 +101,16 @@ func (q *Queries) CreateChatAIMetadata(ctx context.Context, arg CreateChatAIMeta
 
 const createChatMessage = `-- name: CreateChatMessage :one
 INSERT INTO chat_messages (
-    id,
     chat_id,
     sender_id,
     role,
     content
 )
-VALUES ($1, $2, $3, $4, $5)
+VALUES ($1, $2, $3, $4)
 RETURNING id, chat_id, sender_id, role, content, created_at, updated_at
 `
 
 type CreateChatMessageParams struct {
-	ID       pgtype.UUID
 	ChatID   pgtype.UUID
 	SenderID pgtype.UUID
 	Role     MessageRole
@@ -128,7 +119,6 @@ type CreateChatMessageParams struct {
 
 func (q *Queries) CreateChatMessage(ctx context.Context, arg CreateChatMessageParams) (ChatMessage, error) {
 	row := q.db.QueryRow(ctx, createChatMessage,
-		arg.ID,
 		arg.ChatID,
 		arg.SenderID,
 		arg.Role,

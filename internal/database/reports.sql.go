@@ -14,13 +14,12 @@ import (
 const createReport = `-- name: CreateReport :one
 WITH new_report AS (
     INSERT INTO reports (
-        id,
         project_id,
         title,
         content,
         format
     )
-    VALUES ($1, $2, $3, $4, $5)
+    VALUES ($1, $2, $3, $4)
     RETURNING id, project_id, title, content, format, created_at, updated_at
 ),
 new_properties AS (
@@ -31,7 +30,8 @@ new_properties AS (
         status,
         source_chat_id
     )
-    VALUES ($1, $6, $7, $8, $9)
+    SELECT id, $5, $6, $7, $8
+    FROM new_report
     RETURNING report_id, generated_by, generated_by_ai, status, source_chat_id
 )
 SELECT
@@ -52,7 +52,6 @@ ON r.id = rp.report_id
 `
 
 type CreateReportParams struct {
-	ID            pgtype.UUID
 	ProjectID     pgtype.UUID
 	Title         string
 	Content       string
@@ -79,7 +78,6 @@ type CreateReportRow struct {
 
 func (q *Queries) CreateReport(ctx context.Context, arg CreateReportParams) (CreateReportRow, error) {
 	row := q.db.QueryRow(ctx, createReport,
-		arg.ID,
 		arg.ProjectID,
 		arg.Title,
 		arg.Content,

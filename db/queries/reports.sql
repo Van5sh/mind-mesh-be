@@ -1,13 +1,12 @@
 -- name: CreateReport :one
 WITH new_report AS (
     INSERT INTO reports (
-        id,
         project_id,
         title,
         content,
         format
     )
-    VALUES ($1, $2, $3, $4, $5)
+    VALUES ($1, $2, $3, $4)
     RETURNING *
 ),
 new_properties AS (
@@ -18,7 +17,8 @@ new_properties AS (
         status,
         source_chat_id
     )
-    VALUES ($1, $6, $7, $8, $9)
+    SELECT id, $5, $6, $7, $8
+    FROM new_report
     RETURNING *
 )
 SELECT

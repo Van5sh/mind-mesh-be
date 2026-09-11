@@ -39,19 +39,17 @@ func (q *Queries) CountActivityLogsByUserID(ctx context.Context, userID pgtype.U
 
 const createActivityLog = `-- name: CreateActivityLog :one
 INSERT INTO activity_logs (
-    id,
     project_id,
     user_id,
     action,
     entity_type,
     entity_id
 )
-VALUES ($1, $2, $3, $4, $5, $6)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING id, project_id, user_id, action, entity_type, entity_id, created_at
 `
 
 type CreateActivityLogParams struct {
-	ID         pgtype.UUID
 	ProjectID  pgtype.UUID
 	UserID     pgtype.UUID
 	Action     string
@@ -61,7 +59,6 @@ type CreateActivityLogParams struct {
 
 func (q *Queries) CreateActivityLog(ctx context.Context, arg CreateActivityLogParams) (ActivityLog, error) {
 	row := q.db.QueryRow(ctx, createActivityLog,
-		arg.ID,
 		arg.ProjectID,
 		arg.UserID,
 		arg.Action,

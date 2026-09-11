@@ -22,13 +22,12 @@ WHERE id = $1;
 
 -- name: CreateProject :one
 INSERT INTO projects (
-    id,
     owner_id,
     name,
     description,
     visibility
 )
-VALUES ($1, $2, $3, $4, $5)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 
@@ -81,12 +80,11 @@ WHERE project_id = $1
 
 -- name: AddProjectMember :one
 INSERT INTO project_members (
-    id,
     project_id,
     user_id,
     role
 )
-VALUES ($1, $2, $3, $4)
+VALUES ($1, $2, $3)
 RETURNING *;
 
 

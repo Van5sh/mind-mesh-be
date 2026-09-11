@@ -24,7 +24,7 @@ func (r *OAuthRepository) GetOAuthAccount(
 	ctx context.Context,
 	provider string,
 	providerUserID string,
-) (database.OauthAccount, error) {
+) (database.GetOAuthAccountRow, error) {
 	return r.queries.GetOAuthAccount(ctx, database.GetOAuthAccountParams{
 		Provider:       provider,
 		ProviderUserID: providerUserID,

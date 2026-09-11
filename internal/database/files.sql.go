@@ -116,29 +116,22 @@ func (q *Queries) CountProjectFiles(ctx context.Context, projectID pgtype.UUID) 
 
 const createFile = `-- name: CreateFile :one
 INSERT INTO files (
-    id,
     folder_id,
     name,
     size
 )
-VALUES ($1, $2, $3, $4)
+VALUES ($1, $2, $3)
 RETURNING id, folder_id, name, size, created_at, updated_at
 `
 
 type CreateFileParams struct {
-	ID       pgtype.UUID
 	FolderID pgtype.UUID
 	Name     string
 	Size     int64
 }
 
 func (q *Queries) CreateFile(ctx context.Context, arg CreateFileParams) (File, error) {
-	row := q.db.QueryRow(ctx, createFile,
-		arg.ID,
-		arg.FolderID,
-		arg.Name,
-		arg.Size,
-	)
+	row := q.db.QueryRow(ctx, createFile, arg.FolderID, arg.Name, arg.Size)
 	var i File
 	err := row.Scan(
 		&i.ID,
@@ -284,29 +277,22 @@ func (q *Queries) CreateFileStorage(ctx context.Context, arg CreateFileStoragePa
 
 const createFolder = `-- name: CreateFolder :one
 INSERT INTO folders (
-    id,
     project_id,
     parent_folder_id,
     name
 )
-VALUES ($1, $2, $3, $4)
+VALUES ($1, $2, $3)
 RETURNING id, project_id, parent_folder_id, name, created_at, updated_at
 `
 
 type CreateFolderParams struct {
-	ID             pgtype.UUID
 	ProjectID      pgtype.UUID
 	ParentFolderID pgtype.UUID
 	Name           string
 }
 
 func (q *Queries) CreateFolder(ctx context.Context, arg CreateFolderParams) (Folder, error) {
-	row := q.db.QueryRow(ctx, createFolder,
-		arg.ID,
-		arg.ProjectID,
-		arg.ParentFolderID,
-		arg.Name,
-	)
+	row := q.db.QueryRow(ctx, createFolder, arg.ProjectID, arg.ParentFolderID, arg.Name)
 	var i Folder
 	err := row.Scan(
 		&i.ID,
@@ -514,18 +500,16 @@ func (q *Queries) FileNameExistsInFolder(ctx context.Context, arg FileNameExists
 
 const fileShare = `-- name: FileShare :one
 INSERT INTO file_shares (
-    id,
     file_id,
     shared_by,
     shared_with,
     permission
 )
-VALUES ($1, $2, $3, $4, $5)
+VALUES ($1, $2, $3, $4)
 RETURNING id, file_id, shared_by, shared_with, permission, created_at
 `
 
 type FileShareParams struct {
-	ID         pgtype.UUID
 	FileID     pgtype.UUID
 	SharedBy   pgtype.UUID
 	SharedWith pgtype.UUID
@@ -534,7 +518,6 @@ type FileShareParams struct {
 
 func (q *Queries) FileShare(ctx context.Context, arg FileShareParams) (FileShare, error) {
 	row := q.db.QueryRow(ctx, fileShare,
-		arg.ID,
 		arg.FileID,
 		arg.SharedBy,
 		arg.SharedWith,

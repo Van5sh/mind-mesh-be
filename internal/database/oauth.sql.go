@@ -80,7 +80,6 @@ func (q *Queries) DeleteOAuthAccountByUserAndProvider(ctx context.Context, arg D
 const getOAuthAccount = `-- name: GetOAuthAccount :one
 
 SELECT
-    id,
     user_id,
     provider,
     provider_user_id,
@@ -97,14 +96,21 @@ type GetOAuthAccountParams struct {
 	ProviderUserID string
 }
 
+type GetOAuthAccountRow struct {
+	UserID         pgtype.UUID
+	Provider       string
+	ProviderUserID string
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+}
+
 // ============================================================
 // OAuth Accounts
 // ============================================================
-func (q *Queries) GetOAuthAccount(ctx context.Context, arg GetOAuthAccountParams) (OauthAccount, error) {
+func (q *Queries) GetOAuthAccount(ctx context.Context, arg GetOAuthAccountParams) (GetOAuthAccountRow, error) {
 	row := q.db.QueryRow(ctx, getOAuthAccount, arg.Provider, arg.ProviderUserID)
-	var i OauthAccount
+	var i GetOAuthAccountRow
 	err := row.Scan(
-		&i.ID,
 		&i.UserID,
 		&i.Provider,
 		&i.ProviderUserID,

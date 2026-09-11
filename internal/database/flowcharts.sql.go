@@ -13,7 +13,6 @@ import (
 
 const createFlowchart = `-- name: CreateFlowchart :one
 INSERT INTO flowcharts (
-    id,
     project_id,
     name,
     data,
@@ -22,12 +21,11 @@ INSERT INTO flowcharts (
     status,
     source_chat_id
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING id, project_id, name, data, generated_by, generated_by_ai, status, source_chat_id, created_at, updated_at
 `
 
 type CreateFlowchartParams struct {
-	ID            pgtype.UUID
 	ProjectID     pgtype.UUID
 	Name          string
 	Data          []byte
@@ -39,7 +37,6 @@ type CreateFlowchartParams struct {
 
 func (q *Queries) CreateFlowchart(ctx context.Context, arg CreateFlowchartParams) (Flowchart, error) {
 	row := q.db.QueryRow(ctx, createFlowchart,
-		arg.ID,
 		arg.ProjectID,
 		arg.Name,
 		arg.Data,

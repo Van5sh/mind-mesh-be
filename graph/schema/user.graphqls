@@ -16,76 +16,89 @@ type User {
 
 type UserProfile {
   user: User!
+
   firstName: String!
   lastName: String!
+
   bio: String
   avatarUrl: String
+
   createdAt: Time!
   updatedAt: Time!
 }
 
+# ============================================================
+# Queries
+# ============================================================
+
 extend type Query {
-  # Current authenticated user
   me: User
 
-  # Single user lookups
   user(id: ID!): User
   userByEmail(email: String!): User
   userByUsername(username: String!): User
 
-  # User profile
   userProfile(userId: ID!): UserProfile
 
-  # User collections
   allUsers: [User!]!
   users(ids: [ID!]!): [User!]!
 }
 
-extend type Mutation {
-  # User
-  createUser(input: CreateUserInput!): User!
-  updateUser(input: UpdateUserInput!): User!
-  updateUserPassword(input: UpdateUserPasswordInput!): Boolean!
-  deleteUser(userId: ID!): Boolean!
+# ============================================================
+# Mutations
+# ============================================================
 
-  # User profile
-  createUserProfile(input: CreateUserProfileInput!): UserProfile!
-  updateUserProfile(input: UpdateUserProfileInput!): UserProfile!
+extend type Mutation {
+  createUser(
+    input: CreateUserInput!
+  ): User!
+
+  updateUser(
+    id: ID!
+    input: UpdateUserInput!
+  ): User!
+
+  deleteUser(
+    id: ID!
+  ): Boolean!
+
+  updateUserProfile(
+    id: ID!
+    input: UpdateUserProfileInput!
+  ): UserProfile!
+
   updateUserAvatar(
-    userId: ID!
-    avatarUrl: String
+    id: ID!
+    input: UpdateUserAvatarInput!
   ): UserProfile!
 }
+
+# ============================================================
+# User Inputs
+# ============================================================
 
 input CreateUserInput {
   username: String!
   email: String!
-  passwordHash: String!
+  password: String!
 }
 
 input UpdateUserInput {
-  userId: ID!
   username: String!
   email: String!
 }
 
-input UpdateUserPasswordInput {
-  userId: ID!
-  passwordHash: String!
-}
-
-input CreateUserProfileInput {
-  userId: ID!
-  firstName: String!
-  lastName: String!
-  bio: String
-  avatarUrl: String
-}
+# ============================================================
+# User Profile Inputs
+# ============================================================
 
 input UpdateUserProfileInput {
-  userId: ID!
   firstName: String!
   lastName: String!
   bio: String
   avatarUrl: String
+}
+
+input UpdateUserAvatarInput {
+  avatarUrl: String!
 }

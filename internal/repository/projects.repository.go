@@ -4,7 +4,6 @@ import (
 	"context"
 	"example/hello/internal/database"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -42,7 +41,6 @@ func (r *ProjectRepository) CreateProject(ctx context.Context, params database.C
 		return database.Project{}, err
 	}
 	if _, err := queries.AddProjectMember(ctx, database.AddProjectMemberParams{
-		ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
 		ProjectID: project.ID,
 		UserID:    project.OwnerID,
 		Role:      database.ProjectRoleOWNER,

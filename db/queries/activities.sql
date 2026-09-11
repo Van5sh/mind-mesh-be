@@ -1,13 +1,12 @@
 -- name: CreateActivityLog :one
 INSERT INTO activity_logs (
-    id,
     project_id,
     user_id,
     action,
     entity_type,
     entity_id
 )
-VALUES ($1, $2, $3, $4, $5, $6)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: GetActivityLogByID :one

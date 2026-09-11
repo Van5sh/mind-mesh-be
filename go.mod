@@ -14,6 +14,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/valyala/fasthttp v1.16.0
 	github.com/vektah/gqlparser/v2 v2.5.37
+	golang.org/x/oauth2 v0.37.0
 )
 
 require (
@@ -36,8 +37,6 @@ require (
 	github.com/aws/smithy-go v1.28.1 // indirect
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/gofiber/utils v0.0.10 // indirect
-	github.com/google/go-github/v74 v74.0.0 // indirect
-	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/schema v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -45,7 +44,6 @@ require (
 	github.com/klauspost/compress v1.15.11 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/tcplisten v0.0.0-20161114210144-ceec8f93295a // indirect
-	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 )
 

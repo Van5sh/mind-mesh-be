@@ -76,9 +76,6 @@ func (s *ChatService) CreateChatMessage(
 	ctx context.Context,
 	params database.CreateChatMessageParams,
 ) (database.ChatMessage, error) {
-	if err := validators.ValidateUUID("message id", params.ID); err != nil {
-		return database.ChatMessage{}, err
-	}
 	if err := validators.ValidateUUID("chat id", params.ChatID); err != nil {
 		return database.ChatMessage{}, err
 	}

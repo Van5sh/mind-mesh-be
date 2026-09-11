@@ -4,7 +4,6 @@
 
 -- name: GetOAuthAccount :one
 SELECT
-    id,
     user_id,
     provider,
     provider_user_id,

@@ -14,14 +14,12 @@ import (
 const createSession = `-- name: CreateSession :one
 
 INSERT INTO sessions (
-    id,
     user_id,
     expires_at
 )
 VALUES (
     $1,
-    $2,
-    $3
+    $2
 )
 RETURNING
     id,
@@ -31,7 +29,6 @@ RETURNING
 `
 
 type CreateSessionParams struct {
-	ID        pgtype.UUID
 	UserID    pgtype.UUID
 	ExpiresAt pgtype.Timestamptz
 }
@@ -40,7 +37,7 @@ type CreateSessionParams struct {
 // Sessions
 // ============================================================
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
-	row := q.db.QueryRow(ctx, createSession, arg.ID, arg.UserID, arg.ExpiresAt)
+	row := q.db.QueryRow(ctx, createSession, arg.UserID, arg.ExpiresAt)
 	var i Session
 	err := row.Scan(
 		&i.ID,

@@ -18,27 +18,26 @@ extend type Query {
 
 extend type Mutation {
   createFlowchart(input: CreateFlowchartInput!): Flowchart!
-  updateFlowchart(input: UpdateFlowchartInput!): Flowchart!
-  updateFlowchartStatus(
-    flowchartId: ID!
-    status: FlowchartStatus!
-  ): Flowchart!
-  deleteFlowchart(flowchartId: ID!): Boolean!
+  updateFlowchart(id: ID!, input: UpdateFlowchartInput!): Flowchart!
+  deleteFlowchart(id: ID!): Boolean!
 }
 
 input CreateFlowchartInput {
   projectId: ID!
   name: String!
   data: JSON!
-  generatedById: ID!
-  generatedByAI: Boolean!
-  status: FlowchartStatus!
+  generatedById: ID
+  generatedByAI: Boolean
+  status: FlowchartStatus
   sourceChatId: ID
 }
 
 input UpdateFlowchartInput {
-  flowchartId: ID!
-  name: String!
-  data: JSON!
-  generatedByAI: Boolean!
+  id: ID!
+  name: String
+  data: String
+  generatedBy: ID
+  generatedByAI: Boolean
+  status: FlowchartStatus
+  sourceChatId: ID
 }

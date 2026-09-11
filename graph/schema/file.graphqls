@@ -121,15 +121,16 @@ extend type Mutation {
 }
 
 input CreateFolderInput {
-  projectId: ID
+  projectId: ID!
   parentFolderId: ID
   name: String!
 }
 
 input CreateFileInput {
+  projectId: ID!
   folderId: ID
   name: String!
-  size: Int64!
+  size: Int!
 }
 
 input MoveFileInput {

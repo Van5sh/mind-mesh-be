@@ -29,10 +29,6 @@ func (s *FileService) CreateFile(
 	ctx context.Context,
 	params database.CreateFileParams,
 ) (database.File, error) {
-	if err := validators.ValidateUUID("file id", params.ID); err != nil {
-		return database.File{}, err
-	}
-
 	if err := validators.ValidateFileName(params.Name); err != nil {
 		return database.File{}, err
 	}
@@ -186,13 +182,6 @@ func (s *FileService) CreateFolder(
 	ctx context.Context,
 	params database.CreateFolderParams,
 ) (database.Folder, error) {
-	if err := validators.ValidateUUID(
-		"folder id",
-		params.ID,
-	); err != nil {
-		return database.Folder{}, err
-	}
-
 	if err := validators.ValidateFolderName(
 		params.Name,
 	); err != nil {

@@ -1,11 +1,10 @@
 -- name: CreateChat :one
 INSERT INTO chats (
-    id,
     project_id,
     title,
     type
 )
-VALUES ($1, $2, $3, $4)
+VALUES ($1, $2, $3)
 RETURNING *;
 
 
@@ -144,13 +143,12 @@ WHERE id = $1;
 
 -- name: CreateChatMessage :one
 INSERT INTO chat_messages (
-    id,
     chat_id,
     sender_id,
     role,
     content
 )
-VALUES ($1, $2, $3, $4, $5)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 

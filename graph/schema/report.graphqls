@@ -47,12 +47,8 @@ extend type Query {
 extend type Mutation {
   # Reports
   createReport(input: CreateReportInput!): Report!
-  updateReport(input: UpdateReportInput!): Report!
-  updateReportStatus(
-    reportId: ID!
-    status: ReportStatus!
-  ): Report!
-  deleteReport(reportId: ID!): Boolean!
+  updateReport(id: ID!, input: UpdateReportInput!): Report!
+  deleteReport(id: ID!): Boolean!
 }
 
 input CreateReportInput {
@@ -60,15 +56,15 @@ input CreateReportInput {
   title: String!
   content: String!
   format: ReportFormat!
-  generatedById: ID!
-  generatedByAI: Boolean!
-  status: ReportStatus!
+  generatedBy: ID
+  generatedByAi: Boolean
+  status: ReportStatus
   sourceChatId: ID
 }
 
 input UpdateReportInput {
-  reportId: ID!
-  title: String!
-  content: String!
-  format: ReportFormat!
+  id: ID!
+  title: String
+  content: String
+  format: ReportFormat
 }

@@ -13,29 +13,22 @@ import (
 
 const addProjectMember = `-- name: AddProjectMember :one
 INSERT INTO project_members (
-    id,
     project_id,
     user_id,
     role
 )
-VALUES ($1, $2, $3, $4)
+VALUES ($1, $2, $3)
 RETURNING id, project_id, user_id, role, created_at, updated_at
 `
 
 type AddProjectMemberParams struct {
-	ID        pgtype.UUID
 	ProjectID pgtype.UUID
 	UserID    pgtype.UUID
 	Role      ProjectRole
 }
 
 func (q *Queries) AddProjectMember(ctx context.Context, arg AddProjectMemberParams) (ProjectMember, error) {
-	row := q.db.QueryRow(ctx, addProjectMember,
-		arg.ID,
-		arg.ProjectID,
-		arg.UserID,
-		arg.Role,
-	)
+	row := q.db.QueryRow(ctx, addProjectMember, arg.ProjectID, arg.UserID, arg.Role)
 	var i ProjectMember
 	err := row.Scan(
 		&i.ID,
@@ -63,18 +56,16 @@ func (q *Queries) ArchiveProject(ctx context.Context, id pgtype.UUID) error {
 
 const createProject = `-- name: CreateProject :one
 INSERT INTO projects (
-    id,
     owner_id,
     name,
     description,
     visibility
 )
-VALUES ($1, $2, $3, $4, $5)
+VALUES ($1, $2, $3, $4)
 RETURNING id, owner_id, name, description, visibility, archived_at, created_at, updated_at
 `
 
 type CreateProjectParams struct {
-	ID          pgtype.UUID
 	OwnerID     pgtype.UUID
 	Name        string
 	Description pgtype.Text
@@ -83,7 +74,6 @@ type CreateProjectParams struct {
 
 func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error) {
 	row := q.db.QueryRow(ctx, createProject,
-		arg.ID,
 		arg.OwnerID,
 		arg.Name,
 		arg.Description,
