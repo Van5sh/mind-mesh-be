@@ -233,12 +233,12 @@ func (s *Service) LoginWithOAuth(
 	}
 
 	// --------------------------------------------------------
-	// 5. Create user profile
+	// 5. Populate the profile that CreateUser creates.
 	// --------------------------------------------------------
 
-	_, err = s.userRepo.CreateUserProfile(
+	_, err = s.userRepo.UpdateUserProfile(
 		ctx,
-		database.CreateUserProfileParams{
+		database.UpdateUserProfileParams{
 			UserID:    user.ID,
 			FirstName: oauthUser.FirstName,
 			LastName:  oauthUser.LastName,
@@ -250,7 +250,7 @@ func (s *Service) LoginWithOAuth(
 	if err != nil {
 		return database.User{}, database.Session{},
 			apperrors.InternalError(
-				"failed to create OAuth user profile",
+				"failed to update OAuth user profile",
 				err,
 			)
 	}

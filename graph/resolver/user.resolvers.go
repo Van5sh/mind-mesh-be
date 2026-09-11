@@ -8,6 +8,7 @@ package graph
 import (
 	"context"
 	"example/hello/graph/model"
+	"example/hello/internal/auth"
 	"fmt"
 )
 
@@ -38,7 +39,18 @@ func (r *mutationResolver) UpdateUserAvatar(ctx context.Context, id string, inpu
 
 // Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: Me - me"))
+	user, ok := auth.UserFromContext(ctx)
+	if !ok {
+		return nil, nil
+	}
+
+	return &model.User{
+		ID:        uuidString(user.ID),
+		Username:  user.Username,
+		Email:     user.Email,
+		CreatedAt: user.CreatedAt.Time,
+		UpdatedAt: user.UpdatedAt.Time,
+	}, nil
 }
 
 // User is the resolver for the user field.

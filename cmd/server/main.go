@@ -9,6 +9,7 @@ import (
 	"example/hello/graph"
 	graphresolver "example/hello/graph/resolver"
 	"example/hello/internal/app"
+	"example/hello/internal/auth"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
@@ -40,10 +41,20 @@ func StartServer() {
 	}
 	defer application.Close()
 	log.Println("Application initialized successfully")
+	oauthHandler, err := auth.NewOAuthHandlerFromEnvironment(
+		application.Repositories.User,
+		application.Repositories.OAuth,
+		application.Services.Session,
+	)
+	if err != nil {
+		log.Fatalf("initialize OAuth: %v", err)
+	}
 
 	server := fiber.New()
 
 	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: graphresolver.NewResolver(application)}))
+	graphqlHandler := oauthHandler.Middleware(srv)
+	graphqlHandler = oauthHandler.CORS(graphqlHandler)
 
 	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.GET{})
@@ -64,12 +75,20 @@ func StartServer() {
 		}))(c.Fasthttp)
 	})
 
-	server.Post("/query", func(c *fiber.Ctx) {
-		fasthttpadaptor.NewFastHTTPHandler(srv)(c.Fasthttp)
+	server.All("/query", func(c *fiber.Ctx) {
+		fasthttpadaptor.NewFastHTTPHandler(graphqlHandler)(c.Fasthttp)
 	})
-
-	server.Get("/query", func(c *fiber.Ctx) {
-		fasthttpadaptor.NewFastHTTPHandler(srv)(c.Fasthttp)
+	server.Get("/auth/google", func(c *fiber.Ctx) {
+		fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(oauthHandler.GoogleLogin))(c.Fasthttp)
+	})
+	server.Get("/auth/google/callback", func(c *fiber.Ctx) {
+		fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(oauthHandler.GoogleCallback))(c.Fasthttp)
+	})
+	server.Get("/auth/github", func(c *fiber.Ctx) {
+		fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(oauthHandler.GitHubLogin))(c.Fasthttp)
+	})
+	server.Get("/auth/github/callback", func(c *fiber.Ctx) {
+		fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(oauthHandler.GitHubCallback))(c.Fasthttp)
 	})
 
 	log.Printf("🚀 Server ready at http://localhost:%s/", port)

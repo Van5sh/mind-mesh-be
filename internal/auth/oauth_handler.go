@@ -16,9 +16,6 @@ const (
 	oauthStateCookieName = "oauth_state"
 	sessionCookieName    = "session_id"
 
-	// Change this in production.
-	frontendURL = "http://localhost:3000"
-
 	oauthStateMaxAge = 10 * 60 // 10 minutes
 )
 
@@ -26,18 +23,41 @@ type OAuthHandler struct {
 	service *Service
 	google  *GoogleProvider
 	github  *GitHubProvider
+
+	frontendURL      string
+	secureCookie     bool
+	sessionCookieAge time.Duration
 }
 
 func NewOAuthHandler(
 	service *Service,
 	google *GoogleProvider,
 	github *GitHubProvider,
+	frontendURL string,
+	secureCookie bool,
+	sessionCookieAge time.Duration,
 ) *OAuthHandler {
-	return &OAuthHandler{
-		service: service,
-		google:  google,
-		github:  github,
+	if frontendURL == "" {
+		frontendURL = "http://localhost:3000"
 	}
+	if sessionCookieAge <= 0 {
+		sessionCookieAge = 7 * 24 * time.Hour
+	}
+
+	return &OAuthHandler{
+		service:          service,
+		google:           google,
+		github:           github,
+		frontendURL:      frontendURL,
+		secureCookie:     secureCookie,
+		sessionCookieAge: sessionCookieAge,
+	}
+}
+
+// Middleware attaches the authenticated user and session to request contexts.
+// Wrap API handlers that need to read the login session with it.
+func (h *OAuthHandler) Middleware(next http.Handler) http.Handler {
+	return Middleware(h.service)(next)
 }
 
 // ============================================================
@@ -59,7 +79,7 @@ func (h *OAuthHandler) GoogleLogin(
 		return
 	}
 
-	setOAuthStateCookie(w, state)
+	h.setOAuthStateCookie(w, state)
 
 	http.Redirect(
 		w,
@@ -93,6 +113,7 @@ func (h *OAuthHandler) GoogleCallback(
 		)
 		return
 	}
+	h.clearOAuthStateCookie(w)
 
 	code := r.URL.Query().Get("code")
 
@@ -118,14 +139,12 @@ func (h *OAuthHandler) GoogleCallback(
 		return
 	}
 
-	clearOAuthStateCookie(w)
-
-	setSessionCookie(w, session)
+	h.setSessionCookie(w, session)
 
 	http.Redirect(
 		w,
 		r,
-		frontendURL,
+		h.frontendURL,
 		http.StatusSeeOther,
 	)
 }
@@ -149,7 +168,7 @@ func (h *OAuthHandler) GitHubLogin(
 		return
 	}
 
-	setOAuthStateCookie(w, state)
+	h.setOAuthStateCookie(w, state)
 
 	http.Redirect(
 		w,
@@ -183,6 +202,7 @@ func (h *OAuthHandler) GitHubCallback(
 		)
 		return
 	}
+	h.clearOAuthStateCookie(w)
 
 	code := r.URL.Query().Get("code")
 
@@ -208,14 +228,12 @@ func (h *OAuthHandler) GitHubCallback(
 		return
 	}
 
-	clearOAuthStateCookie(w)
-
-	setSessionCookie(w, session)
+	h.setSessionCookie(w, session)
 
 	http.Redirect(
 		w,
 		r,
-		frontendURL,
+		h.frontendURL,
 		http.StatusSeeOther,
 	)
 }
@@ -237,7 +255,7 @@ func generateOAuthState() (string, error) {
 }
 
 // setOAuthStateCookie stores the OAuth state in an HTTP-only cookie.
-func setOAuthStateCookie(
+func (h *OAuthHandler) setOAuthStateCookie(
 	w http.ResponseWriter,
 	state string,
 ) {
@@ -247,9 +265,7 @@ func setOAuthStateCookie(
 		Path:     "/",
 		HttpOnly: true,
 
-		// Local development is HTTP.
-		// Set to true in production.
-		Secure: false,
+		Secure: h.secureCookie,
 
 		SameSite: http.SameSiteLaxMode,
 
@@ -286,13 +302,13 @@ func validateOAuthState(
 }
 
 // clearOAuthStateCookie removes the OAuth state cookie.
-func clearOAuthStateCookie(w http.ResponseWriter) {
+func (h *OAuthHandler) clearOAuthStateCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     oauthStateCookieName,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false,
+		Secure:   h.secureCookie,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
@@ -304,7 +320,7 @@ func clearOAuthStateCookie(w http.ResponseWriter) {
 
 // setSessionCookie stores the authenticated session ID
 // in an HTTP-only cookie.
-func setSessionCookie(
+func (h *OAuthHandler) setSessionCookie(
 	w http.ResponseWriter,
 	session database.Session,
 ) {
@@ -317,17 +333,12 @@ func setSessionCookie(
 
 		HttpOnly: true,
 
-		// Local development:
-		Secure: false,
-
-		// Production:
-		// Secure: true,
+		Secure: h.secureCookie,
 
 		SameSite: http.SameSiteLaxMode,
 
-		// Keep this synchronized with your session duration.
-		Expires: time.Now().Add(30 * 24 * time.Hour),
-		MaxAge:  30 * 24 * 60 * 60,
+		Expires: time.Now().Add(h.sessionCookieAge),
+		MaxAge:  int(h.sessionCookieAge.Seconds()),
 	})
 }
 

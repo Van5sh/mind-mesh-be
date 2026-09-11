@@ -28,6 +28,7 @@ type Repositories struct {
 	Project   *repository.ProjectRepository
 	Report    *repository.ReportRepository
 	User      *repository.UserRepository
+	OAuth     *repository.OAuthRepository
 	Session   *repository.SessionRepository
 }
 
@@ -75,6 +76,8 @@ func New(ctx context.Context, databaseURL string) (*App, error) {
 		Project:   repository.NewProjectRepository(db, queries),
 		Report:    repository.NewReportRepository(queries),
 		User:      repository.NewUserRepository(db, queries),
+		OAuth:     repository.NewOAuthRepository(queries),
+		Session:   repository.NewSessionRepository(queries),
 	}
 	appGuards := Guards{
 		Activity:  guards.NewActivityGuard(repositories.Activity),
@@ -98,6 +101,7 @@ func New(ctx context.Context, databaseURL string) (*App, error) {
 			Project:   services.NewProjectService(repositories.Project, appGuards.User, appGuards.Project),
 			Report:    services.NewReportService(repositories.Report, appGuards.Report),
 			User:      services.NewUserService(repositories.User, appGuards.User),
+			Session:   services.NewSessionService(repositories.Session),
 		},
 	}, nil
 }

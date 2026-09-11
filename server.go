@@ -5,6 +5,7 @@ import (
 	"example/hello/graph"
 	graphresolver "example/hello/graph/resolver"
 	"example/hello/internal/app"
+	"example/hello/internal/auth"
 	"example/hello/internal/services/aws"
 	"log"
 	"net/http"
@@ -43,8 +44,18 @@ func main() {
 		log.Fatalf("initialize application: %v", err)
 	}
 	defer application.Close()
+	oauthHandler, err := auth.NewOAuthHandlerFromEnvironment(
+		application.Repositories.User,
+		application.Repositories.OAuth,
+		application.Services.Session,
+	)
+	if err != nil {
+		log.Fatalf("initialize OAuth: %v", err)
+	}
 
 	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: graphresolver.NewResolver(application)}))
+	graphqlHandler := oauthHandler.Middleware(srv)
+	graphqlHandler = oauthHandler.CORS(graphqlHandler)
 
 	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.GET{})
@@ -58,7 +69,11 @@ func main() {
 	})
 
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
-	http.Handle("/query", srv)
+	http.Handle("/query", graphqlHandler)
+	http.HandleFunc("/auth/google", oauthHandler.GoogleLogin)
+	http.HandleFunc("/auth/google/callback", oauthHandler.GoogleCallback)
+	http.HandleFunc("/auth/github", oauthHandler.GitHubLogin)
+	http.HandleFunc("/auth/github/callback", oauthHandler.GitHubCallback)
 
 	log.Printf("AWS configuration initialized successfully")
 	log.Printf("S3 Bucket: %s", awsConfig.S3Bucket)

@@ -43,58 +43,45 @@ func Middleware(
 				cookie, err := r.Cookie(sessionCookieName)
 
 				if err != nil {
-					// No session cookie.
-					// User is anonymous.
 					next.ServeHTTP(w, r)
 					return
 				}
-
-				// ------------------------------------------------
-				// Parse session ID
-				// ------------------------------------------------
-
 				sessionID, err := parseSessionID(cookie.Value)
 
 				if err != nil {
-					// Invalid cookie.
 					ClearSessionCookie(w)
 
 					next.ServeHTTP(w, r)
 					return
 				}
 
-				// ------------------------------------------------
-				// Load session + user
-				// ------------------------------------------------
-	
 				user, err :=
 					service.GetUserFromSession(
 						r.Context(),
 						sessionID,
 					)
-	
+
 				if err != nil {
-					// Session is invalid/expired.
 					ClearSessionCookie(w)
-	
+
 					next.ServeHTTP(w, r)
 					return
 				}
-	
+
 				// ------------------------------------------------
 				// Store user in context
 				// ------------------------------------------------
-	
+
 				ctx := context.WithValue(
 					r.Context(),
 					userContextKey,
 					user,
 				)
-	
+
 				// ------------------------------------------------
 				// Store session in context
 				// ------------------------------------------------
-	
+
 				ctx = context.WithValue(
 					ctx,
 					sessionContextKey,
@@ -164,13 +151,17 @@ func UserFromContext(
 // The second return value is false when the request is anonymous.
 func SessionFromContext(
 	ctx context.Context,
-) (database.Session, bool) {
+) (pgtype.UUID, bool) {
 
 	session, ok := ctx.Value(
 		sessionContextKey,
-	).(database.Session)
+	).(*pgtype.UUID)
 
-	return session, ok
+	if !ok || session == nil {
+		return pgtype.UUID{}, false
+	}
+
+	return *session, true
 }
 
 // ============================================================
@@ -206,7 +197,7 @@ func SessionIDFromContext(
 		return pgtype.UUID{}, false
 	}
 
-	return session.ID, true
+	return session, true
 }
 
 // ============================================================
