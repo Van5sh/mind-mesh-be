@@ -36,3 +36,10 @@ func uuidString(id pgtype.UUID) string {
 
 	return uuid.UUID(id.Bytes).String()
 }
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}

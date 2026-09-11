@@ -129,12 +129,6 @@ func (r *UserRepository) UpdateUser(
 	return r.q.UpdateUser(ctx, params)
 }
 
-func (r *UserRepository) UpdateUserPassword(
-	ctx context.Context,
-	params database.UpdateUserPasswordParams,
-) (database.User, error) {
-	return r.q.UpdateUserPassword(ctx, params)
-}
 
 func (r *UserRepository) UpdateUserAvatar(
 	ctx context.Context,

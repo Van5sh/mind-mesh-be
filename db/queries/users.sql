@@ -1,11 +1,14 @@
+-- ============================================================
+-- Users
+-- ============================================================
+
 -- name: CreateUser :one
 INSERT INTO users (
     id,
     username,
-    email,
-    password_hash
+    email
 )
-VALUES ($1, $2, $3, $4)
+VALUES ($1, $2, $3)
 RETURNING *;
 
 
@@ -33,6 +36,7 @@ FROM users
 WHERE id = ANY($1::UUID[])
 ORDER BY username;
 
+
 -- name: GetAllUsers :many
 SELECT *
 FROM users
@@ -49,20 +53,14 @@ WHERE id = $1
 RETURNING *;
 
 
--- name: UpdateUserPassword :one
-UPDATE users
-SET
-    password_hash = $2,
-    updated_at = NOW()
-WHERE id = $1
-RETURNING *;
-
-
 -- name: DeleteUser :exec
-DELETE
-FROM users
+DELETE FROM users
 WHERE id = $1;
 
+
+-- ============================================================
+-- User Existence Checks
+-- ============================================================
 
 -- name: CheckUsernameExists :one
 SELECT EXISTS (
@@ -80,6 +78,10 @@ SELECT EXISTS (
 );
 
 
+-- ============================================================
+-- User Profiles
+-- ============================================================
+
 -- name: CreateUserProfile :one
 INSERT INTO user_profiles (
     user_id,
@@ -88,7 +90,13 @@ INSERT INTO user_profiles (
     bio,
     avatar_url
 )
-VALUES ($1, $2, $3, $4, $5)
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5
+)
 RETURNING *;
 
 
@@ -111,7 +119,7 @@ SELECT
     p.avatar_url
 FROM users u
 LEFT JOIN user_profiles p
-ON u.id = p.user_id
+    ON u.id = p.user_id
 WHERE u.id = $1;
 
 
@@ -137,6 +145,5 @@ RETURNING *;
 
 
 -- name: DeleteUserProfile :exec
-DELETE
-FROM user_profiles
+DELETE FROM user_profiles
 WHERE user_id = $1;

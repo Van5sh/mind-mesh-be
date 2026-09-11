@@ -27,6 +27,7 @@ func (q *Queries) CheckEmailExists(ctx context.Context, email string) (bool, err
 }
 
 const checkUsernameExists = `-- name: CheckUsernameExists :one
+
 SELECT EXISTS (
     SELECT 1
     FROM users
@@ -34,6 +35,9 @@ SELECT EXISTS (
 )
 `
 
+// ============================================================
+// User Existence Checks
+// ============================================================
 func (q *Queries) CheckUsernameExists(ctx context.Context, username string) (bool, error) {
 	row := q.db.QueryRow(ctx, checkUsernameExists, username)
 	var exists bool
@@ -42,36 +46,32 @@ func (q *Queries) CheckUsernameExists(ctx context.Context, username string) (boo
 }
 
 const createUser = `-- name: CreateUser :one
+
 INSERT INTO users (
     id,
     username,
-    email,
-    password_hash
+    email
 )
-VALUES ($1, $2, $3, $4)
-RETURNING id, username, email, password_hash, created_at, updated_at
+VALUES ($1, $2, $3)
+RETURNING id, username, email, created_at, updated_at
 `
 
 type CreateUserParams struct {
-	ID           pgtype.UUID
-	Username     string
-	Email        string
-	PasswordHash string
+	ID       pgtype.UUID
+	Username string
+	Email    string
 }
 
+// ============================================================
+// Users
+// ============================================================
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser,
-		arg.ID,
-		arg.Username,
-		arg.Email,
-		arg.PasswordHash,
-	)
+	row := q.db.QueryRow(ctx, createUser, arg.ID, arg.Username, arg.Email)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Username,
 		&i.Email,
-		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -79,6 +79,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const createUserProfile = `-- name: CreateUserProfile :one
+
 INSERT INTO user_profiles (
     user_id,
     first_name,
@@ -86,8 +87,14 @@ INSERT INTO user_profiles (
     bio,
     avatar_url
 )
-VALUES ($1, $2, $3, $4, $5)
-RETURNING user_id, first_name, last_name, bio, avatar_url, created_at, updated_at
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5
+)
+RETURNING id, user_id, first_name, last_name, bio, avatar_url, created_at, updated_at
 `
 
 type CreateUserProfileParams struct {
@@ -98,6 +105,9 @@ type CreateUserProfileParams struct {
 	AvatarUrl pgtype.Text
 }
 
+// ============================================================
+// User Profiles
+// ============================================================
 func (q *Queries) CreateUserProfile(ctx context.Context, arg CreateUserProfileParams) (UserProfile, error) {
 	row := q.db.QueryRow(ctx, createUserProfile,
 		arg.UserID,
@@ -108,6 +118,7 @@ func (q *Queries) CreateUserProfile(ctx context.Context, arg CreateUserProfilePa
 	)
 	var i UserProfile
 	err := row.Scan(
+		&i.ID,
 		&i.UserID,
 		&i.FirstName,
 		&i.LastName,
@@ -120,8 +131,7 @@ func (q *Queries) CreateUserProfile(ctx context.Context, arg CreateUserProfilePa
 }
 
 const deleteUser = `-- name: DeleteUser :exec
-DELETE
-FROM users
+DELETE FROM users
 WHERE id = $1
 `
 
@@ -131,8 +141,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id pgtype.UUID) error {
 }
 
 const deleteUserProfile = `-- name: DeleteUserProfile :exec
-DELETE
-FROM user_profiles
+DELETE FROM user_profiles
 WHERE user_id = $1
 `
 
@@ -142,7 +151,7 @@ func (q *Queries) DeleteUserProfile(ctx context.Context, userID pgtype.UUID) err
 }
 
 const getAllUsers = `-- name: GetAllUsers :many
-SELECT id, username, email, password_hash, created_at, updated_at
+SELECT id, username, email, created_at, updated_at
 FROM users
 ORDER BY username
 `
@@ -160,7 +169,6 @@ func (q *Queries) GetAllUsers(ctx context.Context) ([]User, error) {
 			&i.ID,
 			&i.Username,
 			&i.Email,
-			&i.PasswordHash,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -175,7 +183,7 @@ func (q *Queries) GetAllUsers(ctx context.Context) ([]User, error) {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, email, password_hash, created_at, updated_at
+SELECT id, username, email, created_at, updated_at
 FROM users
 WHERE email = $1
 `
@@ -187,7 +195,6 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.ID,
 		&i.Username,
 		&i.Email,
-		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -195,7 +202,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, email, password_hash, created_at, updated_at
+SELECT id, username, email, created_at, updated_at
 FROM users
 WHERE id = $1
 `
@@ -207,7 +214,6 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.ID,
 		&i.Username,
 		&i.Email,
-		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -215,7 +221,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, password_hash, created_at, updated_at
+SELECT id, username, email, created_at, updated_at
 FROM users
 WHERE username = $1
 `
@@ -227,7 +233,6 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.ID,
 		&i.Username,
 		&i.Email,
-		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -235,7 +240,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 }
 
 const getUserProfile = `-- name: GetUserProfile :one
-SELECT user_id, first_name, last_name, bio, avatar_url, created_at, updated_at
+SELECT id, user_id, first_name, last_name, bio, avatar_url, created_at, updated_at
 FROM user_profiles
 WHERE user_id = $1
 `
@@ -244,6 +249,7 @@ func (q *Queries) GetUserProfile(ctx context.Context, userID pgtype.UUID) (UserP
 	row := q.db.QueryRow(ctx, getUserProfile, userID)
 	var i UserProfile
 	err := row.Scan(
+		&i.ID,
 		&i.UserID,
 		&i.FirstName,
 		&i.LastName,
@@ -268,7 +274,7 @@ SELECT
     p.avatar_url
 FROM users u
 LEFT JOIN user_profiles p
-ON u.id = p.user_id
+    ON u.id = p.user_id
 WHERE u.id = $1
 `
 
@@ -302,7 +308,7 @@ func (q *Queries) GetUserWithProfile(ctx context.Context, id pgtype.UUID) (GetUs
 }
 
 const getUsersByIDs = `-- name: GetUsersByIDs :many
-SELECT id, username, email, password_hash, created_at, updated_at
+SELECT id, username, email, created_at, updated_at
 FROM users
 WHERE id = ANY($1::UUID[])
 ORDER BY username
@@ -321,7 +327,6 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]
 			&i.ID,
 			&i.Username,
 			&i.Email,
-			&i.PasswordHash,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -342,7 +347,7 @@ SET
     email = $3,
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, username, email, password_hash, created_at, updated_at
+RETURNING id, username, email, created_at, updated_at
 `
 
 type UpdateUserParams struct {
@@ -358,7 +363,6 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.ID,
 		&i.Username,
 		&i.Email,
-		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -371,7 +375,7 @@ SET
     avatar_url = $2,
     updated_at = NOW()
 WHERE user_id = $1
-RETURNING user_id, first_name, last_name, bio, avatar_url, created_at, updated_at
+RETURNING id, user_id, first_name, last_name, bio, avatar_url, created_at, updated_at
 `
 
 type UpdateUserAvatarParams struct {
@@ -383,39 +387,12 @@ func (q *Queries) UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarPara
 	row := q.db.QueryRow(ctx, updateUserAvatar, arg.UserID, arg.AvatarUrl)
 	var i UserProfile
 	err := row.Scan(
+		&i.ID,
 		&i.UserID,
 		&i.FirstName,
 		&i.LastName,
 		&i.Bio,
 		&i.AvatarUrl,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const updateUserPassword = `-- name: UpdateUserPassword :one
-UPDATE users
-SET
-    password_hash = $2,
-    updated_at = NOW()
-WHERE id = $1
-RETURNING id, username, email, password_hash, created_at, updated_at
-`
-
-type UpdateUserPasswordParams struct {
-	ID           pgtype.UUID
-	PasswordHash string
-}
-
-func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateUserPassword, arg.ID, arg.PasswordHash)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.Username,
-		&i.Email,
-		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -431,7 +408,7 @@ SET
     avatar_url = $5,
     updated_at = NOW()
 WHERE user_id = $1
-RETURNING user_id, first_name, last_name, bio, avatar_url, created_at, updated_at
+RETURNING id, user_id, first_name, last_name, bio, avatar_url, created_at, updated_at
 `
 
 type UpdateUserProfileParams struct {
@@ -452,6 +429,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 	)
 	var i UserProfile
 	err := row.Scan(
+		&i.ID,
 		&i.UserID,
 		&i.FirstName,
 		&i.LastName,

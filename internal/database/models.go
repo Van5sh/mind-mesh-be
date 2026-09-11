@@ -225,6 +225,48 @@ func (ns NullMessageRole) Value() (driver.Value, error) {
 	return string(ns.MessageRole), nil
 }
 
+type OauthProvider string
+
+const (
+	OauthProviderGOOGLE OauthProvider = "GOOGLE"
+	OauthProviderGITHUB OauthProvider = "GITHUB"
+)
+
+func (e *OauthProvider) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = OauthProvider(s)
+	case string:
+		*e = OauthProvider(s)
+	default:
+		return fmt.Errorf("unsupported scan type for OauthProvider: %T", src)
+	}
+	return nil
+}
+
+type NullOauthProvider struct {
+	OauthProvider OauthProvider
+	Valid         bool // Valid is true if OauthProvider is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullOauthProvider) Scan(value interface{}) error {
+	if value == nil {
+		ns.OauthProvider, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.OauthProvider.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullOauthProvider) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.OauthProvider), nil
+}
+
 type ProjectRole string
 
 const (
@@ -526,6 +568,15 @@ type MessageMention struct {
 	CreatedAt       pgtype.Timestamptz
 }
 
+type OauthAccount struct {
+	ID             pgtype.UUID
+	UserID         pgtype.UUID
+	Provider       string
+	ProviderUserID string
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+}
+
 type Project struct {
 	ID          pgtype.UUID
 	OwnerID     pgtype.UUID
@@ -571,13 +622,19 @@ type ReportProperty struct {
 	SourceChatID  pgtype.UUID
 }
 
+type Session struct {
+	ID        pgtype.UUID
+	UserID    pgtype.UUID
+	ExpiresAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
 type User struct {
-	ID           pgtype.UUID
-	Username     string
-	Email        string
-	PasswordHash string
-	CreatedAt    pgtype.Timestamptz
-	UpdatedAt    pgtype.Timestamptz
+	ID        pgtype.UUID
+	Username  string
+	Email     string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
 }
 
 type UserFilePreference struct {
@@ -589,6 +646,7 @@ type UserFilePreference struct {
 }
 
 type UserProfile struct {
+	ID        pgtype.UUID
 	UserID    pgtype.UUID
 	FirstName string
 	LastName  string

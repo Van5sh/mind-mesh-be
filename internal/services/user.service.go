@@ -37,10 +37,6 @@ func (s *UserService) CreateUser(
 		return database.User{}, err
 	}
 
-	if err := validators.ValidatePasswordHash(params.PasswordHash); err != nil {
-		return database.User{}, err
-	}
-
 	if err := s.guard.EnsureUsernameAvailable(ctx, params.Username); err != nil {
 		return database.User{}, err
 	}
@@ -284,25 +280,6 @@ func (s *UserService) UpdateUserAvatar(
 	}
 
 	return profile, nil
-}
-
-func (s *UserService) UpdateUserPassword(
-	ctx context.Context,
-	params database.UpdateUserPasswordParams,
-) error {
-	if err := validators.ValidatePasswordHash(params.PasswordHash); err != nil {
-		return err
-	}
-
-	if _, err := s.guard.EnsureUserExists(ctx, params.ID); err != nil {
-		return err
-	}
-
-	if _, err := s.repo.UpdateUserPassword(ctx, params); err != nil {
-		return apperrors.InternalError("failed to update user password", err)
-	}
-
-	return nil
 }
 
 func (s *UserService) DeleteUser(
