@@ -1,15 +1,8 @@
 package graph
 
-import "example/hello/internal/app"
+// This file will not be regenerated automatically.
+//
+// It serves as dependency injection for your app, add any dependencies you require
+// here.
 
-// Resolver serves as the dependency-injection container
-// for all GraphQL resolvers.
-type Resolver struct {
-	App *app.App
-}
-
-func NewResolver(app *app.App) *Resolver {
-	return &Resolver{
-		App: app,
-	}
-}
+type Resolver struct{}

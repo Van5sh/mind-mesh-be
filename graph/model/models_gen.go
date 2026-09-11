@@ -138,7 +138,6 @@ type CreateReportInput struct {
 type CreateUserInput struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
-	Password string `json:"password"`
 }
 
 type File struct {
