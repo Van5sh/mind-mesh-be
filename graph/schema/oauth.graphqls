@@ -26,7 +26,6 @@ extend type Mutation {
   createOAuthAccount(
     input: CreateOAuthAccountInput!
   ): OAuthAccount!
-
   deleteOAuthAccount(
     id: ID!
   ): Boolean!
