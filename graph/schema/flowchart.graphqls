@@ -33,7 +33,6 @@ input CreateFlowchartInput {
 }
 
 input UpdateFlowchartInput {
-  id: ID!
   name: String
   data: String
   generatedBy: ID

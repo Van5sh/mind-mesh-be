@@ -63,7 +63,6 @@ input CreateReportInput {
 }
 
 input UpdateReportInput {
-  id: ID!
   title: String
   content: String
   format: ReportFormat

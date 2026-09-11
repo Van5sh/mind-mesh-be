@@ -83,10 +83,10 @@ type CreateChatInput struct {
 }
 
 type CreateChatMessageInput struct {
-	ChatID   string          `json:"chatId"`
-	SenderID string          `json:"senderId"`
-	Role     ChatMessageRole `json:"role"`
-	Content  string          `json:"content"`
+	ChatID   string      `json:"chatId"`
+	SenderID string      `json:"senderId"`
+	Role     MessageRole `json:"role"`
+	Content  string      `json:"content"`
 }
 
 type CreateChatParticipantInput struct {
@@ -117,12 +117,6 @@ type CreateFolderInput struct {
 	Name           string  `json:"name"`
 }
 
-type CreateOAuthAccountInput struct {
-	UserID         string        `json:"userId"`
-	Provider       OAuthProvider `json:"provider"`
-	ProviderUserID string        `json:"providerUserId"`
-}
-
 type CreateProjectInput struct {
 	OwnerID     string            `json:"ownerId"`
 	Name        string            `json:"name"`
@@ -139,11 +133,6 @@ type CreateReportInput struct {
 	GeneratedByAi *bool         `json:"generatedByAi,omitempty"`
 	Status        *ReportStatus `json:"status,omitempty"`
 	SourceChatID  *string       `json:"sourceChatId,omitempty"`
-}
-
-type CreateSessionInput struct {
-	UserID    string `json:"userId"`
-	ExpiresAt string `json:"expiresAt"`
 }
 
 type CreateUserInput struct {
@@ -252,15 +241,6 @@ type MoveFileInput struct {
 type Mutation struct {
 }
 
-type OAuthAccount struct {
-	ID             string        `json:"id"`
-	UserID         string        `json:"userId"`
-	Provider       OAuthProvider `json:"provider"`
-	ProviderUserID string        `json:"providerUserId"`
-	CreatedAt      string        `json:"createdAt"`
-	UpdatedAt      string        `json:"updatedAt"`
-}
-
 type Project struct {
 	ID           string            `json:"id"`
 	Name         string            `json:"name"`
@@ -317,13 +297,6 @@ type ReportProperties struct {
 	SourceChat    *Chat        `json:"sourceChat,omitempty"`
 }
 
-type Session struct {
-	ID        string `json:"id"`
-	UserID    string `json:"userId"`
-	ExpiresAt string `json:"expiresAt"`
-	CreatedAt string `json:"createdAt"`
-}
-
 type SetFileFavoriteInput struct {
 	UserID     string `json:"userId"`
 	FileID     string `json:"fileId"`
@@ -343,7 +316,6 @@ type TransferProjectOwnershipInput struct {
 }
 
 type UpdateChatInput struct {
-	ID     string      `json:"id"`
 	Title  *string     `json:"title,omitempty"`
 	Type   *ChatType   `json:"type,omitempty"`
 	Status *ChatStatus `json:"status,omitempty"`
@@ -355,7 +327,6 @@ type UpdateChatMessageInput struct {
 }
 
 type UpdateFlowchartInput struct {
-	ID            string           `json:"id"`
 	Name          *string          `json:"name,omitempty"`
 	Data          *string          `json:"data,omitempty"`
 	GeneratedBy   *string          `json:"generatedBy,omitempty"`
@@ -365,7 +336,6 @@ type UpdateFlowchartInput struct {
 }
 
 type UpdateProjectInput struct {
-	ID          string             `json:"id"`
 	Name        *string            `json:"name,omitempty"`
 	Description *string            `json:"description,omitempty"`
 	Visibility  *ProjectVisibility `json:"visibility,omitempty"`
@@ -378,7 +348,6 @@ type UpdateProjectMemberRoleInput struct {
 }
 
 type UpdateReportInput struct {
-	ID      string        `json:"id"`
 	Title   *string       `json:"title,omitempty"`
 	Content *string       `json:"content,omitempty"`
 	Format  *ReportFormat `json:"format,omitempty"`
@@ -421,63 +390,6 @@ type UserProfile struct {
 	AvatarURL *string   `json:"avatarUrl,omitempty"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-type ChatMessageRole string
-
-const (
-	ChatMessageRoleUser      ChatMessageRole = "USER"
-	ChatMessageRoleAssistant ChatMessageRole = "ASSISTANT"
-	ChatMessageRoleSystem    ChatMessageRole = "SYSTEM"
-)
-
-var AllChatMessageRole = []ChatMessageRole{
-	ChatMessageRoleUser,
-	ChatMessageRoleAssistant,
-	ChatMessageRoleSystem,
-}
-
-func (e ChatMessageRole) IsValid() bool {
-	switch e {
-	case ChatMessageRoleUser, ChatMessageRoleAssistant, ChatMessageRoleSystem:
-		return true
-	}
-	return false
-}
-
-func (e ChatMessageRole) String() string {
-	return string(e)
-}
-
-func (e *ChatMessageRole) UnmarshalGQL(v any) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = ChatMessageRole(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid ChatMessageRole", str)
-	}
-	return nil
-}
-
-func (e ChatMessageRole) MarshalGQL(w io.Writer) {
-	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
-}
-
-func (e *ChatMessageRole) UnmarshalJSON(b []byte) error {
-	s, err := strconv.Unquote(string(b))
-	if err != nil {
-		return err
-	}
-	return e.UnmarshalGQL(s)
-}
-
-func (e ChatMessageRole) MarshalJSON() ([]byte, error) {
-	var buf bytes.Buffer
-	e.MarshalGQL(&buf)
-	return buf.Bytes(), nil
 }
 
 type ChatStatus string
@@ -758,61 +670,6 @@ func (e *MessageRole) UnmarshalJSON(b []byte) error {
 }
 
 func (e MessageRole) MarshalJSON() ([]byte, error) {
-	var buf bytes.Buffer
-	e.MarshalGQL(&buf)
-	return buf.Bytes(), nil
-}
-
-type OAuthProvider string
-
-const (
-	OAuthProviderGoogle OAuthProvider = "GOOGLE"
-	OAuthProviderGithub OAuthProvider = "GITHUB"
-)
-
-var AllOAuthProvider = []OAuthProvider{
-	OAuthProviderGoogle,
-	OAuthProviderGithub,
-}
-
-func (e OAuthProvider) IsValid() bool {
-	switch e {
-	case OAuthProviderGoogle, OAuthProviderGithub:
-		return true
-	}
-	return false
-}
-
-func (e OAuthProvider) String() string {
-	return string(e)
-}
-
-func (e *OAuthProvider) UnmarshalGQL(v any) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = OAuthProvider(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid OAuthProvider", str)
-	}
-	return nil
-}
-
-func (e OAuthProvider) MarshalGQL(w io.Writer) {
-	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
-}
-
-func (e *OAuthProvider) UnmarshalJSON(b []byte) error {
-	s, err := strconv.Unquote(string(b))
-	if err != nil {
-		return err
-	}
-	return e.UnmarshalGQL(s)
-}
-
-func (e OAuthProvider) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

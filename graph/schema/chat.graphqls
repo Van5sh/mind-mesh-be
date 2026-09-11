@@ -50,7 +50,6 @@ input CreateChatInput {
 }
 
 input UpdateChatInput {
-  id: ID!
   title: String
   type: ChatType
   status: ChatStatus
@@ -64,7 +63,7 @@ input CreateChatParticipantInput {
 input CreateChatMessageInput {
   chatId: ID!
   senderId: ID!
-  role: ChatMessageRole!
+  role: MessageRole!
   content: String!
 }
 
@@ -84,10 +83,4 @@ extend type Mutation {
   createChatMessage(input: CreateChatMessageInput!): ChatMessage!
   updateChatMessage(input: UpdateChatMessageInput!): ChatMessage!
   deleteChatMessage(id: ID!): Boolean!
-}
-
-enum ChatMessageRole {
-  USER
-  ASSISTANT
-  SYSTEM
 }
