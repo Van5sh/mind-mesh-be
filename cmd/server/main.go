@@ -20,82 +20,249 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 	"github.com/vektah/gqlparser/v2/ast"
-	// "gorm.io/driver/postgres"
 )
 
 const defaultPort = "8080"
 
 func StartServer() {
+
+	// ============================================================
+	// Environment
+	// ============================================================
+
 	if err := godotenv.Load(); err != nil {
-		log.Println("Warning: .env file not found, using system environment variables")
+		log.Println(
+			"Warning: .env file not found, using system environment variables",
+		)
 	}
 
 	port := os.Getenv("PORT")
+
 	if port == "" {
 		port = defaultPort
 	}
 
-	application, err := app.New(context.Background(), os.Getenv("DATABASE_URL"))
-	if err != nil {
-		log.Fatalf("initialize application: %v", err)
-	}
-	defer application.Close()
-	log.Println("Application initialized successfully")
-	oauthHandler, err := auth.NewOAuthHandlerFromEnvironment(
-		application.Repositories.User,
-		application.Repositories.OAuth,
-		application.Services.Session,
+	// ============================================================
+	// Application
+	// ============================================================
+
+	application, err := app.New(
+		context.Background(),
+		os.Getenv("DATABASE_URL"),
 	)
+
 	if err != nil {
-		log.Fatalf("initialize OAuth: %v", err)
+		log.Fatalf(
+			"initialize application: %v",
+			err,
+		)
 	}
 
+	defer application.Close()
+
+	log.Println(
+		"Application initialized successfully",
+	)
+
+	// ============================================================
+	// OAuth HTTP Handler
+	// ============================================================
+
+	oauthHandler, err :=
+		auth.NewOAuthHandlerFromEnvironment(
+			application.Repositories.User,
+			application.Repositories.OAuth,
+			application.Services.Session,
+		)
+
+	if err != nil {
+		log.Fatalf(
+			"initialize OAuth: %v",
+			err,
+		)
+	}
 	server := fiber.New()
 
-	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: graphresolver.NewResolver(application)}))
-	graphqlHandler := oauthHandler.Middleware(srv)
-	graphqlHandler = oauthHandler.CORS(graphqlHandler)
+	srv := handler.New(
+		graph.NewExecutableSchema(
+			graph.Config{
+				Resolvers: graphresolver.NewResolver(
+					application,
+				),
+			},
+		),
+	)
 
-	srv.AddTransport(transport.Options{})
-	srv.AddTransport(transport.GET{})
-	srv.AddTransport(transport.POST{})
+	// ------------------------------------------------------------
+	// GraphQL transports
+	// ------------------------------------------------------------
 
-	srv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
+	srv.AddTransport(
+		transport.Options{},
+	)
 
-	srv.Use(extension.Introspection{})
-	srv.Use(extension.AutomaticPersistedQuery{
-		Cache: lru.New[string](100),
-	})
+	srv.AddTransport(
+		transport.GET{},
+	)
 
-	playgroundHandler := playground.Handler("GraphQL Playground", "/query")
+	srv.AddTransport(
+		transport.POST{},
+	)
 
-	server.Get("/", func(c *fiber.Ctx) {
-		fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			playgroundHandler.ServeHTTP(w, r)
-		}))(c.Fasthttp)
-	})
+	// ------------------------------------------------------------
+	// GraphQL query cache
+	// ------------------------------------------------------------
 
-	server.All("/query", func(c *fiber.Ctx) {
-		fasthttpadaptor.NewFastHTTPHandler(graphqlHandler)(c.Fasthttp)
-	})
-	server.Get("/auth/google", func(c *fiber.Ctx) {
-		fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(oauthHandler.GoogleLogin))(c.Fasthttp)
-	})
-	server.Get("/auth/google/callback", func(c *fiber.Ctx) {
-		fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(oauthHandler.GoogleCallback))(c.Fasthttp)
-	})
-	server.Get("/auth/github", func(c *fiber.Ctx) {
-		fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(oauthHandler.GitHubLogin))(c.Fasthttp)
-	})
-	server.Get("/auth/github/callback", func(c *fiber.Ctx) {
-		fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(oauthHandler.GitHubCallback))(c.Fasthttp)
-	})
+	srv.SetQueryCache(
+		lru.New[*ast.QueryDocument](1000),
+	)
 
-	log.Printf("🚀 Server ready at http://localhost:%s/", port)
-	log.Printf("🔍 GraphQL Playground at http://localhost:%s/", port)
-	log.Printf("📡 GraphQL endpoint at http://localhost:%s/query", port)
+	// ------------------------------------------------------------
+	// GraphQL extensions
+	// ------------------------------------------------------------
+
+	srv.Use(
+		extension.Introspection{},
+	)
+
+	srv.Use(
+		extension.AutomaticPersistedQuery{
+			Cache: lru.New[string](100),
+		},
+	)
+
+	// ============================================================
+	// Authentication Middleware
+	// ============================================================
+
+	graphqlHandler := oauthHandler.Middleware(
+		srv,
+	)
+
+	graphqlHandler = oauthHandler.CORS(
+		graphqlHandler,
+	)
+
+	// ============================================================
+	// GraphQL Playground
+	// ============================================================
+
+	playgroundHandler := playground.Handler(
+		"GraphQL Playground",
+		"/query",
+	)
+
+	server.Get(
+		"/",
+		func(c *fiber.Ctx) {
+
+			fasthttpadaptor.NewFastHTTPHandler(
+				http.HandlerFunc(
+					func(w http.ResponseWriter, r *http.Request) {
+						playgroundHandler.ServeHTTP(
+							w,
+							r,
+						)
+					},
+				),
+			)(c.Fasthttp)
+		},
+	)
+
+	// ============================================================
+	// GraphQL Endpoint
+	// ============================================================
+
+	server.All(
+		"/query",
+		func(c *fiber.Ctx) {
+
+			fasthttpadaptor.NewFastHTTPHandler(
+				graphqlHandler,
+			)(c.Fasthttp)
+		},
+	)
+
+	// ============================================================
+	// Google OAuth
+	// ============================================================
+
+	server.Get(
+		"/auth/google",
+		func(c *fiber.Ctx) {
+
+			fasthttpadaptor.NewFastHTTPHandler(
+				http.HandlerFunc(
+					oauthHandler.GoogleLogin,
+				),
+			)(c.Fasthttp)
+		},
+	)
+
+	server.Get(
+		"/auth/google/callback",
+		func(c *fiber.Ctx) {
+
+			fasthttpadaptor.NewFastHTTPHandler(
+				http.HandlerFunc(
+					oauthHandler.GoogleCallback,
+				),
+			)(c.Fasthttp)
+		},
+	)
+
+	// ============================================================
+	// GitHub OAuth
+	// ============================================================
+
+	server.Get(
+		"/auth/github",
+		func(c *fiber.Ctx) {
+
+			fasthttpadaptor.NewFastHTTPHandler(
+				http.HandlerFunc(
+					oauthHandler.GitHubLogin,
+				),
+			)(c.Fasthttp)
+		},
+	)
+
+	server.Get(
+		"/auth/github/callback",
+		func(c *fiber.Ctx) {
+
+			fasthttpadaptor.NewFastHTTPHandler(
+				http.HandlerFunc(
+					oauthHandler.GitHubCallback,
+				),
+			)(c.Fasthttp)
+		},
+	)
+
+	// ============================================================
+	// Server
+	// ============================================================
+
+	log.Printf(
+		"🚀 Server ready at http://localhost:%s/",
+		port,
+	)
+
+	log.Printf(
+		"🔍 GraphQL Playground at http://localhost:%s/",
+		port,
+	)
+
+	log.Printf(
+		"📡 GraphQL endpoint at http://localhost:%s/query",
+		port,
+	)
+
 	if err := server.Listen(":" + port); err != nil {
-		log.Fatalf("start server: %v", err)
+		log.Fatalf(
+			"start server: %v",
+			err,
+		)
 	}
 }
 
