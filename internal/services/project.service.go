@@ -158,6 +158,19 @@ func (s *ProjectService) GetProjectMembers(ctx context.Context, projectID pgtype
 	return members, nil
 }
 
+// GetProjectMember returns a user's membership row for a project, or a
+// NotFound error if the user has no explicit membership record (which is
+// the case for an owner who was never separately added as a member).
+func (s *ProjectService) GetProjectMember(ctx context.Context, projectID, userID pgtype.UUID) (database.ProjectMember, error) {
+	if err := validators.ValidateUUID("project id", projectID); err != nil {
+		return database.ProjectMember{}, err
+	}
+	if err := validators.ValidateUUID("user id", userID); err != nil {
+		return database.ProjectMember{}, err
+	}
+	return s.projectGuard.EnsureProjectMember(ctx, projectID, userID)
+}
+
 func (s *ProjectService) GetProjectsByOwnerID(ctx context.Context, ownerID pgtype.UUID) ([]database.Project, error) {
 	if err := validators.ValidateUUID("owner id", ownerID); err != nil {
 		return nil, err

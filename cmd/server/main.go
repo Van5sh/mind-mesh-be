@@ -10,6 +10,7 @@ import (
 	graphresolver "example/hello/graph/resolver"
 	"example/hello/internal/app"
 	"example/hello/internal/auth"
+	"example/hello/internal/services/aws"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
@@ -36,6 +37,16 @@ func StartServer() {
 		)
 	}
 
+	ctx := context.Background()
+
+	awsConfig, err := aws.InitializeAWSConfig(ctx)
+	if err != nil {
+		log.Fatalf(
+			"initialize AWS configuration: %v",
+			err,
+		)
+	}
+
 	port := os.Getenv("PORT")
 
 	if port == "" {
@@ -43,7 +54,7 @@ func StartServer() {
 	}
 
 	application, err := app.New(
-		context.Background(),
+		ctx,
 		os.Getenv("DATABASE_URL"),
 	)
 
@@ -212,6 +223,13 @@ func StartServer() {
 	log.Printf(
 		"📡 GraphQL endpoint at http://localhost:%s/query",
 		port,
+	)
+
+	log.Printf(
+		"☁️  AWS ready - Region: %s, S3 Bucket: %s, DynamoDB Table: %s",
+		awsConfig.Region,
+		awsConfig.S3Bucket,
+		awsConfig.DynamoDBTable,
 	)
 
 	if err := server.Listen(":" + port); err != nil {

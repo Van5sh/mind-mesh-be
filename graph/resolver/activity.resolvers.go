@@ -7,21 +7,132 @@ package graph
 
 import (
 	"context"
+	"example/hello/graph/helpers"
 	"example/hello/graph/model"
+	"example/hello/internal/apperrors"
+	"example/hello/internal/auth"
+	"example/hello/internal/database"
 	"fmt"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // CreateActivityLog is the resolver for the createActivityLog field.
 func (r *mutationResolver) CreateActivityLog(ctx context.Context, input model.CreateActivityLogInput) (*model.ActivityLog, error) {
-	panic(fmt.Errorf("not implemented: CreateActivityLog - createActivityLog"))
+	userID, ok := auth.UserIDFromContext(ctx)
+	if !ok {
+		return nil, apperrors.UnauthorizedError("authentication required")
+	}
+
+	var projectID pgtype.UUID
+	if input.ProjectID != nil {
+		id, err := parseUUID(*input.ProjectID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid project ID: %w", err)
+		}
+		projectID = id
+	}
+
+	actorID := pgtype.UUID{Bytes: userID.Bytes, Valid: true}
+	if input.UserID != nil {
+		id, err := parseUUID(*input.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid user ID: %w", err)
+		}
+		actorID = id
+	}
+
+	entityID, err := parseUUID(input.EntityID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid entity ID: %w", err)
+	}
+
+	activity, err := r.App.Services.Activity.CreateActivityLog(ctx, database.CreateActivityLogParams{
+		ProjectID:  projectID,
+		UserID:     actorID,
+		Action:     input.Action,
+		EntityType: pgtype.Text{String: input.EntityType, Valid: true},
+		EntityID:   entityID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create activity log: %w", err)
+	}
+
+	return helpers.ActivityLogToModel(activity), nil
 }
 
 // DeleteActivityLogByID is the resolver for the deleteActivityLogByID field.
 func (r *mutationResolver) DeleteActivityLogByID(ctx context.Context, id string) (bool, error) {
-	panic(fmt.Errorf("not implemented: DeleteActivityLogByID - deleteActivityLogByID"))
+	if _, ok := auth.UserIDFromContext(ctx); !ok {
+		return false, apperrors.UnauthorizedError("authentication required")
+	}
+
+	activityID, err := parseUUID(id)
+	if err != nil {
+		return false, fmt.Errorf("invalid activity log ID: %w", err)
+	}
+
+	if err := r.App.Services.Activity.DeleteActivityLogByID(ctx, activityID); err != nil {
+		return false, fmt.Errorf("failed to delete activity log: %w", err)
+	}
+
+	return true, nil
 }
 
 // ActivityLogs is the resolver for the activityLogs field.
 func (r *queryResolver) ActivityLogs(ctx context.Context, projectID *string, userID *string) ([]*model.ActivityLog, error) {
-	panic(fmt.Errorf("not implemented: ActivityLogs - activityLogs"))
+	var activities []database.ActivityLog
+
+	switch {
+	case projectID != nil && userID != nil:
+		pID, err := parseUUID(*projectID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid project ID: %w", err)
+		}
+		uID, err := parseUUID(*userID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid user ID: %w", err)
+		}
+		activities, err = r.App.Services.Activity.GetActivityLogsByProjectAndUser(ctx, database.GetActivityLogsByProjectAndUserParams{
+			ProjectID: pID,
+			UserID:    uID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch activity logs: %w", err)
+		}
+
+	case projectID != nil:
+		pID, err := parseUUID(*projectID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid project ID: %w", err)
+		}
+		activities, err = r.App.Services.Activity.GetActivityLogsByProjectID(ctx, pID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch activity logs: %w", err)
+		}
+
+	case userID != nil:
+		uID, err := parseUUID(*userID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid user ID: %w", err)
+		}
+		activities, err = r.App.Services.Activity.GetActivityLogsByUserID(ctx, uID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch activity logs: %w", err)
+		}
+
+	default:
+		var err error
+		activities, err = r.App.Services.Activity.GetRecentActivityLogs(ctx, 100)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch activity logs: %w", err)
+		}
+	}
+
+	result := make([]*model.ActivityLog, 0, len(activities))
+	for _, activity := range activities {
+		result = append(result, helpers.ActivityLogToModel(activity))
+	}
+
+	return result, nil
 }

@@ -7,7 +7,11 @@ package graph
 
 import (
 	"context"
+	"example/hello/graph"
+	"example/hello/graph/helpers"
 	"example/hello/graph/model"
+	"example/hello/internal/apperrors"
+	"example/hello/internal/auth"
 	"example/hello/internal/database"
 	"fmt"
 
@@ -23,11 +27,7 @@ func (r *mutationResolver) CreateUser(ctx context.Context, input model.CreateUse
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
-	return &model.User{
-		ID:       dbUser.ID.String(),
-		Username: dbUser.Username,
-		Email:    dbUser.Email,
-	}, nil
+	return helpers.UserToModel(dbUser), nil
 }
 
 // UpdateUser is the resolver for the updateUser field.
@@ -44,11 +44,7 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 	if err != nil {
 		return nil, fmt.Errorf("failed to update user: %w", err)
 	}
-	return &model.User{
-		ID:       dbUser.ID.String(),
-		Username: dbUser.Username,
-		Email:    dbUser.Email,
-	}, nil
+	return helpers.UserToModel(dbUser), nil
 }
 
 // DeleteUser is the resolver for the deleteUser field.
@@ -79,19 +75,23 @@ func (r *mutationResolver) UpdateUserProfile(ctx context.Context, id string, inp
 		bio.Valid = true
 	}
 
+	avatarUrl := pgtype.Text{}
+	if input.AvatarURL != nil {
+		avatarUrl.String = *input.AvatarURL
+		avatarUrl.Valid = true
+	}
+
 	dbProfile, err := r.App.Services.User.UpdateUserProfile(ctx, database.UpdateUserProfileParams{
 		UserID:    userId,
 		FirstName: input.FirstName,
 		LastName:  input.LastName,
 		Bio:       bio,
+		AvatarUrl: avatarUrl,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to update user profile: %w", err)
 	}
-	return &model.UserProfile{
-		FirstName: dbProfile.FirstName,
-		LastName:  dbProfile.LastName,
-	}, nil
+	return helpers.UserProfileToModel(dbProfile), nil
 }
 
 // UpdateUserAvatar is the resolver for the updateUserAvatar field.
@@ -102,7 +102,7 @@ func (r *mutationResolver) UpdateUserAvatar(ctx context.Context, id string, inpu
 	}
 
 	avatar := pgtype.Text{}
-	if input.AvatarURL == "" {
+	if input.AvatarURL != "" {
 		avatar.String = input.AvatarURL
 		avatar.Valid = true
 	}
@@ -115,35 +115,30 @@ func (r *mutationResolver) UpdateUserAvatar(ctx context.Context, id string, inpu
 	if err != nil {
 		return nil, fmt.Errorf("failed to update user avatar: %w", err)
 	}
-	return &model.UserProfile{
-		User:      &model.User{},
-		FirstName: dbProfile.FirstName,
-		LastName:  dbProfile.LastName,
-		Bio:       &dbProfile.Bio.String,
-		AvatarURL: &dbProfile.AvatarUrl.String,
-	}, nil
+	return helpers.UserProfileToModel(dbProfile), nil
 }
 
 // Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
-	return nil, fmt.Errorf("not implemented: Me - me")
+	user, ok := auth.UserFromContext(ctx)
+	if !ok {
+		return nil, nil
+	}
+
+	return helpers.UserToModel(user), nil
 }
 
 // User is the resolver for the user field.
 func (r *queryResolver) User(ctx context.Context, id string) (*model.User, error) {
 	userId, err := parseUUID(id)
 	if err != nil {
-		fmt.Printf("error")
+		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
 	user, err := r.App.Services.User.GetUserByID(ctx, userId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
-	return &model.User{
-		ID:       user.ID.String(),
-		Username: user.Username,
-		Email:    user.Email,
-	}, nil
+	return helpers.UserToModel(user), nil
 }
 
 // UserByEmail is the resolver for the userByEmail field.
@@ -152,11 +147,7 @@ func (r *queryResolver) UserByEmail(ctx context.Context, email string) (*model.U
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user by email: %w", err)
 	}
-	return &model.User{
-		ID:       user.ID.String(),
-		Username: user.Username,
-		Email:    user.Email,
-	}, nil
+	return helpers.UserToModel(user), nil
 }
 
 // UserByUsername is the resolver for the userByUsername field.
@@ -165,11 +156,7 @@ func (r *queryResolver) UserByUsername(ctx context.Context, username string) (*m
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user by username: %w", err)
 	}
-	return &model.User{
-		ID:       user.ID.String(),
-		Username: user.Username,
-		Email:    user.Email,
-	}, nil
+	return helpers.UserToModel(user), nil
 }
 
 // UserProfile is the resolver for the userProfile field.
@@ -183,13 +170,7 @@ func (r *queryResolver) UserProfile(ctx context.Context, userID string) (*model.
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user profile: %w", err)
 	}
-	return &model.UserProfile{
-		User:      &model.User{ID: profile.UserID.String()},
-		FirstName: profile.FirstName,
-		LastName:  profile.LastName,
-		Bio:       &profile.Bio.String,
-		AvatarURL: &profile.AvatarUrl.String,
-	}, nil
+	return helpers.UserProfileToModel(profile), nil
 }
 
 // AllUsers is the resolver for the allUsers field.
@@ -199,18 +180,130 @@ func (r *queryResolver) AllUsers(ctx context.Context) ([]*model.User, error) {
 		return nil, fmt.Errorf("failed to get all users: %w", err)
 	}
 
-	var result []*model.User
+	result := make([]*model.User, 0, len(users))
 	for _, user := range users {
-		result = append(result, &model.User{
-			ID:       user.ID.String(),
-			Username: user.Username,
-			Email:    user.Email,
-		})
+		result = append(result, helpers.UserToModel(user))
 	}
 	return result, nil
 }
 
 // Users is the resolver for the users field
 func (r *queryResolver) Users(ctx context.Context, ids []string) ([]*model.User, error) {
-	panic(fmt.Errorf("not implemented: Users - users"))
+	userIDs := make([]pgtype.UUID, 0, len(ids))
+
+	for _, id := range ids {
+		userID, err := parseUUID(id)
+		if err != nil {
+			return nil, fmt.Errorf("invalid user ID: %w", err)
+		}
+		userIDs = append(userIDs, userID)
+	}
+
+	users, err := r.App.Services.User.GetUsersByIDs(ctx, userIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users: %w", err)
+	}
+
+	result := make([]*model.User, 0, len(users))
+	for _, user := range users {
+		result = append(result, helpers.UserToModel(user))
+	}
+	return result, nil
 }
+
+// Profile is the resolver for the profile field.
+func (r *userResolver) Profile(ctx context.Context, obj *model.User) (*model.UserProfile, error) {
+	userID, err := parseUUID(obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	profile, err := r.App.Services.User.GetUserProfile(ctx, userID)
+	if err != nil {
+		if apperrors.IsCode(err, apperrors.NotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return helpers.UserProfileToModel(profile), nil
+}
+
+// OwnedProjects is the resolver for the ownedProjects field.
+func (r *userResolver) OwnedProjects(ctx context.Context, obj *model.User) ([]*model.Project, error) {
+	userID, err := parseUUID(obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	projects, err := r.App.Services.Project.GetProjectsByOwnerID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*model.Project, 0, len(projects))
+	for _, project := range projects {
+		result = append(result, helpers.ProjectToModel(project))
+	}
+	return result, nil
+}
+
+// ProjectMemberships is the resolver for the projectMemberships field.
+func (r *userResolver) ProjectMemberships(ctx context.Context, obj *model.User) ([]*model.ProjectMember, error) {
+	userID, err := parseUUID(obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// A membership record only exists for users explicitly added to a
+	// project; an owner who was never separately added has none, so
+	// each project the user can see is checked individually.
+	projects, err := r.App.Services.Project.GetProjectsForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*model.ProjectMember, 0, len(projects))
+	for _, project := range projects {
+		member, err := r.App.Services.Project.GetProjectMember(ctx, project.ID, userID)
+		if err != nil {
+			if apperrors.IsCode(err, apperrors.Forbidden) {
+				continue
+			}
+			return nil, err
+		}
+		result = append(result, helpers.ProjectMemberToModel(member))
+	}
+	return result, nil
+}
+
+// UploadedFiles is the resolver for the uploadedFiles field.
+func (r *userResolver) UploadedFiles(ctx context.Context, obj *model.User) ([]*model.File, error) {
+	// No query currently traces file_storage.uploaded_by back to a list
+	// of files for a user; this needs a new repository query to back it.
+	return []*model.File{}, nil
+}
+
+// SharedFiles is the resolver for the sharedFiles field.
+func (r *userResolver) SharedFiles(ctx context.Context, obj *model.User) ([]*model.FileShare, error) {
+	userID, err := parseUUID(obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	shares, err := r.App.Services.File.GetFileSharesBySharedWith(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*model.FileShare, 0, len(shares))
+	for _, share := range shares {
+		result = append(result, helpers.FileShareToModel(share))
+	}
+	return result, nil
+}
+
+// User returns graph.UserResolver implementation.
+func (r *Resolver) User() graph.UserResolver { return &userResolver{r} }
+
+type userResolver struct{ *Resolver }

@@ -7,7 +7,10 @@ package graph
 
 import (
 	"context"
+	"example/hello/graph/helpers"
 	"example/hello/graph/model"
+	"example/hello/internal/apperrors"
+	"example/hello/internal/auth"
 	"example/hello/internal/database"
 	"fmt"
 
@@ -16,18 +19,40 @@ import (
 
 // CreateReport is the resolver for the createReport field.
 func (r *mutationResolver) CreateReport(ctx context.Context, input model.CreateReportInput) (*model.Report, error) {
+	userID, ok := auth.UserIDFromContext(ctx)
+	if !ok {
+		return nil, apperrors.UnauthorizedError("authentication required")
+	}
+
 	projectID, err := parseUUID(input.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid project ID: %w", err)
 	}
 
-	generatedByAI := pgtype.Bool{}
-
-	if input.GeneratedByAi != nil {
-		generatedByAI = pgtype.Bool{
-			Bool:  *input.GeneratedByAi,
-			Valid: true,
+	generatedBy := pgtype.UUID{Bytes: userID.Bytes, Valid: true}
+	if input.GeneratedBy != nil {
+		generatedBy, err = parseUUID(*input.GeneratedBy)
+		if err != nil {
+			return nil, fmt.Errorf("invalid generated-by ID: %w", err)
 		}
+	}
+
+	var sourceChatID pgtype.UUID
+	if input.SourceChatID != nil {
+		sourceChatID, err = parseUUID(*input.SourceChatID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid source chat ID: %w", err)
+		}
+	}
+
+	generatedByAI := false
+	if input.GeneratedByAi != nil {
+		generatedByAI = *input.GeneratedByAi
+	}
+
+	status := database.ReportStatusDRAFT
+	if input.Status != nil {
+		status = database.ReportStatus(*input.Status)
 	}
 
 	report, err := r.App.Services.Report.CreateReport(
@@ -35,9 +60,12 @@ func (r *mutationResolver) CreateReport(ctx context.Context, input model.CreateR
 		database.CreateReportParams{
 			ProjectID:     projectID,
 			Title:         input.Title,
-			GeneratedByAi: generatedByAI,
 			Content:       input.Content,
 			Format:        database.ReportFormat(input.Format),
+			GeneratedBy:   generatedBy,
+			GeneratedByAi: pgtype.Bool{Bool: generatedByAI, Valid: true},
+			Status:        status,
+			SourceChatID:  sourceChatID,
 		},
 	)
 
@@ -48,16 +76,15 @@ func (r *mutationResolver) CreateReport(ctx context.Context, input model.CreateR
 		)
 	}
 
-	return &model.Report{
-		ID:         report.ID.String(),
-		Properties: &model.ReportProperties{},
-		Title:      report.Title,
-		Format:     model.ReportFormat(report.Format),
-	}, nil
+	return helpers.ReportToModel(helpers.ReportRow(report)), nil
 }
 
 // UpdateReport is the resolver for the updateReport field.
 func (r *mutationResolver) UpdateReport(ctx context.Context, id string, input model.UpdateReportInput) (*model.Report, error) {
+	if _, ok := auth.UserIDFromContext(ctx); !ok {
+		return nil, apperrors.UnauthorizedError("authentication required")
+	}
+
 	reportID, err := parseUUID(id)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -66,12 +93,36 @@ func (r *mutationResolver) UpdateReport(ctx context.Context, id string, input mo
 		)
 	}
 
+	existing, err := r.App.Services.Report.GetReportByID(ctx, reportID)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to fetch report: %w",
+			err,
+		)
+	}
+
+	title := existing.Title
+	if input.Title != nil {
+		title = *input.Title
+	}
+
+	content := existing.Content
+	if input.Content != nil {
+		content = *input.Content
+	}
+
+	format := existing.Format
+	if input.Format != nil {
+		format = database.ReportFormat(*input.Format)
+	}
+
 	report, err := r.App.Services.Report.UpdateReport(
 		ctx,
 		database.UpdateReportParams{
 			ID:      reportID,
-			Title:   *input.Title,
-			Content: *input.Content,
+			Title:   title,
+			Content: content,
+			Format:  format,
 		},
 	)
 
@@ -82,16 +133,15 @@ func (r *mutationResolver) UpdateReport(ctx context.Context, id string, input mo
 		)
 	}
 
-	return &model.Report{
-		ID:         report.ID.String(),
-		Properties: &model.ReportProperties{},
-		Title:      report.Title,
-		Format:     model.ReportFormat(report.Format),
-	}, nil
+	return helpers.ReportToModel(helpers.ReportRow(report)), nil
 }
 
 // DeleteReport is the resolver for the deleteReport field.
 func (r *mutationResolver) DeleteReport(ctx context.Context, id string) (bool, error) {
+	if _, ok := auth.UserIDFromContext(ctx); !ok {
+		return false, apperrors.UnauthorizedError("authentication required")
+	}
+
 	reportID, err := parseUUID(id)
 	if err != nil {
 		return false, fmt.Errorf(
@@ -134,12 +184,7 @@ func (r *queryResolver) Report(ctx context.Context, id string) (*model.Report, e
 		)
 	}
 
-	return &model.Report{
-		ID:         report.ID.String(),
-		Properties: &model.ReportProperties{},
-		Title:      report.Title,
-		Format:     model.ReportFormat(report.Format),
-	}, nil
+	return helpers.ReportToModel(helpers.ReportRow(report)), nil
 }
 
 // Reports is the resolver for the reports field.
@@ -166,12 +211,7 @@ func (r *queryResolver) Reports(ctx context.Context, projectID string) ([]*model
 	result := make([]*model.Report, 0, len(reports))
 
 	for _, report := range reports {
-		result = append(result, &model.Report{
-			ID:         report.ID.String(),
-			Properties: &model.ReportProperties{},
-			Title:      report.Title,
-			Format:     model.ReportFormat(report.Format),
-		})
+		result = append(result, helpers.ReportToModel(helpers.ReportRow(report)))
 	}
 
 	return result, nil
@@ -201,12 +241,7 @@ func (r *queryResolver) ReportsByChat(ctx context.Context, sourceChatID string) 
 	result := make([]*model.Report, 0, len(reports))
 
 	for _, report := range reports {
-		result = append(result, &model.Report{
-			ID:         report.ID.String(),
-			Properties: &model.ReportProperties{},
-			Title:      report.Title,
-			Format:     model.ReportFormat(report.Format),
-		})
+		result = append(result, helpers.ReportToModel(helpers.ReportRow(report)))
 	}
 
 	return result, nil
@@ -236,12 +271,7 @@ func (r *queryResolver) ReportsByGenerator(ctx context.Context, generatedByID st
 	result := make([]*model.Report, 0, len(reports))
 
 	for _, report := range reports {
-		result = append(result, &model.Report{
-			ID:         report.ID.String(),
-			Properties: &model.ReportProperties{},
-			Title:      report.Title,
-			Format:     model.ReportFormat(report.Format),
-		})
+		result = append(result, helpers.ReportToModel(helpers.ReportRow(report)))
 	}
 
 	return result, nil
@@ -265,12 +295,7 @@ func (r *queryResolver) ReportsByFormat(ctx context.Context, format model.Report
 	result := make([]*model.Report, 0, len(reports))
 
 	for _, report := range reports {
-		result = append(result, &model.Report{
-			ID:         report.ID.String(),
-			Properties: &model.ReportProperties{},
-			Title:      report.Title,
-			Format:     model.ReportFormat(report.Format),
-		})
+		result = append(result, helpers.ReportToModel(helpers.ReportRow(report)))
 	}
 
 	return result, nil
@@ -294,12 +319,7 @@ func (r *queryResolver) ReportsByStatus(ctx context.Context, status model.Report
 	result := make([]*model.Report, 0, len(reports))
 
 	for _, report := range reports {
-		result = append(result, &model.Report{
-			ID:         report.ID.String(),
-			Properties: &model.ReportProperties{},
-			Title:      report.Title,
-			Format:     model.ReportFormat(report.Format),
-		})
+		result = append(result, helpers.ReportToModel(helpers.ReportRow(report)))
 	}
 
 	return result, nil
@@ -329,12 +349,7 @@ func (r *queryResolver) AiReports(ctx context.Context, projectID string) ([]*mod
 	result := make([]*model.Report, 0, len(reports))
 
 	for _, report := range reports {
-		result = append(result, &model.Report{
-			ID:         report.ID.String(),
-			Properties: &model.ReportProperties{},
-			Title:      report.Title,
-			Format:     model.ReportFormat(report.Format),
-		})
+		result = append(result, helpers.ReportToModel(helpers.ReportRow(report)))
 	}
 
 	return result, nil

@@ -1,6 +1,8 @@
 package helpers
 
 import (
+	"time"
+
 	"example/hello/graph/model"
 	"example/hello/internal/database"
 
@@ -50,4 +52,12 @@ func NullableString(value pgtype.Text) *string {
 	}
 
 	return &value.String
+}
+
+func NullableTime(value pgtype.Timestamptz) *time.Time {
+	if !value.Valid {
+		return nil
+	}
+
+	return &value.Time
 }

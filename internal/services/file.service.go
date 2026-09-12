@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 
 	"example/hello/internal/apperrors"
 	"example/hello/internal/database"
@@ -10,6 +11,7 @@ import (
 	"example/hello/internal/utils"
 	"example/hello/internal/validators"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -422,13 +424,6 @@ func (s *FileService) MoveFile(
 		return database.File{}, err
 	}
 
-	if err := validators.ValidateUUID(
-		"destination folder id",
-		params.FolderID,
-	); err != nil {
-		return database.File{}, err
-	}
-
 	if _, err := s.guards.EnsureFileExists(
 		ctx,
 		params.ID,
@@ -437,12 +432,16 @@ func (s *FileService) MoveFile(
 			apperrors.NotFoundError("file not found")
 	}
 
-	if _, err := s.guards.EnsureFolderExists(
-		ctx,
-		params.FolderID,
-	); err != nil {
-		return database.File{},
-			apperrors.NotFoundError("destination folder not found")
+	// A zero-value FolderID means the file is being moved to the
+	// project root, which is valid and has no folder to check.
+	if params.FolderID.Valid {
+		if _, err := s.guards.EnsureFolderExists(
+			ctx,
+			params.FolderID,
+		); err != nil {
+			return database.File{},
+				apperrors.NotFoundError("destination folder not found")
+		}
 	}
 
 	file, err := s.repo.MoveFile(ctx, params)
@@ -684,4 +683,101 @@ func (s *FileService) GetFolderPath(
 	}
 
 	return path, nil
+}
+
+// GetFileStorage returns the storage record for a file. Storage is
+// optional (a file's bytes may not have finished uploading yet), so a
+// missing row is reported as apperrors.NotFound rather than Internal.
+func (s *FileService) GetFileStorage(
+	ctx context.Context,
+	fileID pgtype.UUID,
+) (database.FileStorage, error) {
+	if err := validators.ValidateUUID("file id", fileID); err != nil {
+		return database.FileStorage{}, err
+	}
+
+	storage, err := s.repo.GetFileStorage(ctx, fileID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return database.FileStorage{}, apperrors.NotFoundError("file storage not found")
+		}
+		return database.FileStorage{}, apperrors.InternalError("failed to fetch file storage", err)
+	}
+
+	return storage, nil
+}
+
+// GetFileProperties returns the properties record for a file.
+func (s *FileService) GetFileProperties(
+	ctx context.Context,
+	fileID pgtype.UUID,
+) (database.FileProperty, error) {
+	if err := validators.ValidateUUID("file id", fileID); err != nil {
+		return database.FileProperty{}, err
+	}
+
+	properties, err := s.repo.GetFileProperties(ctx, fileID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return database.FileProperty{}, apperrors.NotFoundError("file properties not found")
+		}
+		return database.FileProperty{}, apperrors.InternalError("failed to fetch file properties", err)
+	}
+
+	return properties, nil
+}
+
+// GetFileAIMetadata returns the AI metadata record for a file. AI
+// metadata is optional until the AI worker has processed the file.
+func (s *FileService) GetFileAIMetadata(
+	ctx context.Context,
+	fileID pgtype.UUID,
+) (database.FileAiMetadatum, error) {
+	if err := validators.ValidateUUID("file id", fileID); err != nil {
+		return database.FileAiMetadatum{}, err
+	}
+
+	metadata, err := s.repo.GetFileAIMetadata(ctx, fileID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return database.FileAiMetadatum{}, apperrors.NotFoundError("file AI metadata not found")
+		}
+		return database.FileAiMetadatum{}, apperrors.InternalError("failed to fetch file AI metadata", err)
+	}
+
+	return metadata, nil
+}
+
+// GetFileSharesByFileID returns every share record for a file.
+func (s *FileService) GetFileSharesByFileID(
+	ctx context.Context,
+	fileID pgtype.UUID,
+) ([]database.FileShare, error) {
+	if err := validators.ValidateUUID("file id", fileID); err != nil {
+		return nil, err
+	}
+
+	shares, err := s.repo.GetFileSharesByFileID(ctx, fileID)
+	if err != nil {
+		return nil, apperrors.InternalError("failed to fetch file shares", err)
+	}
+
+	return shares, nil
+}
+
+// GetFileSharesBySharedWith returns every share extended to a user.
+func (s *FileService) GetFileSharesBySharedWith(
+	ctx context.Context,
+	userID pgtype.UUID,
+) ([]database.FileShare, error) {
+	if err := validators.ValidateUUID("user id", userID); err != nil {
+		return nil, err
+	}
+
+	shares, err := s.repo.GetFileSharesBySharedWith(ctx, userID)
+	if err != nil {
+		return nil, apperrors.InternalError("failed to fetch shared files", err)
+	}
+
+	return shares, nil
 }

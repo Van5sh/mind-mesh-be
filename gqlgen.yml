@@ -15,3 +15,59 @@ resolver:
   layout: follow-schema
   dir: graph/resolver
   filename_template: "{name}.resolvers.go"
+
+models:
+  Project:
+    fields:
+      members:
+        resolver: true
+      folders:
+        resolver: true
+      files:
+        resolver: true
+      chats:
+        resolver: true
+      reports:
+        resolver: true
+      flowcharts:
+        resolver: true
+      activityLogs:
+        resolver: true
+  User:
+    fields:
+      profile:
+        resolver: true
+      ownedProjects:
+        resolver: true
+      projectMemberships:
+        resolver: true
+      uploadedFiles:
+        resolver: true
+      sharedFiles:
+        resolver: true
+  Chat:
+    fields:
+      participants:
+        resolver: true
+      messages:
+        resolver: true
+  File:
+    fields:
+      storage:
+        resolver: true
+      aiMetadata:
+        resolver: true
+      shares:
+        resolver: true
+      preferences:
+        resolver: true
+      projectFiles:
+        resolver: true
+  Folder:
+    fields:
+      parentFolder:
+        resolver: true
+      childFolders:
+        resolver: true
+      files:
+        resolver: true

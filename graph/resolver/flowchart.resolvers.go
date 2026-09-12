@@ -7,66 +7,149 @@ package graph
 
 import (
 	"context"
+	"example/hello/graph/helpers"
 	"example/hello/graph/model"
+	"example/hello/internal/apperrors"
+	"example/hello/internal/auth"
 	"example/hello/internal/database"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // CreateFlowchart is the resolver for the createFlowchart field.
 func (r *mutationResolver) CreateFlowchart(ctx context.Context, input model.CreateFlowchartInput) (*model.Flowchart, error) {
+	userID, ok := auth.UserIDFromContext(ctx)
+	if !ok {
+		return nil, apperrors.UnauthorizedError("authentication required")
+	}
+
 	projectID, err := parseUUID(input.ProjectID)
 	if err != nil {
 		return nil, err
 	}
 
+	generatedBy := pgtype.UUID{Bytes: userID.Bytes, Valid: true}
+	if input.GeneratedByID != nil {
+		generatedBy, err = parseUUID(*input.GeneratedByID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var sourceChatID pgtype.UUID
+	if input.SourceChatID != nil {
+		sourceChatID, err = parseUUID(*input.SourceChatID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	generatedByAI := false
+	if input.GeneratedByAi != nil {
+		generatedByAI = *input.GeneratedByAi
+	}
+
+	status := database.FlowchartStatusDRAFT
+	if input.Status != nil {
+		status = database.FlowchartStatus(*input.Status)
+	}
+
 	flowchart, err := r.App.Services.Flowchart.CreateFlowchart(
 		ctx,
 		database.CreateFlowchartParams{
-			ProjectID: projectID,
-			Name:      input.Name,
-			Data:      []byte(input.Data),
+			ProjectID:     projectID,
+			Name:          input.Name,
+			Data:          []byte(input.Data),
+			GeneratedBy:   generatedBy,
+			GeneratedByAi: pgtype.Bool{Bool: generatedByAI, Valid: true},
+			Status:        status,
+			SourceChatID:  sourceChatID,
 		},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return &model.Flowchart{
-		ID:     flowchart.ID.String(),
-		Name:   flowchart.Name,
-		Data:   string(flowchart.Data),
-		Status: model.FlowchartStatus(flowchart.Status),
-	}, nil
+	return helpers.FlowchartToModel(flowchart), nil
 }
 
 // UpdateFlowchart is the resolver for the updateFlowchart field.
 func (r *mutationResolver) UpdateFlowchart(ctx context.Context, id string, input model.UpdateFlowchartInput) (*model.Flowchart, error) {
+	if _, ok := auth.UserIDFromContext(ctx); !ok {
+		return nil, apperrors.UnauthorizedError("authentication required")
+	}
+
 	flowchartID, err := parseUUID(id)
 	if err != nil {
 		return nil, err
 	}
 
+	existing, err := r.App.Services.Flowchart.GetFlowchartByID(ctx, flowchartID)
+	if err != nil {
+		return nil, err
+	}
+
+	name := existing.Name
+	if input.Name != nil {
+		name = *input.Name
+	}
+
+	data := existing.Data
+	if input.Data != nil {
+		data = []byte(*input.Data)
+	}
+
+	generatedBy := existing.GeneratedBy
+	if input.GeneratedBy != nil {
+		generatedBy, err = parseUUID(*input.GeneratedBy)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	generatedByAI := existing.GeneratedByAi
+	if input.GeneratedByAi != nil {
+		generatedByAI = pgtype.Bool{Bool: *input.GeneratedByAi, Valid: true}
+	}
+
+	status := existing.Status
+	if input.Status != nil {
+		status = database.FlowchartStatus(*input.Status)
+	}
+
+	sourceChatID := existing.SourceChatID
+	if input.SourceChatID != nil {
+		sourceChatID, err = parseUUID(*input.SourceChatID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	flowchart, err := r.App.Services.Flowchart.UpdateFlowchart(
 		ctx,
 		database.UpdateFlowchartParams{
-			ID:   flowchartID,
-			Name: *input.Name,
-			Data: []byte(*input.Data),
+			ID:            flowchartID,
+			Name:          name,
+			Data:          data,
+			GeneratedBy:   generatedBy,
+			GeneratedByAi: generatedByAI,
+			Status:        status,
+			SourceChatID:  sourceChatID,
 		},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return &model.Flowchart{
-		ID:     flowchart.ID.String(),
-		Name:   flowchart.Name,
-		Data:   string(flowchart.Data),
-		Status: model.FlowchartStatus(flowchart.Status),
-	}, nil
+	return helpers.FlowchartToModel(flowchart), nil
 }
 
 // DeleteFlowchart is the resolver for the deleteFlowchart field.
 func (r *mutationResolver) DeleteFlowchart(ctx context.Context, id string) (bool, error) {
+	if _, ok := auth.UserIDFromContext(ctx); !ok {
+		return false, apperrors.UnauthorizedError("authentication required")
+	}
+
 	flowchartID, err := parseUUID(id)
 	if err != nil {
 		return false, err
@@ -106,25 +189,10 @@ func (r *queryResolver) Flowchart(ctx context.Context, id string) (*model.Flowch
 		return nil, err
 	}
 
-	var description *string
+	result := helpers.FlowchartToModel(flowchart)
+	result.Project = helpers.ProjectToModel(project)
 
-	if project.Description.Valid {
-		description = &project.Description.String
-	}
-
-	return &model.Flowchart{
-		ID:   flowchart.ID.String(),
-		Name: flowchart.Name,
-		Data: string(flowchart.Data),
-
-		Status: model.FlowchartStatus(flowchart.Status),
-
-		Project: &model.Project{
-			ID:          project.ID.String(),
-			Name:        project.Name,
-			Description: description,
-		},
-	}, nil
+	return result, nil
 }
 
 // Flowcharts is the resolver for the flowcharts field.
@@ -139,12 +207,7 @@ func (r *queryResolver) Flowcharts(ctx context.Context, projectID string) ([]*mo
 	}
 	result := make([]*model.Flowchart, len(flowcharts))
 	for i, fc := range flowcharts {
-		result[i] = &model.Flowchart{
-			ID:     fc.ID.String(),
-			Name:   fc.Name,
-			Data:   string(fc.Data),
-			Status: model.FlowchartStatus(fc.Status),
-		}
+		result[i] = helpers.FlowchartToModel(fc)
 	}
 	return result, nil
 }
