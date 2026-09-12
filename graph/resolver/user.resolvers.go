@@ -51,6 +51,7 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 	}, nil
 }
 
+// DeleteUser is the resolver for the deleteUser field.
 func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (bool, error) {
 	userId, err := parseUUID(id)
 	if err != nil {
@@ -64,6 +65,7 @@ func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (bool, err
 	return true, nil
 }
 
+// UpdateUserProfile is the resolver for the updateUserProfile field.
 func (r *mutationResolver) UpdateUserProfile(ctx context.Context, id string, input model.UpdateUserProfileInput) (*model.UserProfile, error) {
 	userId, err := parseUUID(id)
 	if err != nil {
@@ -92,6 +94,7 @@ func (r *mutationResolver) UpdateUserProfile(ctx context.Context, id string, inp
 	}, nil
 }
 
+// UpdateUserAvatar is the resolver for the updateUserAvatar field.
 func (r *mutationResolver) UpdateUserAvatar(ctx context.Context, id string, input model.UpdateUserAvatarInput) (*model.UserProfile, error) {
 	userId, err := parseUUID(id)
 	if err != nil {
@@ -121,10 +124,12 @@ func (r *mutationResolver) UpdateUserAvatar(ctx context.Context, id string, inpu
 	}, nil
 }
 
+// Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 	return nil, fmt.Errorf("not implemented: Me - me")
 }
 
+// User is the resolver for the user field.
 func (r *queryResolver) User(ctx context.Context, id string) (*model.User, error) {
 	userId, err := parseUUID(id)
 	if err != nil {
@@ -141,6 +146,7 @@ func (r *queryResolver) User(ctx context.Context, id string) (*model.User, error
 	}, nil
 }
 
+// UserByEmail is the resolver for the userByEmail field.
 func (r *queryResolver) UserByEmail(ctx context.Context, email string) (*model.User, error) {
 	user, err := r.App.Services.User.GetUserByEmail(ctx, email)
 	if err != nil {
@@ -153,6 +159,7 @@ func (r *queryResolver) UserByEmail(ctx context.Context, email string) (*model.U
 	}, nil
 }
 
+// UserByUsername is the resolver for the userByUsername field.
 func (r *queryResolver) UserByUsername(ctx context.Context, username string) (*model.User, error) {
 	user, err := r.App.Services.User.GetUserByUsername(ctx, username)
 	if err != nil {
@@ -165,6 +172,7 @@ func (r *queryResolver) UserByUsername(ctx context.Context, username string) (*m
 	}, nil
 }
 
+// UserProfile is the resolver for the userProfile field.
 func (r *queryResolver) UserProfile(ctx context.Context, userID string) (*model.UserProfile, error) {
 	userId, err := parseUUID(userID)
 	if err != nil {
@@ -184,6 +192,7 @@ func (r *queryResolver) UserProfile(ctx context.Context, userID string) (*model.
 	}, nil
 }
 
+// AllUsers is the resolver for the allUsers field.
 func (r *queryResolver) AllUsers(ctx context.Context) ([]*model.User, error) {
 	users, err := r.App.Services.User.GetAllUsers(ctx)
 	if err != nil {

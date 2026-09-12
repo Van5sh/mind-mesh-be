@@ -14,7 +14,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-
 type App struct {
 	DB           *pgxpool.Pool
 	Repositories Repositories
@@ -75,6 +74,10 @@ type Services struct {
 // ============================================================
 // OAuth Providers
 // ============================================================
+
+// type Helpers struct {
+// 	projectHelpers helpers
+// }
 
 type OAuthProviders struct {
 	Google *auth.GoogleProvider

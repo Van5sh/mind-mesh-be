@@ -83,10 +83,9 @@ type CreateChatInput struct {
 }
 
 type CreateChatMessageInput struct {
-	ChatID   string      `json:"chatId"`
-	SenderID string      `json:"senderId"`
-	Role     MessageRole `json:"role"`
-	Content  string      `json:"content"`
+	ChatID  string      `json:"chatId"`
+	Role    MessageRole `json:"role"`
+	Content string      `json:"content"`
 }
 
 type CreateChatParticipantInput struct {

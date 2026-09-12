@@ -255,9 +255,11 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		ActiveChats             func(childComplexity int, projectID string) int
 		ActivityLogs            func(childComplexity int, projectID *string, userID *string) int
 		AiReports               func(childComplexity int, projectID string) int
 		AllUsers                func(childComplexity int) int
+		ArchivedChats           func(childComplexity int, projectID string) int
 		ArchivedProjectsByOwner func(childComplexity int, ownerID string) int
 		ArchivedProjectsForUser func(childComplexity int, userID string) int
 		Chat                    func(childComplexity int, id string) int
@@ -397,6 +399,8 @@ type QueryResolver interface {
 	Chats(ctx context.Context, projectID string) ([]*model.Chat, error)
 	MyChats(ctx context.Context, projectID *string) ([]*model.Chat, error)
 	ChatMessages(ctx context.Context, chatID string) ([]*model.ChatMessage, error)
+	ArchivedChats(ctx context.Context, projectID string) ([]*model.Chat, error)
+	ActiveChats(ctx context.Context, projectID string) ([]*model.Chat, error)
 	Folder(ctx context.Context, id string) (*model.Folder, error)
 	Folders(ctx context.Context, projectID *string) ([]*model.Folder, error)
 	FolderContents(ctx context.Context, folderID *string, projectID *string) ([]model.FolderItem, error)
@@ -1669,6 +1673,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.ProjectMember.User(childComplexity), true
 
+	case "Query.activeChats":
+		if e.ComplexityRoot.Query.ActiveChats == nil {
+			break
+		}
+
+		args, err := ec.field_Query_activeChats_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ActiveChats(childComplexity, args["projectId"].(string)), true
 	case "Query.activityLogs":
 		if e.ComplexityRoot.Query.ActivityLogs == nil {
 			break
@@ -1697,6 +1712,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.AllUsers(childComplexity), true
+	case "Query.archivedChats":
+		if e.ComplexityRoot.Query.ArchivedChats == nil {
+			break
+		}
+
+		args, err := ec.field_Query_archivedChats_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ArchivedChats(childComplexity, args["projectId"].(string)), true
 	case "Query.archivedProjectsByOwner":
 		if e.ComplexityRoot.Query.ArchivedProjectsByOwner == nil {
 			break
@@ -3667,6 +3693,20 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_activeChats_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "projectId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["projectId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_activityLogs_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -3690,6 +3730,20 @@ func (ec *executionContext) field_Query_activityLogs_args(ctx context.Context, r
 }
 
 func (ec *executionContext) field_Query_aiReports_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "projectId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["projectId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_archivedChats_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "projectId",
@@ -9629,6 +9683,94 @@ func (ec *executionContext) fieldContext_Query_chatMessages(ctx context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_archivedChats(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_archivedChats(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ArchivedChats(ctx, fc.Args["projectId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.Chat) graphql.Marshaler {
+			return ec.marshalNChat2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐChatᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_archivedChats(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Chat(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_archivedChats_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_activeChats(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_activeChats(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ActiveChats(ctx, fc.Args["projectId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.Chat) graphql.Marshaler {
+			return ec.marshalNChat2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐChatᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_activeChats(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Chat(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_activeChats_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_folder(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -13214,7 +13356,7 @@ func (ec *executionContext) unmarshalInputCreateChatMessageInput(ctx context.Con
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"chatId", "senderId", "role", "content"}
+	fieldsInOrder := [...]string{"chatId", "role", "content"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -13228,13 +13370,6 @@ func (ec *executionContext) unmarshalInputCreateChatMessageInput(ctx context.Con
 				return it, err
 			}
 			it.ChatID = data
-		case "senderId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("senderId"))
-			data, err := ec.unmarshalNID2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.SenderID = data
 		case "role":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
 			data, err := ec.unmarshalNMessageRole2exampleᚋhelloᚋgraphᚋmodelᚐMessageRole(ctx, v)
@@ -15845,6 +15980,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_chatMessages(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "archivedChats":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_archivedChats(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "activeChats":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_activeChats(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}

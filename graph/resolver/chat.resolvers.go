@@ -70,3 +70,13 @@ func (r *queryResolver) MyChats(ctx context.Context, projectID *string) ([]*mode
 func (r *queryResolver) ChatMessages(ctx context.Context, chatID string) ([]*model.ChatMessage, error) {
 	panic(fmt.Errorf("not implemented: ChatMessages - chatMessages"))
 }
+
+// ArchivedChats is the resolver for the archivedChats field.
+func (r *queryResolver) ArchivedChats(ctx context.Context, projectID string) ([]*model.Chat, error) {
+	panic(fmt.Errorf("not implemented: ArchivedChats - archivedChats"))
+}
+
+// ActiveChats is the resolver for the activeChats field.
+func (r *queryResolver) ActiveChats(ctx context.Context, projectID string) ([]*model.Chat, error) {
+	panic(fmt.Errorf("not implemented: ActiveChats - activeChats"))
+}
