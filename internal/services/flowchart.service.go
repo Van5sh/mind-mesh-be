@@ -21,7 +21,7 @@ func NewFlowchartService(
 	repo *repository.FlowchartRepository,
 	guard *guards.FlowchartGuard,
 ) *FlowchartService {
-	return &FlowchartService{		repo:  repo,
+	return &FlowchartService{repo: repo,
 		guard: guard,
 	}
 }
@@ -124,4 +124,27 @@ func (s *FlowchartService) DeleteFlowchart(
 	}
 
 	return nil
+}
+
+func (s *FlowchartService) GetFlowchartsByProjectID(
+	ctx context.Context,
+	projectID pgtype.UUID,
+) ([]database.Flowchart, error) {
+
+	if err := validators.ValidateUUID("project_id", projectID); err != nil {
+		return nil, err
+	}
+
+	flowcharts, err := s.repo.GetFlowchartsByProjectID(
+		ctx,
+		projectID,
+	)
+	if err != nil {
+		return nil, apperrors.InternalError(
+			"failed to get flowcharts by project",
+			err,
+		)
+	}
+
+	return flowcharts, nil
 }

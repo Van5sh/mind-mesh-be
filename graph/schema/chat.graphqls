@@ -41,6 +41,9 @@ extend type Query {
   chats(projectId: ID!): [Chat!]!
   myChats(projectId: ID): [Chat!]!
   chatMessages(chatId: ID!): [ChatMessage!]!
+
+  archivedChats(projectId: ID!): [Chat!]!
+  activeChats(projectId: ID!): [Chat!]!
 }
 
 input CreateChatInput {
@@ -62,7 +65,6 @@ input CreateChatParticipantInput {
 
 input CreateChatMessageInput {
   chatId: ID!
-  senderId: ID!
   role: MessageRole!
   content: String!
 }

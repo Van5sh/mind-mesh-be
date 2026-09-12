@@ -14,18 +14,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// ============================================================
-// App
-// ============================================================
 
-// App owns the application's shared infrastructure
-// and all application dependencies.
 type App struct {
 	DB           *pgxpool.Pool
 	Repositories Repositories
 	Guards       Guards
 	Services     Services
 	OAuth        OAuthProviders
+	AuthHandler  *auth.OAuthHandler
 }
 
 // ============================================================
@@ -132,6 +128,9 @@ func New(
 
 	queries := database.New(db)
 
+	// --------------------------------------------------------
+	// Repositories
+	// --------------------------------------------------------
 
 	repositories := Repositories{
 		Activity: repository.NewActivityRepository(
@@ -173,6 +172,9 @@ func New(
 		),
 	}
 
+	// --------------------------------------------------------
+	// Guards
+	// --------------------------------------------------------
 
 	appGuards := Guards{
 		Activity: guards.NewActivityGuard(
@@ -204,9 +206,17 @@ func New(
 		),
 	}
 
+	// --------------------------------------------------------
+	// Session Service
+	// --------------------------------------------------------
+
 	sessionService := services.NewSessionService(
 		repositories.Session,
 	)
+
+	// --------------------------------------------------------
+	// OAuth Providers
+	// --------------------------------------------------------
 
 	googleProvider := auth.NewGoogleProvider(
 		os.Getenv("GOOGLE_CLIENT_ID"),
@@ -220,6 +230,10 @@ func New(
 		os.Getenv("GITHUB_REDIRECT_URL"),
 	)
 
+	// --------------------------------------------------------
+	// Authentication Service
+	// --------------------------------------------------------
+
 	authService := auth.NewService(
 		repositories.User,
 		repositories.OAuth,
@@ -228,16 +242,36 @@ func New(
 		githubProvider,
 	)
 
+	// --------------------------------------------------------
+	// OAuth Handler
+	// --------------------------------------------------------
+
+	oauthHandler := auth.NewOAuthHandler(
+		authService,
+		googleProvider,
+		githubProvider,
+		os.Getenv("FRONTEND_URL"),
+		os.Getenv("AUTH_COOKIE_SECURE") == "true",
+		7*24*60*60*1000000000, // 7 days
+	)
+
+	// --------------------------------------------------------
+	// Application
+	// --------------------------------------------------------
 
 	return &App{
-		DB:           db,
+		DB: db,
+
 		Repositories: repositories,
-		Guards:       appGuards,
+
+		Guards: appGuards,
 
 		OAuth: OAuthProviders{
 			Google: googleProvider,
 			GitHub: githubProvider,
 		},
+
+		AuthHandler: oauthHandler,
 
 		Services: Services{
 			Activity: services.NewActivityService(
