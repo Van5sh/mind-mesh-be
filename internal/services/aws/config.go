@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/ses"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/textract"
 )
 
@@ -21,12 +22,14 @@ type AWSConfig struct {
 	AccessKeyID     string
 	SecretAccessKey string
 	S3Bucket        string
+	SQSQueueURL     string
 	SESFromEmail    string
 	DynamoDBTable   string
 
 	Config aws.Config
 
 	S3Client       *s3.Client
+	SQSClient      *sqs.Client
 	SESClient      *ses.Client
 	DynamoDBClient *dynamodb.Client
 	TextractClient *textract.Client
@@ -42,7 +45,10 @@ func InitializeAWSConfig(ctx context.Context) (*AWSConfig, error) {
 
 	accessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
 	secretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
-	s3Bucket := os.Getenv("AWS_S3_BUCKET")
+	// S3_BUCKET / SQS_QUEUE_URL (no AWS_ prefix) match the names used in
+	// this project's .env and the Python AI worker's .env.
+	s3Bucket := os.Getenv("S3_BUCKET")
+	sqsQueueURL := os.Getenv("SQS_QUEUE_URL")
 	sesFromEmail := os.Getenv("AWS_SES_FROM_EMAIL")
 	dynamoDBTable := os.Getenv("AWS_DYNAMODB_TABLE")
 
@@ -79,10 +85,12 @@ func InitializeAWSConfig(ctx context.Context) (*AWSConfig, error) {
 		AccessKeyID:     accessKeyID,
 		SecretAccessKey: secretAccessKey,
 		S3Bucket:        s3Bucket,
+		SQSQueueURL:     sqsQueueURL,
 		SESFromEmail:    sesFromEmail,
 		DynamoDBTable:   dynamoDBTable,
 		Config:          cfg,
 		S3Client:        s3.NewFromConfig(cfg),
+		SQSClient:       sqs.NewFromConfig(cfg),
 		SESClient:       ses.NewFromConfig(cfg),
 		DynamoDBClient:  dynamodb.NewFromConfig(cfg),
 		TextractClient:  textract.NewFromConfig(cfg),
@@ -95,6 +103,10 @@ func InitializeAWSConfig(ctx context.Context) (*AWSConfig, error) {
 
 func (ac *AWSConfig) GetS3Client() *s3.Client {
 	return ac.S3Client
+}
+
+func (ac *AWSConfig) GetSQSClient() *sqs.Client {
+	return ac.SQSClient
 }
 
 func (ac *AWSConfig) GetSESClient() *ses.Client {

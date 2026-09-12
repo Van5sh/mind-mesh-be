@@ -130,7 +130,7 @@ input CreateFileInput {
   projectId: ID!
   folderId: ID
   name: String!
-  size: Int!
+  file: Upload!
 }
 
 input MoveFileInput {

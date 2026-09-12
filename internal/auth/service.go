@@ -99,9 +99,6 @@ func (s *Service) LoginWithGitHub(
 	return s.LoginWithOAuth(ctx, oauthUser)
 }
 
-
-
-
 // ============================================================
 // Generic OAuth Login
 // ============================================================
@@ -153,7 +150,6 @@ func (s *Service) LoginWithOAuth(
 			err,
 		)
 	}
-
 
 	user, err := s.userRepo.GetUserByEmail(
 		ctx,

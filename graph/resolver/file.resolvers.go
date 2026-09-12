@@ -297,13 +297,21 @@ func (r *mutationResolver) CreateFile(ctx context.Context, input model.CreateFil
 		}
 	}
 
+	projectID, err := parseUUID(input.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+
 	file, err := r.App.Services.File.CreateFile(
 		ctx,
 		database.CreateFileParams{
-			FolderID: folderID,
-			Name:     input.Name,
-			Size:     int64(input.Size),
+			FolderID:  folderID,
+			ProjectID: projectID,
+			Name:      input.Name,
+			Size:      input.File.Size,
 		},
+		input.File.File,
+		input.File.ContentType,
 	)
 	if err != nil {
 		return nil, err

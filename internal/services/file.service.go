@@ -3,11 +3,14 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 
 	"example/hello/internal/apperrors"
 	"example/hello/internal/database"
 	"example/hello/internal/guards"
 	"example/hello/internal/repository"
+	"example/hello/internal/services/aws"
 	"example/hello/internal/utils"
 	"example/hello/internal/validators"
 
@@ -18,23 +21,36 @@ import (
 type FileService struct {
 	repo   *repository.FileRepository
 	guards *guards.FileGuard
+	s3     *aws.S3Service
+	sqs    *aws.SQSService
 }
 
-func NewFileService(repo *repository.FileRepository, guard *guards.FileGuard) *FileService {
+func NewFileService(
+	repo *repository.FileRepository,
+	guard *guards.FileGuard,
+	s3Service *aws.S3Service,
+	sqsService *aws.SQSService,
+) *FileService {
 	return &FileService{
 		repo:   repo,
 		guards: guard,
+		s3:     s3Service,
+		sqs:    sqsService,
 	}
 }
 
 func (s *FileService) CreateFile(
 	ctx context.Context,
 	params database.CreateFileParams,
+	body io.Reader,
+	contentType string,
 ) (database.File, error) {
 	if err := validators.ValidateFileName(params.Name); err != nil {
 		return database.File{}, err
 	}
-
+	if err := validators.ValidateUUID("project id", params.ProjectID); err != nil {
+		return database.File{}, err
+	}
 	if params.FolderID.Valid {
 		if err := validators.ValidateUUID(
 			"folder id",
@@ -43,17 +59,24 @@ func (s *FileService) CreateFile(
 			return database.File{}, err
 		}
 
-		if _, err := s.guards.EnsureFolderExists(
+		folder, err := s.guards.EnsureFolderExists(
 			ctx,
 			params.FolderID,
-		); err != nil {
+		)
+		if err != nil {
 			return database.File{},
 				apperrors.NotFoundError("destination folder not found")
+		}
+
+		if folder.ProjectID != params.ProjectID {
+			return database.File{},
+				apperrors.Validation("destination folder does not belong to the given project")
 		}
 	}
 
 	name, err := s.resolveFileName(
 		ctx,
+		params.ProjectID,
 		params.FolderID,
 		params.Name,
 	)
@@ -66,6 +89,39 @@ func (s *FileService) CreateFile(
 	file, err := s.repo.CreateFile(ctx, params)
 	if err != nil {
 		return database.File{}, apperrors.InternalError("failed to create file", err)
+	}
+
+	s3Key := fmt.Sprintf(
+		"projects/%s/files/%s/%s",
+		file.ProjectID,
+		file.ID,
+		file.Name,
+	)
+	if err := s.s3.S3Upload(
+		ctx,
+		s3Key,
+		body,
+		contentType,
+	); err != nil {
+		// Important: don't leave a file looking successfully uploaded.
+		_ = s.repo.DeleteFile(ctx, file.ID)
+		return database.File{},
+			apperrors.InternalError("failed to upload file to storage", err)
+	}
+
+	// Queue processing job.
+	job := aws.FileProcessingJob{
+		JobType:   "file_processing",
+		FileID:    file.ID.String(),
+		ProjectID: file.ProjectID.String(),
+		Key:       s3Key,
+		// Bucket is only needed if the worker isn't configured
+		// with its own bucket.
+	}
+
+	if err := s.sqs.SendFileProcessingJob(ctx, job); err != nil {
+		return database.File{},
+			apperrors.InternalError("failed to queue file processing", err)
 	}
 
 	return file, nil
@@ -151,6 +207,7 @@ func (s *FileService) DeleteFile(
 
 func (s *FileService) resolveFileName(
 	ctx context.Context,
+	projectID pgtype.UUID,
 	folderID pgtype.UUID,
 	name string,
 ) (string, error) {
@@ -161,8 +218,9 @@ func (s *FileService) resolveFileName(
 		exists, err := s.repo.FileNameExistsInFolder(
 			ctx,
 			database.FileNameExistsInFolderParams{
-				FolderID: folderID,
-				Name:     candidate,
+				ProjectID: projectID,
+				FolderID:  folderID,
+				Name:      candidate,
 			},
 		)
 		if err != nil {
@@ -424,10 +482,11 @@ func (s *FileService) MoveFile(
 		return database.File{}, err
 	}
 
-	if _, err := s.guards.EnsureFileExists(
+	existing, err := s.guards.EnsureFileExists(
 		ctx,
 		params.ID,
-	); err != nil {
+	)
+	if err != nil {
 		return database.File{},
 			apperrors.NotFoundError("file not found")
 	}
@@ -435,12 +494,18 @@ func (s *FileService) MoveFile(
 	// A zero-value FolderID means the file is being moved to the
 	// project root, which is valid and has no folder to check.
 	if params.FolderID.Valid {
-		if _, err := s.guards.EnsureFolderExists(
+		folder, err := s.guards.EnsureFolderExists(
 			ctx,
 			params.FolderID,
-		); err != nil {
+		)
+		if err != nil {
 			return database.File{},
 				apperrors.NotFoundError("destination folder not found")
+		}
+
+		if folder.ProjectID != existing.ProjectID {
+			return database.File{},
+				apperrors.Validation("destination folder does not belong to the file's project")
 		}
 	}
 
@@ -476,6 +541,7 @@ func (s *FileService) RenameFile(
 
 	name, err := s.resolveFileName(
 		ctx,
+		file.ProjectID,
 		file.FolderID,
 		params.Name,
 	)

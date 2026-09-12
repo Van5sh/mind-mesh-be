@@ -56,6 +56,7 @@ func StartServer() {
 	application, err := app.New(
 		ctx,
 		os.Getenv("DATABASE_URL"),
+		awsConfig,
 	)
 
 	if err != nil {
@@ -106,6 +107,10 @@ func StartServer() {
 
 	srv.AddTransport(
 		transport.POST{},
+	)
+
+	srv.AddTransport(
+		transport.MultipartForm{},
 	)
 
 	srv.SetQueryCache(

@@ -10,6 +10,7 @@ import (
 	"example/hello/internal/guards"
 	"example/hello/internal/repository"
 	"example/hello/internal/services"
+	"example/hello/internal/services/aws"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -91,6 +92,7 @@ type OAuthProviders struct {
 func New(
 	ctx context.Context,
 	databaseURL string,
+	awsConfig *aws.AWSConfig,
 ) (*App, error) {
 
 	// --------------------------------------------------------
@@ -100,6 +102,12 @@ func New(
 	if databaseURL == "" {
 		return nil, fmt.Errorf(
 			"DATABASE_URL is required",
+		)
+	}
+
+	if awsConfig == nil {
+		return nil, fmt.Errorf(
+			"AWS configuration is required",
 		)
 	}
 
@@ -210,6 +218,20 @@ func New(
 	}
 
 	// --------------------------------------------------------
+	// AWS-backed Services
+	// --------------------------------------------------------
+
+	s3Service := aws.NewS3Service(
+		awsConfig.S3Client,
+		awsConfig.S3Bucket,
+	)
+
+	sqsService := aws.NewSQSService(
+		awsConfig.SQSClient,
+		awsConfig.SQSQueueURL,
+	)
+
+	// --------------------------------------------------------
 	// Session Service
 	// --------------------------------------------------------
 
@@ -290,6 +312,8 @@ func New(
 			File: services.NewFileService(
 				repositories.File,
 				appGuards.File,
+				s3Service,
+				sqsService,
 			),
 
 			Flowchart: services.NewFlowchartService(

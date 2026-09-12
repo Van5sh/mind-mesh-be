@@ -104,14 +104,17 @@ CREATE TABLE folders (
     UNIQUE(project_id, parent_folder_id, name),
     UNIQUE(id, project_id)
 );
+
 CREATE TABLE files (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     folder_id UUID REFERENCES folders(id) ON DELETE SET NULL,
+    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     size BIGINT NOT NULL CHECK(size >= 0),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 CREATE TABLE file_storage(
     file_id UUID PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
     bucket_name VARCHAR(100) NOT NULL,
@@ -321,6 +324,9 @@ ON files(name);
 
 CREATE INDEX idx_files_folder
 ON files(folder_id);
+
+CREATE INDEX idx_files_project
+ON files(project_id);
 
 CREATE INDEX idx_flowcharts_generated_by
 ON flowcharts(generated_by);

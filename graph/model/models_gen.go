@@ -8,6 +8,8 @@ import (
 	"io"
 	"strconv"
 	"time"
+
+	"github.com/99designs/gqlgen/graphql"
 )
 
 type FolderItem interface {
@@ -94,10 +96,10 @@ type CreateChatParticipantInput struct {
 }
 
 type CreateFileInput struct {
-	ProjectID string  `json:"projectId"`
-	FolderID  *string `json:"folderId,omitempty"`
-	Name      string  `json:"name"`
-	Size      int     `json:"size"`
+	ProjectID string         `json:"projectId"`
+	FolderID  *string        `json:"folderId,omitempty"`
+	Name      string         `json:"name"`
+	File      graphql.Upload `json:"file"`
 }
 
 type CreateFlowchartInput struct {

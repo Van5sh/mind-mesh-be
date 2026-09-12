@@ -1,10 +1,11 @@
 -- name: CreateFile :one
 INSERT INTO files (
     folder_id,
+    project_id,
     name,
     size
 )
-VALUES ($1, $2, $3)
+VALUES ($1, $2, $3,$4)
 RETURNING *;
 
 -- name: GetFileByID :one
@@ -30,30 +31,26 @@ WHERE project_id = $1
 -- name: GetProjectFileByID :one
 SELECT f.*
 FROM files f
-JOIN project_files pf
-ON f.id = pf.file_id
 WHERE f.id = $1
-  AND pf.project_id = $2;
+  AND f.project_id = $2;
 
 -- name: CheckProjectContainsFile :one
 SELECT EXISTS (
     SELECT 1
-    FROM project_files
+    FROM files
     WHERE project_id = $1
-      AND file_id = $2
+      AND id = $2
 );
 
 -- name: GetFilesByProjectID :many
 SELECT f.*
 FROM files f
-JOIN project_files pf
-ON f.id = pf.file_id
-WHERE pf.project_id = $1
+WHERE f.project_id = $1
 ORDER BY f.name;
 
 -- name: CountProjectFiles :one
 SELECT COUNT(*) AS count
-FROM project_files
+FROM files
 WHERE project_id = $1;
 
 -- name: GetFilesByFolderID :many
@@ -65,19 +62,15 @@ ORDER BY name;
 -- name: GetProjectFilesByFolderID :many
 SELECT f.*
 FROM files f
-JOIN project_files pf
-ON f.id = pf.file_id
-WHERE pf.project_id = $1
-  AND pf.folder_id IS NOT DISTINCT FROM $2
+WHERE f.project_id = $1
+  AND f.folder_id IS NOT DISTINCT FROM $2
 ORDER BY f.name;
 
 -- name: GetRootFiles :many
 SELECT f.*
 FROM files f
-JOIN project_files pf
-ON f.id = pf.file_id
-WHERE pf.project_id = $1
-  AND pf.folder_id IS NULL
+WHERE f.project_id = $1
+  AND f.folder_id IS NULL
 ORDER BY f.name;
 
 -- name: GetFileByFolderAndName :one
@@ -89,10 +82,8 @@ WHERE folder_id IS NOT DISTINCT FROM $1
 -- name: GetProjectFileByFolderAndName :one
 SELECT f.*
 FROM files f
-JOIN project_files pf
-ON f.id = pf.file_id
-WHERE pf.project_id = $1
-  AND pf.folder_id IS NOT DISTINCT FROM $2
+WHERE f.project_id = $1
+  AND f.folder_id IS NOT DISTINCT FROM $2
   AND f.name = $3;
 
 -- name: CheckFileNameExists :one
@@ -107,19 +98,15 @@ SELECT EXISTS (
 SELECT EXISTS (
     SELECT 1
     FROM files f
-    JOIN project_files pf
-    ON f.id = pf.file_id
-    WHERE pf.project_id = $1
-      AND pf.folder_id IS NOT DISTINCT FROM $2
+    WHERE f.project_id = $1
+      AND f.folder_id IS NOT DISTINCT FROM $2
       AND f.name = $3
 );
 
 -- name: SearchFiles :many
 SELECT f.*
 FROM files f
-JOIN project_files pf
-ON f.id = pf.file_id
-WHERE pf.project_id = $1
+WHERE f.project_id = $1
   AND f.name ILIKE '%' || $2 || '%'
 ORDER BY f.name;
 
@@ -300,10 +287,8 @@ SELECT
     'file' AS item_type,
     fi.created_at
 FROM files fi
-JOIN project_files pf
-ON fi.id = pf.file_id
-WHERE pf.project_id = $1
-  AND pf.folder_id IS NOT DISTINCT FROM $2
+WHERE fi.project_id = $1
+  AND fi.folder_id IS NOT DISTINCT FROM $2
 ORDER BY item_type, name;
 
 
@@ -536,10 +521,8 @@ SELECT f.*
 FROM files f
 JOIN file_properties fp
 ON f.id = fp.file_id
-JOIN project_files pf
-ON f.id = pf.file_id
 WHERE fp.deleted_at IS NOT NULL
-  AND pf.project_id = $1
+  AND f.project_id = $1
 ORDER BY fp.deleted_at DESC;
 
 
@@ -607,11 +590,9 @@ SELECT f.*
 FROM files f
 JOIN user_file_preferences ufp
 ON f.id = ufp.file_id
-JOIN project_files pf
-ON f.id = pf.file_id
 WHERE ufp.user_id = $1
   AND ufp.is_favorite = TRUE
-  AND pf.project_id = $2;
+  AND f.project_id = $2;
 
 
 -- name: GetIndexedFiles :many
@@ -619,10 +600,8 @@ SELECT f.*
 FROM files f
 JOIN file_properties fp
 ON f.id = fp.file_id
-JOIN project_files pf
-ON f.id = pf.file_id
 WHERE fp.is_indexed = TRUE
-  AND pf.project_id = $1;
+  AND f.project_id = $1;
 
 
 -- name: GetFilesByIDs :many
@@ -655,6 +634,7 @@ SELECT EXISTS (
 SELECT EXISTS (
     SELECT 1
     FROM files
-    WHERE folder_id IS NOT DISTINCT FROM $1
-      AND name = $2
+    WHERE project_id = $1
+      AND folder_id IS NOT DISTINCT FROM $2
+      AND name = $3
 );

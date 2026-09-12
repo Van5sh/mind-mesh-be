@@ -26,10 +26,10 @@ func New(code Code, message string, err error) error {
 	return &AppError{Code: code, Message: message, Err: err}
 }
 
-func Validation(message string) error       { return New(InvalidArgument, message, nil) }
-func NotFoundError(message string) error    { return New(NotFound, message, nil) }
-func ConflictError(message string) error    { return New(Conflict, message, nil) }
-func ForbiddenError(message string) error   { return New(Forbidden, message, nil) }
+func Validation(message string) error        { return New(InvalidArgument, message, nil) }
+func NotFoundError(message string) error     { return New(NotFound, message, nil) }
+func ConflictError(message string) error     { return New(Conflict, message, nil) }
+func ForbiddenError(message string) error    { return New(Forbidden, message, nil) }
 func UnauthorizedError(message string) error { return New(Unauthorized, message, nil) }
 func InternalError(message string, err error) error {
 	return New(Internal, message, err)
