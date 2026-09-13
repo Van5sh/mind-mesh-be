@@ -1,8 +1,7 @@
 import logging
-import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from ai.worker.main import ProcessingJob
 from ai.worker.s3 import S3Downloader
 from ai.extraction.factory import ExtractionFactory
 from ai.chunking.text_splitter import TextChunker
@@ -11,58 +10,11 @@ from ai.embeddings.text import TextEmbedder
 from ai.qdrant.client import QdrantClient
 from ai.database.postgres import PostgresClient
 
-from dataclasses import dataclass
-
-from extraction.docx import DocxExtractor
-from extraction.pdf import PDFExtractor
-from extraction.text import TextExtractor
+if TYPE_CHECKING:
+    from ai.worker.main import ProcessingJob
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class ProcessingJob:
-    file_id: str
-    file_path: str
-    content_type: str
-
-
-class FileProcessor:
-
-    def __init__(self) -> None:
-        self.pdf_extractor = PDFExtractor()
-        self.docx_extractor = DocxExtractor()
-        self.text_extractor = TextExtractor()
-
-    def process(self, job: ProcessingJob) -> str:
-        extractor = self._get_extractor(job.content_type)
-
-        text = extractor.extract(job.file_path)
-
-        if not text.strip():
-            raise ValueError(
-                f"No text could be extracted from file: {job.file_id}"
-            )
-
-        return text
-
-    def _get_extractor(self, content_type: str):
-        extractors = {
-            "application/pdf": self.pdf_extractor,
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-                self.docx_extractor,
-            "text/plain": self.text_extractor,
-        }
-
-        extractor = extractors.get(content_type)
-
-        if extractor is None:
-            raise ValueError(
-                f"Unsupported content type: {content_type}"
-            )
-
-        return extractor
 
 
 class DocumentProcessor:
@@ -75,10 +27,10 @@ class DocumentProcessor:
         self.qdrant = QdrantClient()
         self.postgres = PostgresClient()
 
-    def process_document(self, job: ProcessingJob) -> None:
+    def process_document(self, job: "ProcessingJob") -> None:
         """
         Complete pipeline:
-        SQS job → S3 download → extract → chunk → summarize → embed → Qdrant → PostgreSQL
+        SQS job -> S3 download -> extract -> chunk -> summarize -> embed -> Qdrant -> PostgreSQL
         """
         temp_file = None
         try:
@@ -95,6 +47,9 @@ class DocumentProcessor:
             logger.info(f"Extracting text from {job.content_type}...")
             extractor = self.extraction_factory.get_extractor(job.content_type)
             raw_text = extractor.extract(temp_file)
+
+            if not raw_text.strip():
+                raise ValueError(f"No text could be extracted from file: {job.file_id}")
 
             # 4. Chunk text
             logger.info("Chunking text...")
@@ -133,7 +88,6 @@ class DocumentProcessor:
                 job.project_id,
                 "COMPLETED",
                 summary=summary,
-                processed_at=True,
             )
 
             logger.info(

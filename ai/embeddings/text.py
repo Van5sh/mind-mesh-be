@@ -1,6 +1,6 @@
 import logging
 
-from langchain.embeddings import OllamaEmbeddings
+from langchain_ollama import OllamaEmbeddings
 
 from ai.config.settings import settings
 from ai.embeddings.base import BaseEmbedder

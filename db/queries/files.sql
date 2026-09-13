@@ -510,6 +510,49 @@ WHERE file_id = $1
 RETURNING *;
 
 
+-- name: MarkFileProcessingStarted :one
+UPDATE file_ai_metadata
+SET
+    processing_status = 'PROCESSING',
+    error_message = NULL,
+    updated_at = NOW()
+WHERE file_id = $1
+RETURNING *;
+
+
+-- name: CompleteFileProcessing :one
+UPDATE file_ai_metadata
+SET
+    processing_status = 'COMPLETED',
+    summary = $2,
+    error_message = NULL,
+    embedding_synced = TRUE,
+    indexed_at = NOW(),
+    updated_at = NOW()
+WHERE file_id = $1
+RETURNING *;
+
+
+-- name: FailFileProcessing :one
+UPDATE file_ai_metadata
+SET
+    processing_status = 'FAILED',
+    error_message = $2,
+    updated_at = NOW()
+WHERE file_id = $1
+RETURNING *;
+
+
+-- name: GetFilesByProcessingStatus :many
+SELECT f.*
+FROM files f
+JOIN file_ai_metadata fam
+ON f.id = fam.file_id
+WHERE f.project_id = $1
+  AND fam.processing_status = $2
+ORDER BY f.created_at ASC;
+
+
 -- name: DeleteFileAIMetadata :exec
 DELETE
 FROM file_ai_metadata

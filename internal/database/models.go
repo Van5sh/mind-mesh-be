@@ -138,6 +138,50 @@ func (ns NullFilePermission) Value() (driver.Value, error) {
 	return string(ns.FilePermission), nil
 }
 
+type FileProcessingStatus string
+
+const (
+	FileProcessingStatusPENDING    FileProcessingStatus = "PENDING"
+	FileProcessingStatusPROCESSING FileProcessingStatus = "PROCESSING"
+	FileProcessingStatusCOMPLETED  FileProcessingStatus = "COMPLETED"
+	FileProcessingStatusFAILED     FileProcessingStatus = "FAILED"
+)
+
+func (e *FileProcessingStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = FileProcessingStatus(s)
+	case string:
+		*e = FileProcessingStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for FileProcessingStatus: %T", src)
+	}
+	return nil
+}
+
+type NullFileProcessingStatus struct {
+	FileProcessingStatus FileProcessingStatus
+	Valid                bool // Valid is true if FileProcessingStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullFileProcessingStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.FileProcessingStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.FileProcessingStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullFileProcessingStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.FileProcessingStatus), nil
+}
+
 type FlowchartStatus string
 
 const (
@@ -495,13 +539,16 @@ type File struct {
 }
 
 type FileAiMetadatum struct {
-	FileID          pgtype.UUID
-	ExtractedText   pgtype.Text
-	EmbeddingModel  pgtype.Text
-	EmbeddingSynced pgtype.Bool
-	IndexedAt       pgtype.Timestamptz
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
+	FileID           pgtype.UUID
+	ExtractedText    pgtype.Text
+	EmbeddingModel   pgtype.Text
+	EmbeddingSynced  pgtype.Bool
+	IndexedAt        pgtype.Timestamptz
+	ProcessingStatus FileProcessingStatus
+	Summary          pgtype.Text
+	ErrorMessage     pgtype.Text
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
 }
 
 type FileProperty struct {

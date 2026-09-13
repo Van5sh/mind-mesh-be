@@ -52,6 +52,9 @@ type FileAIMetadata {
   embeddingModel: String
   embeddingSynced: Boolean!
   indexedAt: Time
+  processingStatus: FileProcessingStatus!
+  summary: String
+  errorMessage: String
   createdAt: Time!
   updatedAt: Time!
 }

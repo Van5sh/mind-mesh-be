@@ -14,6 +14,7 @@ import (
 	"example/hello/internal/utils"
 	"example/hello/internal/validators"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -109,17 +110,32 @@ func (s *FileService) CreateFile(
 			apperrors.InternalError("failed to upload file to storage", err)
 	}
 
-	// Queue processing job.
+	// Create the AI-metadata row up front (status PENDING) so the worker's
+	// status updates - which only UPDATE, never INSERT - have a row to hit.
+	if _, err := s.repo.CreateFileAIMetadata(ctx, database.CreateFileAIMetadataParams{
+		FileID:          file.ID,
+		EmbeddingSynced: pgtype.Bool{Bool: false, Valid: true},
+	}); err != nil {
+		_ = s.repo.DeleteFile(ctx, file.ID)
+		return database.File{},
+			apperrors.InternalError("failed to initialize file processing status", err)
+	}
+
+	// Queue processing job. Field names must match ai/worker/main.py's
+	// ProcessingJob model exactly (see FileProcessingJob for details).
 	job := aws.FileProcessingJob{
-		JobType:   "file_processing",
-		FileID:    file.ID.String(),
-		ProjectID: file.ProjectID.String(),
-		Key:       s3Key,
-		// Bucket is only needed if the worker isn't configured
-		// with its own bucket.
+		JobID:       uuid.NewString(),
+		FileID:      file.ID.String(),
+		ProjectID:   file.ProjectID.String(),
+		StorageKey:  s3Key,
+		ContentType: contentType,
 	}
 
 	if err := s.sqs.SendFileProcessingJob(ctx, job); err != nil {
+		_, _ = s.repo.FailFileProcessing(ctx, database.FailFileProcessingParams{
+			FileID:       file.ID,
+			ErrorMessage: pgtype.Text{String: "failed to queue for processing", Valid: true},
+		})
 		return database.File{},
 			apperrors.InternalError("failed to queue file processing", err)
 	}

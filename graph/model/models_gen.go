@@ -159,13 +159,16 @@ type File struct {
 func (File) IsFolderItem() {}
 
 type FileAIMetadata struct {
-	File            *File      `json:"file"`
-	ExtractedText   *string    `json:"extractedText,omitempty"`
-	EmbeddingModel  *string    `json:"embeddingModel,omitempty"`
-	EmbeddingSynced bool       `json:"embeddingSynced"`
-	IndexedAt       *time.Time `json:"indexedAt,omitempty"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	UpdatedAt       time.Time  `json:"updatedAt"`
+	File             *File                `json:"file"`
+	ExtractedText    *string              `json:"extractedText,omitempty"`
+	EmbeddingModel   *string              `json:"embeddingModel,omitempty"`
+	EmbeddingSynced  bool                 `json:"embeddingSynced"`
+	IndexedAt        *time.Time           `json:"indexedAt,omitempty"`
+	ProcessingStatus FileProcessingStatus `json:"processingStatus"`
+	Summary          *string              `json:"summary,omitempty"`
+	ErrorMessage     *string              `json:"errorMessage,omitempty"`
+	CreatedAt        time.Time            `json:"createdAt"`
+	UpdatedAt        time.Time            `json:"updatedAt"`
 }
 
 type FilePreference struct {
@@ -554,6 +557,65 @@ func (e *FilePermission) UnmarshalJSON(b []byte) error {
 }
 
 func (e FilePermission) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type FileProcessingStatus string
+
+const (
+	FileProcessingStatusPending    FileProcessingStatus = "PENDING"
+	FileProcessingStatusProcessing FileProcessingStatus = "PROCESSING"
+	FileProcessingStatusCompleted  FileProcessingStatus = "COMPLETED"
+	FileProcessingStatusFailed     FileProcessingStatus = "FAILED"
+)
+
+var AllFileProcessingStatus = []FileProcessingStatus{
+	FileProcessingStatusPending,
+	FileProcessingStatusProcessing,
+	FileProcessingStatusCompleted,
+	FileProcessingStatusFailed,
+}
+
+func (e FileProcessingStatus) IsValid() bool {
+	switch e {
+	case FileProcessingStatusPending, FileProcessingStatusProcessing, FileProcessingStatusCompleted, FileProcessingStatusFailed:
+		return true
+	}
+	return false
+}
+
+func (e FileProcessingStatus) String() string {
+	return string(e)
+}
+
+func (e *FileProcessingStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FileProcessingStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FileProcessingStatus", str)
+	}
+	return nil
+}
+
+func (e FileProcessingStatus) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *FileProcessingStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e FileProcessingStatus) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

@@ -20,12 +20,15 @@ func NewSQSService(client *sqs.Client, queueURL string) *SQSService {
 	}
 }
 
+// FileProcessingJob is the message contract with the Python AI worker
+// (ai/worker/main.py's ProcessingJob model) — field names must match
+// exactly, since the worker parses this JSON with a strict pydantic model.
 type FileProcessingJob struct {
-	JobType   string `json:"job_type"`
-	FileID    string `json:"file_id"`
-	ProjectID string `json:"project_id"`
-	Bucket    string `json:"s3_bucket"`
-	Key       string `json:"s3_key"`
+	JobID       string `json:"job_id"`
+	FileID      string `json:"file_id"`
+	ProjectID   string `json:"project_id"`
+	StorageKey  string `json:"storage_key"`
+	ContentType string `json:"content_type"`
 }
 
 func (s *SQSService) SendFileProcessingJob(

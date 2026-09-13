@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -10,7 +9,13 @@ logger = logging.getLogger(__name__)
 
 
 class PostgresClient:
-    """Client for updating file processing status in PostgreSQL."""
+    """Client for updating file processing status in PostgreSQL.
+
+    Status lives on file_ai_metadata (one row per file, keyed by file_id) -
+    not on files itself. The Go backend creates that row (status PENDING)
+    when the file is created, so every call here is an UPDATE against an
+    already-existing row, never an INSERT.
+    """
 
     def __init__(self):
         self.conn_string = (
@@ -29,48 +34,50 @@ class PostgresClient:
         status: str,
         summary: str = None,
         error_message: str = None,
-        processed_at: bool = False,
     ) -> None:
         """
         Update file processing status.
 
         Args:
             file_id: File ID
-            project_id: Project ID
-            status: PROCESSING, COMPLETED, or FAILED
-            summary: Document summary (optional)
-            error_message: Error message if failed (optional)
-            processed_at: Set current timestamp if True
+            project_id: Project ID (logging only - not a file_ai_metadata column)
+            status: PENDING, PROCESSING, COMPLETED, or FAILED
+            summary: Document summary (optional, set on COMPLETED)
+            error_message: Error message (optional, set on FAILED)
         """
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
 
-            # Build update query
-            updates = ["processing_status = %s"]
+            updates = ["processing_status = %s", "updated_at = NOW()"]
             params = [status]
 
-            if summary:
+            if summary is not None:
                 updates.append("summary = %s")
                 params.append(summary)
 
-            if error_message:
+            if error_message is not None:
                 updates.append("error_message = %s")
                 params.append(error_message)
 
-            if processed_at:
-                updates.append("processed_at = %s")
-                params.append(datetime.utcnow())
+            if status == "COMPLETED":
+                updates.append("indexed_at = NOW()")
+                updates.append("embedding_synced = TRUE")
 
-            params.extend([file_id, project_id])
+            params.append(file_id)
 
             query = f"""
-                UPDATE files
+                UPDATE file_ai_metadata
                 SET {", ".join(updates)}
-                WHERE id = %s AND project_id = %s
+                WHERE file_id = %s
             """
 
             cursor.execute(query, params)
+            if cursor.rowcount == 0:
+                logger.warning(
+                    f"No file_ai_metadata row for file {file_id} "
+                    f"(project {project_id}); status update had no effect"
+                )
             conn.commit()
 
             logger.info(f"Updated file {file_id} status to {status}")
@@ -88,20 +95,28 @@ class PostgresClient:
 
         Args:
             file_id: File ID
-            project_id: Project ID
+            project_id: Project ID (used only to confirm the file belongs
+                to the caller's project; not a file_ai_metadata column)
 
         Returns:
-            Dictionary with file status and metadata
+            Dictionary with file status and metadata, or None if not found
         """
         try:
             conn = self._get_connection()
             cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             query = """
-                SELECT id, file_id, project_id, processing_status, 
-                       summary, error_message, processed_at
-                FROM files
-                WHERE id = %s AND project_id = %s
+                SELECT
+                    fam.file_id,
+                    f.project_id,
+                    fam.processing_status,
+                    fam.summary,
+                    fam.error_message,
+                    fam.indexed_at
+                FROM file_ai_metadata fam
+                JOIN files f ON f.id = fam.file_id
+                WHERE fam.file_id = %s
+                  AND f.project_id = %s
             """
 
             cursor.execute(query, (file_id, project_id))

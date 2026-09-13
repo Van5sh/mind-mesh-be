@@ -63,13 +63,16 @@ func (r *fileResolver) AiMetadata(ctx context.Context, obj *model.File) (*model.
 	}
 
 	return &model.FileAIMetadata{
-		File:            &model.File{ID: obj.ID, Properties: obj.Properties},
-		ExtractedText:   helpers.NullableString(metadata.ExtractedText),
-		EmbeddingModel:  helpers.NullableString(metadata.EmbeddingModel),
-		EmbeddingSynced: metadata.EmbeddingSynced.Bool,
-		IndexedAt:       helpers.NullableTime(metadata.IndexedAt),
-		CreatedAt:       metadata.CreatedAt.Time,
-		UpdatedAt:       metadata.UpdatedAt.Time,
+		File:             &model.File{ID: obj.ID, Properties: obj.Properties},
+		ExtractedText:    helpers.NullableString(metadata.ExtractedText),
+		EmbeddingModel:   helpers.NullableString(metadata.EmbeddingModel),
+		EmbeddingSynced:  metadata.EmbeddingSynced.Bool,
+		IndexedAt:        helpers.NullableTime(metadata.IndexedAt),
+		ProcessingStatus: model.FileProcessingStatus(metadata.ProcessingStatus),
+		Summary:          helpers.NullableString(metadata.Summary),
+		ErrorMessage:     helpers.NullableString(metadata.ErrorMessage),
+		CreatedAt:        metadata.CreatedAt.Time,
+		UpdatedAt:        metadata.UpdatedAt.Time,
 	}, nil
 }
 

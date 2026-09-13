@@ -241,6 +241,22 @@ func (r *FileRepository) MarkFileEmbeddingSynced(ctx context.Context, params dat
 	return r.q.MarkFileEmbeddingSynced(ctx, params)
 }
 
+func (r *FileRepository) MarkFileProcessingStarted(ctx context.Context, fileID pgtype.UUID) (database.FileAiMetadatum, error) {
+	return r.q.MarkFileProcessingStarted(ctx, fileID)
+}
+
+func (r *FileRepository) CompleteFileProcessing(ctx context.Context, params database.CompleteFileProcessingParams) (database.FileAiMetadatum, error) {
+	return r.q.CompleteFileProcessing(ctx, params)
+}
+
+func (r *FileRepository) FailFileProcessing(ctx context.Context, params database.FailFileProcessingParams) (database.FileAiMetadatum, error) {
+	return r.q.FailFileProcessing(ctx, params)
+}
+
+func (r *FileRepository) GetFilesByProcessingStatus(ctx context.Context, params database.GetFilesByProcessingStatusParams) ([]database.File, error) {
+	return r.q.GetFilesByProcessingStatus(ctx, params)
+}
+
 func (r *FileRepository) MarkFileIndexed(ctx context.Context, params database.MarkFileIndexedParams) error {
 	return r.q.MarkFileIndexed(ctx, params)
 }

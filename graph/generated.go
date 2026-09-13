@@ -107,13 +107,16 @@ type ComplexityRoot struct {
 	}
 
 	FileAIMetadata struct {
-		CreatedAt       func(childComplexity int) int
-		EmbeddingModel  func(childComplexity int) int
-		EmbeddingSynced func(childComplexity int) int
-		ExtractedText   func(childComplexity int) int
-		File            func(childComplexity int) int
-		IndexedAt       func(childComplexity int) int
-		UpdatedAt       func(childComplexity int) int
+		CreatedAt        func(childComplexity int) int
+		EmbeddingModel   func(childComplexity int) int
+		EmbeddingSynced  func(childComplexity int) int
+		ErrorMessage     func(childComplexity int) int
+		ExtractedText    func(childComplexity int) int
+		File             func(childComplexity int) int
+		IndexedAt        func(childComplexity int) int
+		ProcessingStatus func(childComplexity int) int
+		Summary          func(childComplexity int) int
+		UpdatedAt        func(childComplexity int) int
 	}
 
 	FilePreference struct {
@@ -788,6 +791,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.FileAIMetadata.EmbeddingSynced(childComplexity), true
+	case "FileAIMetadata.errorMessage":
+		if e.ComplexityRoot.FileAIMetadata.ErrorMessage == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FileAIMetadata.ErrorMessage(childComplexity), true
 	case "FileAIMetadata.extractedText":
 		if e.ComplexityRoot.FileAIMetadata.ExtractedText == nil {
 			break
@@ -806,6 +815,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.FileAIMetadata.IndexedAt(childComplexity), true
+	case "FileAIMetadata.processingStatus":
+		if e.ComplexityRoot.FileAIMetadata.ProcessingStatus == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FileAIMetadata.ProcessingStatus(childComplexity), true
+	case "FileAIMetadata.summary":
+		if e.ComplexityRoot.FileAIMetadata.Summary == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FileAIMetadata.Summary(childComplexity), true
 	case "FileAIMetadata.updatedAt":
 		if e.ComplexityRoot.FileAIMetadata.UpdatedAt == nil {
 			break
@@ -2623,6 +2644,12 @@ func (ec *executionContext) childFields_FileAIMetadata(ctx context.Context, fiel
 		return ec.fieldContext_FileAIMetadata_embeddingSynced(ctx, field)
 	case "indexedAt":
 		return ec.fieldContext_FileAIMetadata_indexedAt(ctx, field)
+	case "processingStatus":
+		return ec.fieldContext_FileAIMetadata_processingStatus(ctx, field)
+	case "summary":
+		return ec.fieldContext_FileAIMetadata_summary(ctx, field)
+	case "errorMessage":
+		return ec.fieldContext_FileAIMetadata_errorMessage(ctx, field)
 	case "createdAt":
 		return ec.fieldContext_FileAIMetadata_createdAt(ctx, field)
 	case "updatedAt":
@@ -5697,6 +5724,75 @@ func (ec *executionContext) _FileAIMetadata_indexedAt(ctx context.Context, field
 }
 func (ec *executionContext) fieldContext_FileAIMetadata_indexedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("FileAIMetadata", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _FileAIMetadata_processingStatus(ctx context.Context, field graphql.CollectedField, obj *model.FileAIMetadata) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FileAIMetadata_processingStatus(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ProcessingStatus, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model.FileProcessingStatus) graphql.Marshaler {
+			return ec.marshalNFileProcessingStatus2exampleᚋhelloᚋgraphᚋmodelᚐFileProcessingStatus(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FileAIMetadata_processingStatus(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FileAIMetadata", field, false, false, errors.New("field of type FileProcessingStatus does not have child fields"))
+}
+
+func (ec *executionContext) _FileAIMetadata_summary(ctx context.Context, field graphql.CollectedField, obj *model.FileAIMetadata) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FileAIMetadata_summary(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Summary, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FileAIMetadata_summary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FileAIMetadata", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _FileAIMetadata_errorMessage(ctx context.Context, field graphql.CollectedField, obj *model.FileAIMetadata) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FileAIMetadata_errorMessage(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ErrorMessage, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FileAIMetadata_errorMessage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FileAIMetadata", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _FileAIMetadata_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.FileAIMetadata) (ret graphql.Marshaler) {
@@ -15089,6 +15185,21 @@ func (ec *executionContext) _FileAIMetadata(ctx context.Context, sel ast.Selecti
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
+		case "processingStatus":
+			out.Values[i] = ec._FileAIMetadata_processingStatus(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "summary":
+			out.Values[i] = ec._FileAIMetadata_summary(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "errorMessage":
+			out.Values[i] = ec._FileAIMetadata_errorMessage(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		case "createdAt":
 			out.Values[i] = ec._FileAIMetadata_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -18534,6 +18645,16 @@ func (ec *executionContext) marshalNFilePreference2ᚖexampleᚋhelloᚋgraphᚋ
 		return graphql.Null
 	}
 	return ec._FilePreference(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNFileProcessingStatus2exampleᚋhelloᚋgraphᚋmodelᚐFileProcessingStatus(ctx context.Context, v any) (model.FileProcessingStatus, error) {
+	var res model.FileProcessingStatus
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFileProcessingStatus2exampleᚋhelloᚋgraphᚋmodelᚐFileProcessingStatus(ctx context.Context, sel ast.SelectionSet, v model.FileProcessingStatus) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) marshalNFileProperties2ᚖexampleᚋhelloᚋgraphᚋmodelᚐFileProperties(ctx context.Context, sel ast.SelectionSet, v *model.FileProperties) graphql.Marshaler {

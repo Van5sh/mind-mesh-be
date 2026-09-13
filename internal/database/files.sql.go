@@ -99,6 +99,42 @@ func (q *Queries) CheckProjectFileNameExists(ctx context.Context, arg CheckProje
 	return exists, err
 }
 
+const completeFileProcessing = `-- name: CompleteFileProcessing :one
+UPDATE file_ai_metadata
+SET
+    processing_status = 'COMPLETED',
+    summary = $2,
+    error_message = NULL,
+    embedding_synced = TRUE,
+    indexed_at = NOW(),
+    updated_at = NOW()
+WHERE file_id = $1
+RETURNING file_id, extracted_text, embedding_model, embedding_synced, indexed_at, processing_status, summary, error_message, created_at, updated_at
+`
+
+type CompleteFileProcessingParams struct {
+	FileID  pgtype.UUID
+	Summary pgtype.Text
+}
+
+func (q *Queries) CompleteFileProcessing(ctx context.Context, arg CompleteFileProcessingParams) (FileAiMetadatum, error) {
+	row := q.db.QueryRow(ctx, completeFileProcessing, arg.FileID, arg.Summary)
+	var i FileAiMetadatum
+	err := row.Scan(
+		&i.FileID,
+		&i.ExtractedText,
+		&i.EmbeddingModel,
+		&i.EmbeddingSynced,
+		&i.IndexedAt,
+		&i.ProcessingStatus,
+		&i.Summary,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const countProjectFiles = `-- name: CountProjectFiles :one
 SELECT COUNT(*) AS count
 FROM files
@@ -159,7 +195,7 @@ INSERT INTO file_ai_metadata (
     indexed_at
 )
 VALUES ($1, $2, $3, $4, $5)
-RETURNING file_id, extracted_text, embedding_model, embedding_synced, indexed_at, created_at, updated_at
+RETURNING file_id, extracted_text, embedding_model, embedding_synced, indexed_at, processing_status, summary, error_message, created_at, updated_at
 `
 
 type CreateFileAIMetadataParams struct {
@@ -185,6 +221,9 @@ func (q *Queries) CreateFileAIMetadata(ctx context.Context, arg CreateFileAIMeta
 		&i.EmbeddingModel,
 		&i.EmbeddingSynced,
 		&i.IndexedAt,
+		&i.ProcessingStatus,
+		&i.Summary,
+		&i.ErrorMessage,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -483,6 +522,39 @@ func (q *Queries) DeleteUserFilePreference(ctx context.Context, arg DeleteUserFi
 	return err
 }
 
+const failFileProcessing = `-- name: FailFileProcessing :one
+UPDATE file_ai_metadata
+SET
+    processing_status = 'FAILED',
+    error_message = $2,
+    updated_at = NOW()
+WHERE file_id = $1
+RETURNING file_id, extracted_text, embedding_model, embedding_synced, indexed_at, processing_status, summary, error_message, created_at, updated_at
+`
+
+type FailFileProcessingParams struct {
+	FileID       pgtype.UUID
+	ErrorMessage pgtype.Text
+}
+
+func (q *Queries) FailFileProcessing(ctx context.Context, arg FailFileProcessingParams) (FileAiMetadatum, error) {
+	row := q.db.QueryRow(ctx, failFileProcessing, arg.FileID, arg.ErrorMessage)
+	var i FileAiMetadatum
+	err := row.Scan(
+		&i.FileID,
+		&i.ExtractedText,
+		&i.EmbeddingModel,
+		&i.EmbeddingSynced,
+		&i.IndexedAt,
+		&i.ProcessingStatus,
+		&i.Summary,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const fileNameExistsInFolder = `-- name: FileNameExistsInFolder :one
 SELECT EXISTS (
     SELECT 1
@@ -682,7 +754,7 @@ func (q *Queries) GetFavoritesFiles(ctx context.Context, arg GetFavoritesFilesPa
 }
 
 const getFileAIMetadata = `-- name: GetFileAIMetadata :one
-SELECT file_id, extracted_text, embedding_model, embedding_synced, indexed_at, created_at, updated_at
+SELECT file_id, extracted_text, embedding_model, embedding_synced, indexed_at, processing_status, summary, error_message, created_at, updated_at
 FROM file_ai_metadata
 WHERE file_id = $1
 `
@@ -696,6 +768,9 @@ func (q *Queries) GetFileAIMetadata(ctx context.Context, fileID pgtype.UUID) (Fi
 		&i.EmbeddingModel,
 		&i.EmbeddingSynced,
 		&i.IndexedAt,
+		&i.ProcessingStatus,
+		&i.Summary,
+		&i.ErrorMessage,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -952,6 +1027,49 @@ ORDER BY name
 
 func (q *Queries) GetFilesByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]File, error) {
 	rows, err := q.db.Query(ctx, getFilesByIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []File
+	for rows.Next() {
+		var i File
+		if err := rows.Scan(
+			&i.ID,
+			&i.FolderID,
+			&i.ProjectID,
+			&i.Name,
+			&i.Size,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFilesByProcessingStatus = `-- name: GetFilesByProcessingStatus :many
+SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
+FROM files f
+JOIN file_ai_metadata fam
+ON f.id = fam.file_id
+WHERE f.project_id = $1
+  AND fam.processing_status = $2
+ORDER BY f.created_at ASC
+`
+
+type GetFilesByProcessingStatusParams struct {
+	ProjectID        pgtype.UUID
+	ProcessingStatus FileProcessingStatus
+}
+
+func (q *Queries) GetFilesByProcessingStatus(ctx context.Context, arg GetFilesByProcessingStatusParams) ([]File, error) {
+	rows, err := q.db.Query(ctx, getFilesByProcessingStatus, arg.ProjectID, arg.ProcessingStatus)
 	if err != nil {
 		return nil, err
 	}
@@ -1643,7 +1761,7 @@ SET
     indexed_at = $3,
     updated_at = NOW()
 WHERE file_id = $1
-RETURNING file_id, extracted_text, embedding_model, embedding_synced, indexed_at, created_at, updated_at
+RETURNING file_id, extracted_text, embedding_model, embedding_synced, indexed_at, processing_status, summary, error_message, created_at, updated_at
 `
 
 type MarkFileEmbeddingSyncedParams struct {
@@ -1661,6 +1779,9 @@ func (q *Queries) MarkFileEmbeddingSynced(ctx context.Context, arg MarkFileEmbed
 		&i.EmbeddingModel,
 		&i.EmbeddingSynced,
 		&i.IndexedAt,
+		&i.ProcessingStatus,
+		&i.Summary,
+		&i.ErrorMessage,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -1683,6 +1804,34 @@ type MarkFileIndexedParams struct {
 func (q *Queries) MarkFileIndexed(ctx context.Context, arg MarkFileIndexedParams) error {
 	_, err := q.db.Exec(ctx, markFileIndexed, arg.FileID, arg.IsIndexed)
 	return err
+}
+
+const markFileProcessingStarted = `-- name: MarkFileProcessingStarted :one
+UPDATE file_ai_metadata
+SET
+    processing_status = 'PROCESSING',
+    error_message = NULL,
+    updated_at = NOW()
+WHERE file_id = $1
+RETURNING file_id, extracted_text, embedding_model, embedding_synced, indexed_at, processing_status, summary, error_message, created_at, updated_at
+`
+
+func (q *Queries) MarkFileProcessingStarted(ctx context.Context, fileID pgtype.UUID) (FileAiMetadatum, error) {
+	row := q.db.QueryRow(ctx, markFileProcessingStarted, fileID)
+	var i FileAiMetadatum
+	err := row.Scan(
+		&i.FileID,
+		&i.ExtractedText,
+		&i.EmbeddingModel,
+		&i.EmbeddingSynced,
+		&i.IndexedAt,
+		&i.ProcessingStatus,
+		&i.Summary,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const moveFile = `-- name: MoveFile :one
@@ -2027,7 +2176,7 @@ SET
     indexed_at = $5,
     updated_at = NOW()
 WHERE file_id = $1
-RETURNING file_id, extracted_text, embedding_model, embedding_synced, indexed_at, created_at, updated_at
+RETURNING file_id, extracted_text, embedding_model, embedding_synced, indexed_at, processing_status, summary, error_message, created_at, updated_at
 `
 
 type UpdateFileAIMetadataParams struct {
@@ -2053,6 +2202,9 @@ func (q *Queries) UpdateFileAIMetadata(ctx context.Context, arg UpdateFileAIMeta
 		&i.EmbeddingModel,
 		&i.EmbeddingSynced,
 		&i.IndexedAt,
+		&i.ProcessingStatus,
+		&i.Summary,
+		&i.ErrorMessage,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

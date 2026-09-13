@@ -44,6 +44,12 @@ CREATE TYPE flowchart_status AS ENUM (
     'READY',
     'FAILED'
 );
+CREATE TYPE file_processing_status AS ENUM (
+    'PENDING',
+    'PROCESSING',
+    'COMPLETED',
+    'FAILED'
+);
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
@@ -142,6 +148,9 @@ CREATE TABLE file_ai_metadata (
     embedding_model VARCHAR(100),
     embedding_synced BOOLEAN DEFAULT FALSE,
     indexed_at TIMESTAMPTZ,
+    processing_status file_processing_status NOT NULL DEFAULT 'PENDING',
+    summary TEXT,
+    error_message TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -300,6 +309,9 @@ ON folders(parent_folder_id);
 
 CREATE INDEX idx_file_ai_metadata_synced
 ON file_ai_metadata(embedding_synced);
+
+CREATE INDEX idx_file_ai_metadata_status
+ON file_ai_metadata(processing_status);
 
 CREATE INDEX idx_chat_ai_metadata_synced
 ON chat_ai_metadata(embedding_synced);

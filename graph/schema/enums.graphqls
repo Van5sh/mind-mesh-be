@@ -51,3 +51,10 @@ enum ReportFormat {
   PDF
   DOCX
 }
+
+enum FileProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
