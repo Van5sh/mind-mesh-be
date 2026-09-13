@@ -1,8 +1,27 @@
 *.env
 api.db
 
-
 *.venv
 
 */__pycache__/
 __pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Docker-mounted data directories (Qdrant vector storage, Ollama model
+# weights) - runtime state, not source, and easily multiple GB.
+qdrant_storage/
+ollama_data/
+
+# Go build output
+/server
+/cmd/server/server
+*.exe
+*.test
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
