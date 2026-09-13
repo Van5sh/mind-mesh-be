@@ -45,22 +45,34 @@ CREATE TYPE flowchart_status AS ENUM (
     'READY',
     'FAILED'
 );
+CREATE TYPE file_processing_status AS ENUM (
+    'PENDING',
+    'PROCESSING',
+    'COMPLETED',
+    'FAILED'
+);
+CREATE TYPE oauth_provider AS ENUM (
+    'GOOGLE',
+    'GITHUB'
+);
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username VARCHAR(50) NOT NULL UNIQUE,
-    email VARCHAR(100) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    email VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE TABLE user_profiles (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    first_name VARCHAR(50) NOT NULL,
-    last_name VARCHAR(50) NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL UNIQUE
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+    first_name VARCHAR(100) NOT NULL DEFAULT '',
+    last_name VARCHAR(100) NOT NULL DEFAULT '',
     bio TEXT,
     avatar_url TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE TABLE projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -95,6 +107,7 @@ CREATE TABLE folders (
 CREATE TABLE files (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     folder_id UUID REFERENCES folders(id) ON DELETE SET NULL,
+    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     size BIGINT NOT NULL CHECK(size >= 0),
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -127,6 +140,9 @@ CREATE TABLE file_ai_metadata (
     embedding_model VARCHAR(100),
     embedding_synced BOOLEAN DEFAULT FALSE,
     indexed_at TIMESTAMPTZ,
+    processing_status file_processing_status NOT NULL DEFAULT 'PENDING',
+    summary TEXT,
+    error_message TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -188,6 +204,22 @@ CREATE TABLE chat_ai_metadata (
     embedding_model VARCHAR(100),
     embedding_synced BOOLEAN DEFAULT FALSE,
     indexed_at TIMESTAMPTZ
+);
+CREATE TABLE oauth_accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL,
+    provider_user_id TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(provider, provider_user_id)
+);
+CREATE TABLE sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(id)
 );
 CREATE TABLE message_mentions (
     message_id UUID NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
@@ -257,6 +289,9 @@ ON folders(parent_folder_id);
 CREATE INDEX idx_file_ai_metadata_synced
 ON file_ai_metadata(embedding_synced);
 
+CREATE INDEX idx_file_ai_metadata_status
+ON file_ai_metadata(processing_status);
+
 CREATE INDEX idx_chat_ai_metadata_synced
 ON chat_ai_metadata(embedding_synced);
 
@@ -280,6 +315,9 @@ ON files(name);
 
 CREATE INDEX idx_files_folder
 ON files(folder_id);
+
+CREATE INDEX idx_files_project
+ON files(project_id);
 
 CREATE INDEX idx_flowcharts_generated_by
 ON flowcharts(generated_by);
@@ -361,6 +399,12 @@ ON message_file_references(file_id);
 
 CREATE INDEX idx_projects_archived
 ON projects(archived_at);
+
+CREATE INDEX sessions_user_id_idx
+ON sessions(user_id);
+
+CREATE INDEX sessions_expires_at_idx
+ON sessions(expires_at);
 -- +goose down
 
 DROP TABLE IF EXISTS activity_logs CASCADE;
@@ -369,6 +413,8 @@ DROP TABLE IF EXISTS reports CASCADE;
 DROP TABLE IF EXISTS flowcharts CASCADE;
 DROP TABLE IF EXISTS message_file_references CASCADE;
 DROP TABLE IF EXISTS message_mentions CASCADE;
+DROP TABLE IF EXISTS sessions CASCADE;
+DROP TABLE IF EXISTS oauth_accounts CASCADE;
 DROP TABLE IF EXISTS chat_ai_metadata CASCADE;
 DROP TABLE IF EXISTS chat_messages CASCADE;
 DROP TABLE IF EXISTS chat_participants CASCADE;
@@ -385,6 +431,8 @@ DROP TABLE IF EXISTS project_members CASCADE;
 DROP TABLE IF EXISTS projects CASCADE;
 DROP TABLE IF EXISTS user_profiles CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
+DROP TYPE IF EXISTS oauth_provider;
+DROP TYPE IF EXISTS file_processing_status;
 DROP TYPE IF EXISTS flowchart_status;
 DROP TYPE IF EXISTS report_status;
 DROP TYPE IF EXISTS report_format;
