@@ -9,8 +9,6 @@ import (
 	"context"
 	"example/hello/graph/helpers"
 	"example/hello/graph/model"
-	"example/hello/internal/apperrors"
-	"example/hello/internal/auth"
 	"example/hello/internal/database"
 	"fmt"
 
@@ -19,14 +17,18 @@ import (
 
 // CreateReport is the resolver for the createReport field.
 func (r *mutationResolver) CreateReport(ctx context.Context, input model.CreateReportInput) (*model.Report, error) {
-	userID, ok := auth.UserIDFromContext(ctx)
-	if !ok {
-		return nil, apperrors.UnauthorizedError("authentication required")
+	userID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	projectID, err := parseUUID(input.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid project ID: %w", err)
+	}
+
+	if err := r.requireProjectMember(ctx, projectID); err != nil {
+		return nil, err
 	}
 
 	generatedBy := pgtype.UUID{Bytes: userID.Bytes, Valid: true}
@@ -81,8 +83,8 @@ func (r *mutationResolver) CreateReport(ctx context.Context, input model.CreateR
 
 // UpdateReport is the resolver for the updateReport field.
 func (r *mutationResolver) UpdateReport(ctx context.Context, id string, input model.UpdateReportInput) (*model.Report, error) {
-	if _, ok := auth.UserIDFromContext(ctx); !ok {
-		return nil, apperrors.UnauthorizedError("authentication required")
+	if _, err := currentUserID(ctx); err != nil {
+		return nil, err
 	}
 
 	reportID, err := parseUUID(id)
@@ -99,6 +101,9 @@ func (r *mutationResolver) UpdateReport(ctx context.Context, id string, input mo
 			"failed to fetch report: %w",
 			err,
 		)
+	}
+	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
+		return nil, err
 	}
 
 	title := existing.Title
@@ -138,8 +143,8 @@ func (r *mutationResolver) UpdateReport(ctx context.Context, id string, input mo
 
 // DeleteReport is the resolver for the deleteReport field.
 func (r *mutationResolver) DeleteReport(ctx context.Context, id string) (bool, error) {
-	if _, ok := auth.UserIDFromContext(ctx); !ok {
-		return false, apperrors.UnauthorizedError("authentication required")
+	if _, err := currentUserID(ctx); err != nil {
+		return false, err
 	}
 
 	reportID, err := parseUUID(id)
@@ -148,6 +153,17 @@ func (r *mutationResolver) DeleteReport(ctx context.Context, id string) (bool, e
 			"invalid report ID: %w",
 			err,
 		)
+	}
+
+	existing, err := r.App.Services.Report.GetReportByID(ctx, reportID)
+	if err != nil {
+		return false, fmt.Errorf(
+			"failed to fetch report: %w",
+			err,
+		)
+	}
+	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
+		return false, err
 	}
 
 	if err := r.App.Services.Report.DeleteReport(
@@ -183,6 +199,9 @@ func (r *queryResolver) Report(ctx context.Context, id string) (*model.Report, e
 			err,
 		)
 	}
+	if err := r.requireProjectMember(ctx, report.ProjectID); err != nil {
+		return nil, err
+	}
 
 	return helpers.ReportToModel(helpers.ReportRow(report)), nil
 }
@@ -195,6 +214,9 @@ func (r *queryResolver) Reports(ctx context.Context, projectID string) ([]*model
 			"invalid project ID: %w",
 			err,
 		)
+	}
+	if err := r.requireProjectMember(ctx, id); err != nil {
+		return nil, err
 	}
 
 	reports, err := r.App.Services.Report.GetReportsByProjectID(
@@ -227,6 +249,17 @@ func (r *queryResolver) ReportsByChat(ctx context.Context, sourceChatID string) 
 		)
 	}
 
+	chat, err := r.App.Services.Chat.GetChatByID(ctx, chatID)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to fetch chat: %w",
+			err,
+		)
+	}
+	if err := r.requireProjectMember(ctx, chat.ProjectID); err != nil {
+		return nil, err
+	}
+
 	reports, err := r.App.Services.Report.GetReportsByChatID(
 		ctx,
 		chatID,
@@ -248,7 +281,17 @@ func (r *queryResolver) ReportsByChat(ctx context.Context, sourceChatID string) 
 }
 
 // ReportsByGenerator is the resolver for the reportsByGenerator field.
+//
+// NOTE: this endpoint has no project scope in the schema (generatedById
+// alone), so it cannot be authorized per-project here - it currently
+// returns that user's generated reports across every project. Treat
+// this as a known gap: fixing it properly means adding a projectId
+// argument to the schema.
 func (r *queryResolver) ReportsByGenerator(ctx context.Context, generatedByID string) ([]*model.Report, error) {
+	if _, err := currentUserID(ctx); err != nil {
+		return nil, err
+	}
+
 	generatorID, err := parseUUID(generatedByID)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -278,7 +321,14 @@ func (r *queryResolver) ReportsByGenerator(ctx context.Context, generatedByID st
 }
 
 // ReportsByFormat is the resolver for the reportsByFormat field.
+//
+// NOTE: same schema gap as ReportsByGenerator - no projectId argument,
+// so this returns matching reports across every project.
 func (r *queryResolver) ReportsByFormat(ctx context.Context, format model.ReportFormat) ([]*model.Report, error) {
+	if _, err := currentUserID(ctx); err != nil {
+		return nil, err
+	}
+
 	reports, err := r.App.Services.Report.GetReportsByFormat(
 		ctx,
 		database.GetReportsByFormatParams{
@@ -302,7 +352,14 @@ func (r *queryResolver) ReportsByFormat(ctx context.Context, format model.Report
 }
 
 // ReportsByStatus is the resolver for the reportsByStatus field.
+//
+// NOTE: same schema gap as ReportsByGenerator - no projectId argument,
+// so this returns matching reports across every project.
 func (r *queryResolver) ReportsByStatus(ctx context.Context, status model.ReportStatus) ([]*model.Report, error) {
+	if _, err := currentUserID(ctx); err != nil {
+		return nil, err
+	}
+
 	reports, err := r.App.Services.Report.GetReportsByStatus(
 		ctx,
 		database.GetReportsByStatusParams{
@@ -333,6 +390,9 @@ func (r *queryResolver) AiReports(ctx context.Context, projectID string) ([]*mod
 			"invalid project ID: %w",
 			err,
 		)
+	}
+	if err := r.requireProjectMember(ctx, id); err != nil {
+		return nil, err
 	}
 
 	reports, err := r.App.Services.Report.GetAIReports(

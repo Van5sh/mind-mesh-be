@@ -146,16 +146,17 @@ type ComplexityRoot struct {
 	}
 
 	FileStorage struct {
-		BucketName func(childComplexity int) int
-		Checksum   func(childComplexity int) int
-		CreatedAt  func(childComplexity int) int
-		Etag       func(childComplexity int) int
-		File       func(childComplexity int) int
-		MimeType   func(childComplexity int) int
-		ObjectKey  func(childComplexity int) int
-		UpdatedAt  func(childComplexity int) int
-		UploadedBy func(childComplexity int) int
-		VersionID  func(childComplexity int) int
+		BucketName  func(childComplexity int) int
+		Checksum    func(childComplexity int) int
+		CreatedAt   func(childComplexity int) int
+		DownloadURL func(childComplexity int) int
+		Etag        func(childComplexity int) int
+		File        func(childComplexity int) int
+		MimeType    func(childComplexity int) int
+		ObjectKey   func(childComplexity int) int
+		UpdatedAt   func(childComplexity int) int
+		UploadedBy  func(childComplexity int) int
+		VersionID   func(childComplexity int) int
 	}
 
 	Flowchart struct {
@@ -957,6 +958,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.FileStorage.CreatedAt(childComplexity), true
+	case "FileStorage.downloadUrl":
+		if e.ComplexityRoot.FileStorage.DownloadURL == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FileStorage.DownloadURL(childComplexity), true
 	case "FileStorage.etag":
 		if e.ComplexityRoot.FileStorage.Etag == nil {
 			break
@@ -2728,6 +2735,8 @@ func (ec *executionContext) childFields_FileStorage(ctx context.Context, field g
 		return ec.fieldContext_FileStorage_mimeType(ctx, field)
 	case "uploadedBy":
 		return ec.fieldContext_FileStorage_uploadedBy(ctx, field)
+	case "downloadUrl":
+		return ec.fieldContext_FileStorage_downloadUrl(ctx, field)
 	case "createdAt":
 		return ec.fieldContext_FileStorage_createdAt(ctx, field)
 	case "updatedAt":
@@ -6486,6 +6495,29 @@ func (ec *executionContext) fieldContext_FileStorage_uploadedBy(_ context.Contex
 		},
 	}
 	return fc, nil
+}
+
+func (ec *executionContext) _FileStorage_downloadUrl(ctx context.Context, field graphql.CollectedField, obj *model.FileStorage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FileStorage_downloadUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DownloadURL, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FileStorage_downloadUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FileStorage", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _FileStorage_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.FileStorage) (ret graphql.Marshaler) {
@@ -15464,6 +15496,11 @@ func (ec *executionContext) _FileStorage(ctx context.Context, sel ast.SelectionS
 			}
 		case "uploadedBy":
 			out.Values[i] = ec._FileStorage_uploadedBy(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "downloadUrl":
+			out.Values[i] = ec._FileStorage_downloadUrl(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

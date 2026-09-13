@@ -11,7 +11,6 @@ import (
 	"example/hello/graph/helpers"
 	"example/hello/graph/model"
 	"example/hello/internal/apperrors"
-	"example/hello/internal/auth"
 	"example/hello/internal/database"
 	"fmt"
 
@@ -33,17 +32,23 @@ func (r *fileResolver) Storage(ctx context.Context, obj *model.File) (*model.Fil
 		return nil, err
 	}
 
+	downloadURL, err := r.App.Services.File.GetFileDownloadURL(ctx, storage.ObjectKey)
+	if err != nil {
+		return nil, err
+	}
+
 	return &model.FileStorage{
-		File:       &model.File{ID: obj.ID, Properties: obj.Properties},
-		BucketName: storage.BucketName,
-		ObjectKey:  storage.ObjectKey,
-		Etag:       helpers.NullableString(storage.Etag),
-		VersionID:  helpers.NullableString(storage.VersionID),
-		Checksum:   helpers.NullableString(storage.Checksum),
-		MimeType:   storage.MimeType,
-		UploadedBy: &model.User{ID: storage.UploadedBy.String()},
-		CreatedAt:  storage.CreatedAt.Time,
-		UpdatedAt:  storage.UpdatedAt.Time,
+		File:        &model.File{ID: obj.ID, Properties: obj.Properties},
+		BucketName:  storage.BucketName,
+		ObjectKey:   storage.ObjectKey,
+		Etag:        helpers.NullableString(storage.Etag),
+		VersionID:   helpers.NullableString(storage.VersionID),
+		Checksum:    helpers.NullableString(storage.Checksum),
+		MimeType:    storage.MimeType,
+		UploadedBy:  &model.User{ID: storage.UploadedBy.String()},
+		DownloadURL: downloadURL,
+		CreatedAt:   storage.CreatedAt.Time,
+		UpdatedAt:   storage.UpdatedAt.Time,
 	}, nil
 }
 
@@ -175,6 +180,10 @@ func (r *mutationResolver) CreateFolder(ctx context.Context, input model.CreateF
 		return nil, err
 	}
 
+	if err := r.requireProjectMember(ctx, projectID); err != nil {
+		return nil, err
+	}
+
 	var parentFolderID pgtype.UUID
 
 	// nil = root folder
@@ -214,6 +223,14 @@ func (r *mutationResolver) RenameFolder(ctx context.Context, folderID string, na
 		return nil, err
 	}
 
+	existing, err := r.App.Services.File.GetFolderByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
+		return nil, err
+	}
+
 	folder, err := r.App.Services.File.RenameFolder(
 		ctx,
 		database.RenameFolderParams{
@@ -238,6 +255,14 @@ func (r *mutationResolver) RenameFolder(ctx context.Context, folderID string, na
 func (r *mutationResolver) MoveFolder(ctx context.Context, folderID string, parentFolderID *string) (*model.Folder, error) {
 	id, err := parseUUID(folderID)
 	if err != nil {
+		return nil, err
+	}
+
+	existing, err := r.App.Services.File.GetFolderByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
 		return nil, err
 	}
 
@@ -279,6 +304,14 @@ func (r *mutationResolver) DeleteFolder(ctx context.Context, folderID string) (b
 		return false, err
 	}
 
+	existing, err := r.App.Services.File.GetFolderByID(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
+		return false, err
+	}
+
 	if err := r.App.Services.File.DeleteFolder(ctx, id); err != nil {
 		return false, err
 	}
@@ -288,8 +321,16 @@ func (r *mutationResolver) DeleteFolder(ctx context.Context, folderID string) (b
 
 // CreateFile is the resolver for the createFile field.
 func (r *mutationResolver) CreateFile(ctx context.Context, input model.CreateFileInput) (*model.File, error) {
+	projectID, err := parseUUID(input.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := r.requireProjectMember(ctx, projectID); err != nil {
+		return nil, err
+	}
+
 	var folderID pgtype.UUID
-	var err error
 
 	// nil = root file
 	// non-nil = file inside a folder
@@ -298,11 +339,6 @@ func (r *mutationResolver) CreateFile(ctx context.Context, input model.CreateFil
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	projectID, err := parseUUID(input.ProjectID)
-	if err != nil {
-		return nil, err
 	}
 
 	file, err := r.App.Services.File.CreateFile(
@@ -330,6 +366,14 @@ func (r *mutationResolver) RenameFile(ctx context.Context, fileID string, name s
 		return nil, err
 	}
 
+	existing, err := r.App.Services.File.GetFileByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
+		return nil, err
+	}
+
 	file, err := r.App.Services.File.RenameFile(
 		ctx,
 		database.RenameFileParams{
@@ -348,6 +392,14 @@ func (r *mutationResolver) RenameFile(ctx context.Context, fileID string, name s
 func (r *mutationResolver) MoveFile(ctx context.Context, input model.MoveFileInput) (*model.File, error) {
 	fileID, err := parseUUID(input.FileID)
 	if err != nil {
+		return nil, err
+	}
+
+	existing, err := r.App.Services.File.GetFileByID(ctx, fileID)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
 		return nil, err
 	}
 
@@ -383,6 +435,14 @@ func (r *mutationResolver) DeleteFile(ctx context.Context, fileID string) (bool,
 		return false, err
 	}
 
+	existing, err := r.App.Services.File.GetFileByID(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
+		return false, err
+	}
+
 	if err := r.App.Services.File.DeleteFile(ctx, id); err != nil {
 		return false, err
 	}
@@ -413,9 +473,9 @@ func (r *mutationResolver) DeleteFileShare(ctx context.Context, fileShareID stri
 
 // SetFileFavorite is the resolver for the setFileFavorite field.
 func (r *mutationResolver) SetFileFavorite(ctx context.Context, input model.SetFileFavoriteInput) (*model.FilePreference, error) {
-	authUserID, ok := auth.UserIDFromContext(ctx)
-	if !ok {
-		return nil, apperrors.UnauthorizedError("authentication required")
+	authUserID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	fileID, err := parseUUID(input.FileID)
@@ -474,6 +534,9 @@ func (r *queryResolver) Folder(ctx context.Context, id string) (*model.Folder, e
 	if err != nil {
 		return nil, err
 	}
+	if err := r.requireProjectMember(ctx, folder.ProjectID); err != nil {
+		return nil, err
+	}
 
 	return &model.Folder{
 		ID:   folder.ID.String(),
@@ -492,6 +555,9 @@ func (r *queryResolver) Folders(ctx context.Context, projectID *string) ([]*mode
 
 	id, err := parseUUID(*projectID)
 	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, id); err != nil {
 		return nil, err
 	}
 
@@ -532,6 +598,14 @@ func (r *queryResolver) FolderPath(ctx context.Context, folderID string) ([]*mod
 		return nil, err
 	}
 
+	target, err := r.App.Services.File.GetFolderByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, target.ProjectID); err != nil {
+		return nil, err
+	}
+
 	folders, err := r.App.Services.File.GetFolderPath(
 		ctx,
 		id,
@@ -559,6 +633,9 @@ func (r *queryResolver) FolderPath(ctx context.Context, folderID string) ([]*mod
 func (r *queryResolver) RootFolders(ctx context.Context, projectID string) ([]*model.Folder, error) {
 	id, err := parseUUID(projectID)
 	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, id); err != nil {
 		return nil, err
 	}
 
@@ -599,6 +676,9 @@ func (r *queryResolver) File(ctx context.Context, id string) (*model.File, error
 	if err != nil {
 		return nil, err
 	}
+	if err := r.requireProjectMember(ctx, file.ProjectID); err != nil {
+		return nil, err
+	}
 
 	return helpers.FileToModel(file), nil
 }
@@ -606,9 +686,16 @@ func (r *queryResolver) File(ctx context.Context, id string) (*model.File, error
 // Files is the resolver for the files field.
 func (r *queryResolver) Files(ctx context.Context, projectID *string, folderID *string) ([]*model.File, error) {
 	if folderID != nil {
-
 		id, err := parseUUID(*folderID)
 		if err != nil {
+			return nil, err
+		}
+
+		folder, err := r.App.Services.File.GetFolderByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if err := r.requireProjectMember(ctx, folder.ProjectID); err != nil {
 			return nil, err
 		}
 
@@ -624,9 +711,11 @@ func (r *queryResolver) Files(ctx context.Context, projectID *string, folderID *
 	}
 
 	if projectID != nil {
-
 		id, err := parseUUID(*projectID)
 		if err != nil {
+			return nil, err
+		}
+		if err := r.requireProjectMember(ctx, id); err != nil {
 			return nil, err
 		}
 
@@ -648,6 +737,9 @@ func (r *queryResolver) Files(ctx context.Context, projectID *string, folderID *
 func (r *queryResolver) RootFiles(ctx context.Context, projectID string) ([]*model.File, error) {
 	id, err := parseUUID(projectID)
 	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, id); err != nil {
 		return nil, err
 	}
 

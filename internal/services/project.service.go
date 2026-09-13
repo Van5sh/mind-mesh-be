@@ -30,6 +30,46 @@ func NewProjectService(
 	}
 }
 
+// EnsureMemberAccess authorizes a user to read or modify project-scoped
+// resources: the project owner or any explicit member passes, anyone
+// else gets NotFound (if the project doesn't exist) or Forbidden.
+// Resolvers for project-scoped resources (chats, files, reports,
+// flowcharts, ...) call this before touching the resource.
+func (s *ProjectService) EnsureMemberAccess(ctx context.Context, projectID, userID pgtype.UUID) error {
+	if err := validators.ValidateUUID("project id", projectID); err != nil {
+		return err
+	}
+	if err := validators.ValidateUUID("user id", userID); err != nil {
+		return err
+	}
+
+	project, err := s.projectGuard.EnsureProjectExists(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if project.OwnerID == userID {
+		return nil
+	}
+
+	_, err = s.projectGuard.EnsureProjectMember(ctx, projectID, userID)
+	return err
+}
+
+// EnsureOwnerAccess authorizes only the project's owner - used for
+// destructive or ownership-sensitive operations (delete, archive,
+// transfer ownership, membership management).
+func (s *ProjectService) EnsureOwnerAccess(ctx context.Context, projectID, userID pgtype.UUID) error {
+	if err := validators.ValidateUUID("project id", projectID); err != nil {
+		return err
+	}
+	if err := validators.ValidateUUID("user id", userID); err != nil {
+		return err
+	}
+
+	_, err := s.projectGuard.EnsureProjectOwner(ctx, projectID, userID)
+	return err
+}
+
 func (s *ProjectService) CreateProject(
 	ctx context.Context,
 	params database.CreateProjectParams,

@@ -10,6 +10,7 @@ import (
 	"example/hello/internal/guards"
 	"example/hello/internal/repository"
 	"example/hello/internal/services"
+	"example/hello/internal/services/ai"
 	"example/hello/internal/services/aws"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -232,6 +233,17 @@ func New(
 	)
 
 	// --------------------------------------------------------
+	// AI Service Client
+	// --------------------------------------------------------
+
+	aiServiceURL := os.Getenv("AI_SERVICE_URL")
+	if aiServiceURL == "" {
+		aiServiceURL = "http://localhost:8000"
+	}
+
+	aiClient := ai.NewClient(aiServiceURL)
+
+	// --------------------------------------------------------
 	// Session Service
 	// --------------------------------------------------------
 
@@ -307,6 +319,7 @@ func New(
 			Chat: services.NewChatService(
 				repositories.Chat,
 				appGuards.Chat,
+				aiClient,
 			),
 
 			File: services.NewFileService(

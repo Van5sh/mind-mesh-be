@@ -198,16 +198,17 @@ type FileShare struct {
 }
 
 type FileStorage struct {
-	File       *File     `json:"file"`
-	BucketName string    `json:"bucketName"`
-	ObjectKey  string    `json:"objectKey"`
-	Etag       *string   `json:"etag,omitempty"`
-	VersionID  *string   `json:"versionId,omitempty"`
-	Checksum   *string   `json:"checksum,omitempty"`
-	MimeType   string    `json:"mimeType"`
-	UploadedBy *User     `json:"uploadedBy"`
-	CreatedAt  time.Time `json:"createdAt"`
-	UpdatedAt  time.Time `json:"updatedAt"`
+	File        *File     `json:"file"`
+	BucketName  string    `json:"bucketName"`
+	ObjectKey   string    `json:"objectKey"`
+	Etag        *string   `json:"etag,omitempty"`
+	VersionID   *string   `json:"versionId,omitempty"`
+	Checksum    *string   `json:"checksum,omitempty"`
+	MimeType    string    `json:"mimeType"`
+	UploadedBy  *User     `json:"uploadedBy"`
+	DownloadURL string    `json:"downloadUrl"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type Flowchart struct {

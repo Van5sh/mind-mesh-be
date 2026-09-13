@@ -33,6 +33,7 @@ type FileStorage {
   checksum: String
   mimeType: String!
   uploadedBy: User!
+  downloadUrl: String!
   createdAt: Time!
   updatedAt: Time!
 }

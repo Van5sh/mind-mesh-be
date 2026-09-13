@@ -10,8 +10,6 @@ import (
 	"example/hello/graph"
 	"example/hello/graph/helpers"
 	"example/hello/graph/model"
-	"example/hello/internal/apperrors"
-	"example/hello/internal/auth"
 	"example/hello/internal/database"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -65,6 +63,10 @@ func (r *mutationResolver) CreateChat(ctx context.Context, input model.CreateCha
 		return nil, err
 	}
 
+	if err := r.requireProjectMember(ctx, projectID); err != nil {
+		return nil, err
+	}
+
 	chat, err := r.App.Services.Chat.CreateChat(
 		ctx,
 		database.CreateChatParams{
@@ -87,6 +89,14 @@ func (r *mutationResolver) CreateChat(ctx context.Context, input model.CreateCha
 func (r *mutationResolver) UpdateChat(ctx context.Context, id string, input model.UpdateChatInput) (*model.Chat, error) {
 	chatID, err := parseUUID(id)
 	if err != nil {
+		return nil, err
+	}
+
+	existing, err := r.App.Services.Chat.GetChatByID(ctx, chatID)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
 		return nil, err
 	}
 
@@ -151,6 +161,14 @@ func (r *mutationResolver) DeleteChat(ctx context.Context, id string) (bool, err
 		return false, err
 	}
 
+	existing, err := r.App.Services.Chat.GetChatByID(ctx, chatID)
+	if err != nil {
+		return false, err
+	}
+	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
+		return false, err
+	}
+
 	if err := r.App.Services.Chat.DeleteChat(ctx, chatID); err != nil {
 		return false, err
 	}
@@ -167,6 +185,14 @@ func (r *mutationResolver) CreateChatParticipant(ctx context.Context, input mode
 
 	userID, err := parseUUID(input.UserID)
 	if err != nil {
+		return nil, err
+	}
+
+	chat, err := r.App.Services.Chat.GetChatByID(ctx, chatID)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, chat.ProjectID); err != nil {
 		return nil, err
 	}
 
@@ -201,6 +227,14 @@ func (r *mutationResolver) RemoveChatParticipant(ctx context.Context, chatID str
 		return false, err
 	}
 
+	chat, err := r.App.Services.Chat.GetChatByID(ctx, cID)
+	if err != nil {
+		return false, err
+	}
+	if err := r.requireProjectMember(ctx, chat.ProjectID); err != nil {
+		return false, err
+	}
+
 	if err := r.App.Services.Chat.RemoveChatParticipant(
 		ctx,
 		database.RemoveChatParticipantParams{
@@ -222,13 +256,16 @@ func (r *mutationResolver) CreateChatMessage(ctx context.Context, input model.Cr
 	}
 
 	// Get the authenticated user's ID from the context.
-	userID, ok := auth.UserIDFromContext(ctx)
-	if !ok {
-		return nil, apperrors.UnauthorizedError("authentication required")
+	userID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	senderID, err := parseUUID(userID.String())
+	chat, err := r.App.Services.Chat.GetChatByID(ctx, chatID)
 	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, chat.ProjectID); err != nil {
 		return nil, err
 	}
 
@@ -237,7 +274,7 @@ func (r *mutationResolver) CreateChatMessage(ctx context.Context, input model.Cr
 		database.CreateChatMessageParams{
 			ChatID: chatID,
 			SenderID: pgtype.UUID{
-				Bytes: senderID.Bytes,
+				Bytes: userID.Bytes,
 				Valid: true,
 			},
 			Role:    database.MessageRole(input.Role),
@@ -255,6 +292,18 @@ func (r *mutationResolver) CreateChatMessage(ctx context.Context, input model.Cr
 func (r *mutationResolver) UpdateChatMessage(ctx context.Context, input model.UpdateChatMessageInput) (*model.ChatMessage, error) {
 	messageID, err := parseUUID(input.ID)
 	if err != nil {
+		return nil, err
+	}
+
+	existing, err := r.App.Services.Chat.GetChatMessageByID(ctx, messageID)
+	if err != nil {
+		return nil, err
+	}
+	chat, err := r.App.Services.Chat.GetChatByID(ctx, existing.ChatID)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, chat.ProjectID); err != nil {
 		return nil, err
 	}
 
@@ -279,6 +328,18 @@ func (r *mutationResolver) DeleteChatMessage(ctx context.Context, id string) (bo
 		return false, err
 	}
 
+	existing, err := r.App.Services.Chat.GetChatMessageByID(ctx, messageID)
+	if err != nil {
+		return false, err
+	}
+	chat, err := r.App.Services.Chat.GetChatByID(ctx, existing.ChatID)
+	if err != nil {
+		return false, err
+	}
+	if err := r.requireProjectMember(ctx, chat.ProjectID); err != nil {
+		return false, err
+	}
+
 	if err := r.App.Services.Chat.DeleteChatMessage(
 		ctx,
 		messageID,
@@ -300,6 +361,9 @@ func (r *queryResolver) Chat(ctx context.Context, id string) (*model.Chat, error
 	if err != nil {
 		return nil, err
 	}
+	if err := r.requireProjectMember(ctx, chat.ProjectID); err != nil {
+		return nil, err
+	}
 
 	return helpers.ChatToModel(chat), nil
 }
@@ -308,6 +372,9 @@ func (r *queryResolver) Chat(ctx context.Context, id string) (*model.Chat, error
 func (r *queryResolver) Chats(ctx context.Context, projectID string) ([]*model.Chat, error) {
 	pID, err := parseUUID(projectID)
 	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, pID); err != nil {
 		return nil, err
 	}
 
@@ -330,12 +397,7 @@ func (r *queryResolver) Chats(ctx context.Context, projectID string) ([]*model.C
 
 // MyChats is the resolver for the myChats field.
 func (r *queryResolver) MyChats(ctx context.Context, projectID *string) ([]*model.Chat, error) {
-	userID, ok := auth.UserIDFromContext(ctx)
-	if !ok {
-		return nil, apperrors.UnauthorizedError("authentication required")
-	}
-
-	userUUID, err := parseUUID(userID.String())
+	userUUID, err := currentUserID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -384,6 +446,14 @@ func (r *queryResolver) ChatMessages(ctx context.Context, chatID string) ([]*mod
 		return nil, err
 	}
 
+	chat, err := r.App.Services.Chat.GetChatByID(ctx, cID)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, chat.ProjectID); err != nil {
+		return nil, err
+	}
+
 	messages, err := r.App.Services.Chat.GetChatMessagesByChatID(
 		ctx,
 		cID,
@@ -405,6 +475,9 @@ func (r *queryResolver) ChatMessages(ctx context.Context, chatID string) ([]*mod
 func (r *queryResolver) ArchivedChats(ctx context.Context, projectID string) ([]*model.Chat, error) {
 	pID, err := parseUUID(projectID)
 	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, pID); err != nil {
 		return nil, err
 	}
 
@@ -429,6 +502,9 @@ func (r *queryResolver) ArchivedChats(ctx context.Context, projectID string) ([]
 func (r *queryResolver) ActiveChats(ctx context.Context, projectID string) ([]*model.Chat, error) {
 	pID, err := parseUUID(projectID)
 	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, pID); err != nil {
 		return nil, err
 	}
 

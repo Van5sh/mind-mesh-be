@@ -40,6 +40,16 @@ func NewFileService(
 	}
 }
 
+// supportedProcessingContentTypes must stay in sync with the content
+// types ai/extraction/factory.py knows how to extract text from. Files
+// of other types would just be queued, downloaded, and marked FAILED
+// by the worker, so reject them up front instead.
+var supportedProcessingContentTypes = map[string]bool{
+	"application/pdf": true,
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
+	"text/plain": true,
+}
+
 func (s *FileService) CreateFile(
 	ctx context.Context,
 	params database.CreateFileParams,
@@ -51,6 +61,11 @@ func (s *FileService) CreateFile(
 	}
 	if err := validators.ValidateUUID("project id", params.ProjectID); err != nil {
 		return database.File{}, err
+	}
+	if !supportedProcessingContentTypes[contentType] {
+		return database.File{}, apperrors.Validation(
+			fmt.Sprintf("unsupported file type: %s (supported: pdf, docx, plain text)", contentType),
+		)
 	}
 	if params.FolderID.Valid {
 		if err := validators.ValidateUUID(
@@ -787,6 +802,19 @@ func (s *FileService) GetFileStorage(
 	}
 
 	return storage, nil
+}
+
+// GetFileDownloadURL returns a presigned, time-limited URL for retrieving
+// an uploaded file's bytes directly from S3.
+func (s *FileService) GetFileDownloadURL(
+	ctx context.Context,
+	objectKey string,
+) (string, error) {
+	url, err := s.s3.S3GetUrl(ctx, objectKey)
+	if err != nil {
+		return "", apperrors.InternalError("failed to generate file download URL", err)
+	}
+	return url, nil
 }
 
 // GetFileProperties returns the properties record for a file.

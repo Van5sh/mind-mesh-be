@@ -2,28 +2,33 @@ package services
 
 import (
 	"context"
+	"log"
 
 	"example/hello/internal/apperrors"
 	"example/hello/internal/database"
 	"example/hello/internal/guards"
 	"example/hello/internal/repository"
+	"example/hello/internal/services/ai"
 	"example/hello/internal/validators"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type ChatService struct {
-	repo  *repository.ChatRepository
-	guard *guards.ChatGuard
+	repo   *repository.ChatRepository
+	guard  *guards.ChatGuard
+	aiChat *ai.Client
 }
 
 func NewChatService(
 	repo *repository.ChatRepository,
 	guard *guards.ChatGuard,
+	aiChat *ai.Client,
 ) *ChatService {
 	return &ChatService{
-		repo:  repo,
-		guard: guard,
+		repo:   repo,
+		guard:  guard,
+		aiChat: aiChat,
 	}
 }
 
@@ -306,7 +311,8 @@ func (s *ChatService) CreateChatMessage(
 		return database.ChatMessage{}, err
 	}
 
-	if _, err := s.guard.EnsureChatExists(ctx, params.ChatID); err != nil {
+	chat, err := s.guard.EnsureChatExists(ctx, params.ChatID)
+	if err != nil {
 		return database.ChatMessage{}, err
 	}
 
@@ -325,7 +331,47 @@ func (s *ChatService) CreateChatMessage(
 		)
 	}
 
+	// AI_ASSISTANT chats get an automatic reply to user messages. A
+	// failure here must not fail message creation: the user's message
+	// is already saved, and the AI companion being unavailable is a
+	// degraded experience, not an error the caller should see.
+	if chat.Type == database.ChatTypeAIASSISTANT && params.Role == database.MessageRoleUSER {
+		s.generateAIReply(ctx, chat, params.Content)
+	}
+
 	return message, nil
+}
+
+// generateAIReply asks the AI service for an answer grounded in the
+// chat's project documents and persists it as an AI-role message.
+// Errors are logged, never returned - see CreateChatMessage.
+func (s *ChatService) generateAIReply(
+	ctx context.Context,
+	chat database.Chat,
+	question string,
+) {
+	if s.aiChat == nil {
+		return
+	}
+
+	result, err := s.aiChat.AnswerChatQuestion(ctx, chat.ProjectID.String(), question)
+	if err != nil {
+		log.Printf("AI reply generation failed for chat %s: %v", chat.ID.String(), err)
+		return
+	}
+
+	if _, err := s.repo.CreateChatMessage(ctx, database.CreateChatMessageParams{
+		ChatID:  chat.ID,
+		Role:    database.MessageRoleAI,
+		Content: result.Answer,
+	}); err != nil {
+		log.Printf("failed to save AI reply for chat %s: %v", chat.ID.String(), err)
+		return
+	}
+
+	if err := s.repo.UpdateChatActivity(ctx, chat.ID); err != nil {
+		log.Printf("failed to update chat activity after AI reply for chat %s: %v", chat.ID.String(), err)
+	}
 }
 
 // GetChatMessageByID gets a message by ID.

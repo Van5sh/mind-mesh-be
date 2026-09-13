@@ -1,40 +1,28 @@
 from pydantic import BaseModel, Field
 
 
-class ProcessFileRequest(BaseModel):
-    """Request to process a file."""
-    
-    job_id: str = Field(..., description="Unique job identifier")
-    file_id: str = Field(..., description="File identifier")
-    project_id: str = Field(..., description="Project identifier")
-    storage_key: str = Field(..., description="S3 object key (e.g., projects/proj-123/files/file-456.pdf)")
-    content_type: str = Field(..., description="MIME type (application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, text/plain)")
+class ChatQuestionRequest(BaseModel):
+    """A question asked in a project's AI-assistant chat."""
+
+    project_id: str = Field(..., description="Project to search within")
+    question: str = Field(..., description="The user's question")
 
 
-class ProcessFileResponse(BaseModel):
-    """Response after queuing file for processing."""
-    
-    job_id: str
+class ChatSource(BaseModel):
+    """One retrieved chunk that contributed to an answer."""
+
     file_id: str
-    project_id: str
-    status: str = "QUEUED"
-    message: str
+    chunk_index: int
 
 
-class JobStatusResponse(BaseModel):
-    """Response with job processing status."""
-    
-    job_id: str
-    file_id: str
-    project_id: str
-    status: str  # QUEUED, PROCESSING, COMPLETED, FAILED
-    summary: str = None
-    error_message: str = None
-    processed_at: str = None
+class ChatQuestionResponse(BaseModel):
+    """A grounded answer plus the chunks it was drawn from."""
+
+    answer: str
+    sources: list[ChatSource]
 
 
 class HealthResponse(BaseModel):
     """Health check response."""
-    
+
     status: str = "healthy"
-    worker_status: str = "running"
