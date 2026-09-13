@@ -173,14 +173,17 @@ func (s *ReportService) GetReportsByFormat(
 
 func (s *ReportService) GetReportsByGenerator(
 	ctx context.Context,
-	generatedBy pgtype.UUID,
+	params database.GetReportsByGeneratorParams,
 ) ([]database.GetReportsByGeneratorRow, error) {
 
-	if err := validators.ValidateUUID("generated_by", generatedBy); err != nil {
+	if err := validators.ValidateUUID("project_id", params.ProjectID); err != nil {
+		return nil, err
+	}
+	if err := validators.ValidateUUID("generated_by", params.GeneratedBy); err != nil {
 		return nil, err
 	}
 
-	reports, err := s.repo.GetReportsByGenerator(ctx, generatedBy)
+	reports, err := s.repo.GetReportsByGenerator(ctx, params)
 	if err != nil {
 		return nil, apperrors.InternalError(
 			"failed to fetch reports by generator",

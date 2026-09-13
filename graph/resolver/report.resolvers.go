@@ -281,14 +281,15 @@ func (r *queryResolver) ReportsByChat(ctx context.Context, sourceChatID string) 
 }
 
 // ReportsByGenerator is the resolver for the reportsByGenerator field.
-//
-// NOTE: this endpoint has no project scope in the schema (generatedById
-// alone), so it cannot be authorized per-project here - it currently
-// returns that user's generated reports across every project. Treat
-// this as a known gap: fixing it properly means adding a projectId
-// argument to the schema.
-func (r *queryResolver) ReportsByGenerator(ctx context.Context, generatedByID string) ([]*model.Report, error) {
-	if _, err := currentUserID(ctx); err != nil {
+func (r *queryResolver) ReportsByGenerator(ctx context.Context, projectID string, generatedByID string) ([]*model.Report, error) {
+	pID, err := parseUUID(projectID)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"invalid project ID: %w",
+			err,
+		)
+	}
+	if err := r.requireProjectMember(ctx, pID); err != nil {
 		return nil, err
 	}
 
@@ -302,7 +303,10 @@ func (r *queryResolver) ReportsByGenerator(ctx context.Context, generatedByID st
 
 	reports, err := r.App.Services.Report.GetReportsByGenerator(
 		ctx,
-		generatorID,
+		database.GetReportsByGeneratorParams{
+			ProjectID:   pID,
+			GeneratedBy: generatorID,
+		},
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -321,18 +325,23 @@ func (r *queryResolver) ReportsByGenerator(ctx context.Context, generatedByID st
 }
 
 // ReportsByFormat is the resolver for the reportsByFormat field.
-//
-// NOTE: same schema gap as ReportsByGenerator - no projectId argument,
-// so this returns matching reports across every project.
-func (r *queryResolver) ReportsByFormat(ctx context.Context, format model.ReportFormat) ([]*model.Report, error) {
-	if _, err := currentUserID(ctx); err != nil {
+func (r *queryResolver) ReportsByFormat(ctx context.Context, projectID string, format model.ReportFormat) ([]*model.Report, error) {
+	pID, err := parseUUID(projectID)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"invalid project ID: %w",
+			err,
+		)
+	}
+	if err := r.requireProjectMember(ctx, pID); err != nil {
 		return nil, err
 	}
 
 	reports, err := r.App.Services.Report.GetReportsByFormat(
 		ctx,
 		database.GetReportsByFormatParams{
-			Format: database.ReportFormat(format),
+			ProjectID: pID,
+			Format:    database.ReportFormat(format),
 		},
 	)
 	if err != nil {
@@ -352,18 +361,23 @@ func (r *queryResolver) ReportsByFormat(ctx context.Context, format model.Report
 }
 
 // ReportsByStatus is the resolver for the reportsByStatus field.
-//
-// NOTE: same schema gap as ReportsByGenerator - no projectId argument,
-// so this returns matching reports across every project.
-func (r *queryResolver) ReportsByStatus(ctx context.Context, status model.ReportStatus) ([]*model.Report, error) {
-	if _, err := currentUserID(ctx); err != nil {
+func (r *queryResolver) ReportsByStatus(ctx context.Context, projectID string, status model.ReportStatus) ([]*model.Report, error) {
+	pID, err := parseUUID(projectID)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"invalid project ID: %w",
+			err,
+		)
+	}
+	if err := r.requireProjectMember(ctx, pID); err != nil {
 		return nil, err
 	}
 
 	reports, err := r.App.Services.Report.GetReportsByStatus(
 		ctx,
 		database.GetReportsByStatusParams{
-			Status: database.ReportStatus(status),
+			ProjectID: pID,
+			Status:    database.ReportStatus(status),
 		},
 	)
 	if err != nil {

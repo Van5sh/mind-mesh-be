@@ -9,8 +9,6 @@ import (
 	"context"
 	"example/hello/graph/helpers"
 	"example/hello/graph/model"
-	"example/hello/internal/apperrors"
-	"example/hello/internal/auth"
 	"example/hello/internal/database"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -18,13 +16,17 @@ import (
 
 // CreateFlowchart is the resolver for the createFlowchart field.
 func (r *mutationResolver) CreateFlowchart(ctx context.Context, input model.CreateFlowchartInput) (*model.Flowchart, error) {
-	userID, ok := auth.UserIDFromContext(ctx)
-	if !ok {
-		return nil, apperrors.UnauthorizedError("authentication required")
+	userID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	projectID, err := parseUUID(input.ProjectID)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := r.requireProjectMember(ctx, projectID); err != nil {
 		return nil, err
 	}
 
@@ -75,8 +77,8 @@ func (r *mutationResolver) CreateFlowchart(ctx context.Context, input model.Crea
 
 // UpdateFlowchart is the resolver for the updateFlowchart field.
 func (r *mutationResolver) UpdateFlowchart(ctx context.Context, id string, input model.UpdateFlowchartInput) (*model.Flowchart, error) {
-	if _, ok := auth.UserIDFromContext(ctx); !ok {
-		return nil, apperrors.UnauthorizedError("authentication required")
+	if _, err := currentUserID(ctx); err != nil {
+		return nil, err
 	}
 
 	flowchartID, err := parseUUID(id)
@@ -86,6 +88,9 @@ func (r *mutationResolver) UpdateFlowchart(ctx context.Context, id string, input
 
 	existing, err := r.App.Services.Flowchart.GetFlowchartByID(ctx, flowchartID)
 	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
 		return nil, err
 	}
 
@@ -146,12 +151,20 @@ func (r *mutationResolver) UpdateFlowchart(ctx context.Context, id string, input
 
 // DeleteFlowchart is the resolver for the deleteFlowchart field.
 func (r *mutationResolver) DeleteFlowchart(ctx context.Context, id string) (bool, error) {
-	if _, ok := auth.UserIDFromContext(ctx); !ok {
-		return false, apperrors.UnauthorizedError("authentication required")
+	if _, err := currentUserID(ctx); err != nil {
+		return false, err
 	}
 
 	flowchartID, err := parseUUID(id)
 	if err != nil {
+		return false, err
+	}
+
+	existing, err := r.App.Services.Flowchart.GetFlowchartByID(ctx, flowchartID)
+	if err != nil {
+		return false, err
+	}
+	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
 		return false, err
 	}
 
@@ -180,6 +193,9 @@ func (r *queryResolver) Flowchart(ctx context.Context, id string) (*model.Flowch
 	if err != nil {
 		return nil, err
 	}
+	if err := r.requireProjectMember(ctx, flowchart.ProjectID); err != nil {
+		return nil, err
+	}
 
 	project, err := r.App.Services.Project.GetProjectByID(
 		ctx,
@@ -201,6 +217,10 @@ func (r *queryResolver) Flowcharts(ctx context.Context, projectID string) ([]*mo
 	if err != nil {
 		return nil, err
 	}
+	if err := r.requireProjectMember(ctx, projId); err != nil {
+		return nil, err
+	}
+
 	flowcharts, err := r.App.Services.Flowchart.GetFlowchartsByProjectID(ctx, projId)
 	if err != nil {
 		return nil, err

@@ -45,8 +45,8 @@ func (r *ReportRepository) GetReportsByFormat(ctx context.Context, params databa
 	return r.q.GetReportsByFormat(ctx, params)
 }
 
-func (r *ReportRepository) GetReportsByGenerator(ctx context.Context, generatedBy pgtype.UUID) ([]database.GetReportsByGeneratorRow, error) {
-	return r.q.GetReportsByGenerator(ctx, generatedBy)
+func (r *ReportRepository) GetReportsByGenerator(ctx context.Context, params database.GetReportsByGeneratorParams) ([]database.GetReportsByGeneratorRow, error) {
+	return r.q.GetReportsByGenerator(ctx, params)
 }
 
 func (r *ReportRepository) GetReportsByProjectID(ctx context.Context, projectId pgtype.UUID) ([]database.GetReportsByProjectIDRow, error) {

@@ -10,7 +10,6 @@ import (
 	"example/hello/graph/helpers"
 	"example/hello/graph/model"
 	"example/hello/internal/apperrors"
-	"example/hello/internal/auth"
 	"example/hello/internal/database"
 	"fmt"
 
@@ -19,9 +18,9 @@ import (
 
 // CreateActivityLog is the resolver for the createActivityLog field.
 func (r *mutationResolver) CreateActivityLog(ctx context.Context, input model.CreateActivityLogInput) (*model.ActivityLog, error) {
-	userID, ok := auth.UserIDFromContext(ctx)
-	if !ok {
-		return nil, apperrors.UnauthorizedError("authentication required")
+	userID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	var projectID pgtype.UUID
@@ -29,6 +28,9 @@ func (r *mutationResolver) CreateActivityLog(ctx context.Context, input model.Cr
 		id, err := parseUUID(*input.ProjectID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid project ID: %w", err)
+		}
+		if err := r.requireProjectMember(ctx, id); err != nil {
+			return nil, err
 		}
 		projectID = id
 	}
@@ -63,13 +65,23 @@ func (r *mutationResolver) CreateActivityLog(ctx context.Context, input model.Cr
 
 // DeleteActivityLogByID is the resolver for the deleteActivityLogByID field.
 func (r *mutationResolver) DeleteActivityLogByID(ctx context.Context, id string) (bool, error) {
-	if _, ok := auth.UserIDFromContext(ctx); !ok {
-		return false, apperrors.UnauthorizedError("authentication required")
+	if _, err := currentUserID(ctx); err != nil {
+		return false, err
 	}
 
 	activityID, err := parseUUID(id)
 	if err != nil {
 		return false, fmt.Errorf("invalid activity log ID: %w", err)
+	}
+
+	existing, err := r.App.Services.Activity.GetActivityLogByID(ctx, activityID)
+	if err != nil {
+		return false, fmt.Errorf("failed to fetch activity log: %w", err)
+	}
+	if existing.ProjectID.Valid {
+		if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
+			return false, err
+		}
 	}
 
 	if err := r.App.Services.Activity.DeleteActivityLogByID(ctx, activityID); err != nil {
@@ -81,6 +93,11 @@ func (r *mutationResolver) DeleteActivityLogByID(ctx context.Context, id string)
 
 // ActivityLogs is the resolver for the activityLogs field.
 func (r *queryResolver) ActivityLogs(ctx context.Context, projectID *string, userID *string) ([]*model.ActivityLog, error) {
+	callerID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var activities []database.ActivityLog
 
 	switch {
@@ -88,6 +105,9 @@ func (r *queryResolver) ActivityLogs(ctx context.Context, projectID *string, use
 		pID, err := parseUUID(*projectID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid project ID: %w", err)
+		}
+		if err := r.requireProjectMember(ctx, pID); err != nil {
+			return nil, err
 		}
 		uID, err := parseUUID(*userID)
 		if err != nil {
@@ -106,6 +126,9 @@ func (r *queryResolver) ActivityLogs(ctx context.Context, projectID *string, use
 		if err != nil {
 			return nil, fmt.Errorf("invalid project ID: %w", err)
 		}
+		if err := r.requireProjectMember(ctx, pID); err != nil {
+			return nil, err
+		}
 		activities, err = r.App.Services.Activity.GetActivityLogsByProjectID(ctx, pID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch activity logs: %w", err)
@@ -116,14 +139,21 @@ func (r *queryResolver) ActivityLogs(ctx context.Context, projectID *string, use
 		if err != nil {
 			return nil, fmt.Errorf("invalid user ID: %w", err)
 		}
+		if uID != callerID {
+			return nil, apperrors.ForbiddenError("cannot view another user's activity")
+		}
 		activities, err = r.App.Services.Activity.GetActivityLogsByUserID(ctx, uID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch activity logs: %w", err)
 		}
 
 	default:
-		var err error
-		activities, err = r.App.Services.Activity.GetRecentActivityLogs(ctx, 100)
+		// No filters: this used to return the 100 most recent activity
+		// logs system-wide, visible to any authenticated user - a
+		// cross-project data leak. Default to the caller's own activity
+		// instead; callers that want a specific project's feed should
+		// pass projectId explicitly.
+		activities, err = r.App.Services.Activity.GetActivityLogsByUserID(ctx, callerID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch activity logs: %w", err)
 		}

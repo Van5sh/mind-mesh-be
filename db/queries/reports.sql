@@ -113,7 +113,8 @@ SELECT
 FROM reports r
 JOIN report_properties rp
 ON r.id = rp.report_id
-WHERE rp.generated_by = $1
+WHERE r.project_id = $1
+  AND rp.generated_by = $2
 ORDER BY r.created_at DESC;
 
 

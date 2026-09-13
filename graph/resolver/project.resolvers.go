@@ -11,7 +11,6 @@ import (
 	"example/hello/graph/helpers"
 	"example/hello/graph/model"
 	"example/hello/internal/apperrors"
-	"example/hello/internal/auth"
 	"example/hello/internal/database"
 	"fmt"
 
@@ -20,11 +19,9 @@ import (
 
 // CreateProject is the resolver for the createProject field.
 func (r *mutationResolver) CreateProject(ctx context.Context, input model.CreateProjectInput) (*model.Project, error) {
-	userId, ok := auth.UserIDFromContext(ctx)
-	if !ok {
-		return nil, apperrors.UnauthorizedError(
-			"authentication required",
-		)
+	userId, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
 	}
 	var description pgtype.Text
 
@@ -68,6 +65,10 @@ func (r *mutationResolver) CreateProject(ctx context.Context, input model.Create
 func (r *mutationResolver) UpdateProject(ctx context.Context, id string, input model.UpdateProjectInput) (*model.Project, error) {
 	projectID, err := parseUUID(id)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := r.requireProjectMember(ctx, projectID); err != nil {
 		return nil, err
 	}
 
@@ -122,6 +123,10 @@ func (r *mutationResolver) ArchiveProject(ctx context.Context, projectID string)
 		return false, err
 	}
 
+	if err := r.requireProjectOwner(ctx, id); err != nil {
+		return false, err
+	}
+
 	if err := r.App.Services.Project.ArchiveProject(ctx, id); err != nil {
 		return false, err
 	}
@@ -133,6 +138,10 @@ func (r *mutationResolver) ArchiveProject(ctx context.Context, projectID string)
 func (r *mutationResolver) RestoreProject(ctx context.Context, projectID string) (bool, error) {
 	id, err := parseUUID(projectID)
 	if err != nil {
+		return false, err
+	}
+
+	if err := r.requireProjectOwner(ctx, id); err != nil {
 		return false, err
 	}
 
@@ -150,6 +159,10 @@ func (r *mutationResolver) DeleteProject(ctx context.Context, id string) (bool, 
 		return false, err
 	}
 
+	if err := r.requireProjectOwner(ctx, projectID); err != nil {
+		return false, err
+	}
+
 	if err := r.App.Services.Project.DeleteProject(ctx, projectID); err != nil {
 		return false, err
 	}
@@ -161,6 +174,10 @@ func (r *mutationResolver) DeleteProject(ctx context.Context, id string) (bool, 
 func (r *mutationResolver) TransferProjectOwnership(ctx context.Context, input model.TransferProjectOwnershipInput) (*model.Project, error) {
 	projectID, err := parseUUID(input.ProjectID)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := r.requireProjectOwner(ctx, projectID); err != nil {
 		return nil, err
 	}
 
@@ -203,6 +220,10 @@ func (r *mutationResolver) AddProjectMember(ctx context.Context, input model.Add
 		return nil, err
 	}
 
+	if err := r.requireProjectOwner(ctx, projectID); err != nil {
+		return nil, err
+	}
+
 	userID, err := parseUUID(input.UserID)
 	if err != nil {
 		return nil, err
@@ -230,6 +251,10 @@ func (r *mutationResolver) UpdateProjectMemberRole(ctx context.Context, input mo
 		return nil, err
 	}
 
+	if err := r.requireProjectOwner(ctx, projectID); err != nil {
+		return nil, err
+	}
+
 	userID, err := parseUUID(input.UserID)
 	if err != nil {
 		return nil, err
@@ -254,6 +279,10 @@ func (r *mutationResolver) UpdateProjectMemberRole(ctx context.Context, input mo
 func (r *mutationResolver) RemoveProjectMember(ctx context.Context, projectID string, userID string) (bool, error) {
 	pID, err := parseUUID(projectID)
 	if err != nil {
+		return false, err
+	}
+
+	if err := r.requireProjectOwner(ctx, pID); err != nil {
 		return false, err
 	}
 
@@ -419,6 +448,10 @@ func (r *queryResolver) Project(ctx context.Context, id string) (*model.Project,
 		return nil, err
 	}
 
+	if err := r.requireProjectMember(ctx, projectID); err != nil {
+		return nil, err
+	}
+
 	project, err := r.App.Services.Project.GetProjectByID(ctx, projectID)
 	if err != nil {
 		return nil, err
@@ -443,9 +476,9 @@ func (r *queryResolver) Project(ctx context.Context, id string) (*model.Project,
 
 // Projects is the resolver for the projects field.
 func (r *queryResolver) Projects(ctx context.Context) ([]*model.Project, error) {
-	userId, ok := auth.UserIDFromContext(ctx)
-	if !ok {
-		return nil, apperrors.UnauthorizedError("authentication required")
+	userId, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
 	}
 	projects, err := r.App.Services.Project.GetProjectsForUser(ctx, userId)
 	if err != nil {
@@ -463,9 +496,20 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*model.Project, error) 
 
 // ProjectsByOwner is the resolver for the projectsByOwner field.
 func (r *queryResolver) ProjectsByOwner(ctx context.Context, ownerID string) ([]*model.Project, error) {
+	callerID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	id, err := parseUUID(ownerID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Without this, any authenticated user could enumerate any other
+	// user's owned projects by guessing their ID.
+	if id != callerID {
+		return nil, apperrors.ForbiddenError("cannot list another user's owned projects")
 	}
 
 	projects, err := r.App.Services.Project.GetProjectsByOwnerID(ctx, id)
@@ -484,9 +528,18 @@ func (r *queryResolver) ProjectsByOwner(ctx context.Context, ownerID string) ([]
 
 // ProjectsForUser is the resolver for the projectsForUser field.
 func (r *queryResolver) ProjectsForUser(ctx context.Context, userID string) ([]*model.Project, error) {
+	callerID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	id, err := parseUUID(userID)
 	if err != nil {
 		return nil, err
+	}
+
+	if id != callerID {
+		return nil, apperrors.ForbiddenError("cannot list another user's projects")
 	}
 
 	projects, err := r.App.Services.Project.GetProjectsForUser(ctx, id)
@@ -505,9 +558,18 @@ func (r *queryResolver) ProjectsForUser(ctx context.Context, userID string) ([]*
 
 // ArchivedProjectsByOwner is the resolver for the archivedProjectsByOwner field.
 func (r *queryResolver) ArchivedProjectsByOwner(ctx context.Context, ownerID string) ([]*model.Project, error) {
+	callerID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	id, err := parseUUID(ownerID)
 	if err != nil {
 		return nil, err
+	}
+
+	if id != callerID {
+		return nil, apperrors.ForbiddenError("cannot list another user's owned projects")
 	}
 
 	projects, err := r.App.Services.Project.GetArchivedProjectsByOwner(ctx, id)
@@ -526,9 +588,18 @@ func (r *queryResolver) ArchivedProjectsByOwner(ctx context.Context, ownerID str
 
 // ArchivedProjectsForUser is the resolver for the archivedProjectsForUser field.
 func (r *queryResolver) ArchivedProjectsForUser(ctx context.Context, userID string) ([]*model.Project, error) {
+	callerID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	id, err := parseUUID(userID)
 	if err != nil {
 		return nil, err
+	}
+
+	if id != callerID {
+		return nil, apperrors.ForbiddenError("cannot list another user's projects")
 	}
 
 	projects, err := r.App.Services.Project.GetArchivedProjectsForUser(ctx, id)
@@ -549,6 +620,10 @@ func (r *queryResolver) ArchivedProjectsForUser(ctx context.Context, userID stri
 func (r *queryResolver) ProjectMembers(ctx context.Context, projectID string) ([]*model.ProjectMember, error) {
 	id, err := parseUUID(projectID)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := r.requireProjectMember(ctx, id); err != nil {
 		return nil, err
 	}
 

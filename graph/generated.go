@@ -296,9 +296,9 @@ type ComplexityRoot struct {
 		Report                  func(childComplexity int, id string) int
 		Reports                 func(childComplexity int, projectID string) int
 		ReportsByChat           func(childComplexity int, sourceChatID string) int
-		ReportsByFormat         func(childComplexity int, format model.ReportFormat) int
-		ReportsByGenerator      func(childComplexity int, generatedByID string) int
-		ReportsByStatus         func(childComplexity int, status model.ReportStatus) int
+		ReportsByFormat         func(childComplexity int, projectID string, format model.ReportFormat) int
+		ReportsByGenerator      func(childComplexity int, projectID string, generatedByID string) int
+		ReportsByStatus         func(childComplexity int, projectID string, status model.ReportStatus) int
 		RootFiles               func(childComplexity int, projectID string) int
 		RootFolders             func(childComplexity int, projectID string) int
 		SharedWithMe            func(childComplexity int, userID string) int
@@ -460,9 +460,9 @@ type QueryResolver interface {
 	Report(ctx context.Context, id string) (*model.Report, error)
 	Reports(ctx context.Context, projectID string) ([]*model.Report, error)
 	ReportsByChat(ctx context.Context, sourceChatID string) ([]*model.Report, error)
-	ReportsByGenerator(ctx context.Context, generatedByID string) ([]*model.Report, error)
-	ReportsByFormat(ctx context.Context, format model.ReportFormat) ([]*model.Report, error)
-	ReportsByStatus(ctx context.Context, status model.ReportStatus) ([]*model.Report, error)
+	ReportsByGenerator(ctx context.Context, projectID string, generatedByID string) ([]*model.Report, error)
+	ReportsByFormat(ctx context.Context, projectID string, format model.ReportFormat) ([]*model.Report, error)
+	ReportsByStatus(ctx context.Context, projectID string, status model.ReportStatus) ([]*model.Report, error)
 	AiReports(ctx context.Context, projectID string) ([]*model.Report, error)
 	Me(ctx context.Context) (*model.User, error)
 	User(ctx context.Context, id string) (*model.User, error)
@@ -2082,7 +2082,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.ReportsByFormat(childComplexity, args["format"].(model.ReportFormat)), true
+		return e.ComplexityRoot.Query.ReportsByFormat(childComplexity, args["projectId"].(string), args["format"].(model.ReportFormat)), true
 	case "Query.reportsByGenerator":
 		if e.ComplexityRoot.Query.ReportsByGenerator == nil {
 			break
@@ -2093,7 +2093,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.ReportsByGenerator(childComplexity, args["generatedById"].(string)), true
+		return e.ComplexityRoot.Query.ReportsByGenerator(childComplexity, args["projectId"].(string), args["generatedById"].(string)), true
 	case "Query.reportsByStatus":
 		if e.ComplexityRoot.Query.ReportsByStatus == nil {
 			break
@@ -2104,7 +2104,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.ReportsByStatus(childComplexity, args["status"].(model.ReportStatus)), true
+		return e.ComplexityRoot.Query.ReportsByStatus(childComplexity, args["projectId"].(string), args["status"].(model.ReportStatus)), true
 	case "Query.rootFiles":
 		if e.ComplexityRoot.Query.RootFiles == nil {
 			break
@@ -4180,42 +4180,66 @@ func (ec *executionContext) field_Query_reportsByChat_args(ctx context.Context, 
 func (ec *executionContext) field_Query_reportsByFormat_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "format",
-		func(ctx context.Context, v any) (model.ReportFormat, error) {
-			return ec.unmarshalNReportFormat2exampleᚋhelloᚋgraphᚋmodelᚐReportFormat(ctx, v)
-		})
-	if err != nil {
-		return nil, err
-	}
-	args["format"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Query_reportsByGenerator_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "generatedById",
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "projectId",
 		func(ctx context.Context, v any) (string, error) {
 			return ec.unmarshalNID2string(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["generatedById"] = arg0
+	args["projectId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "format",
+		func(ctx context.Context, v any) (model.ReportFormat, error) {
+			return ec.unmarshalNReportFormat2exampleᚋhelloᚋgraphᚋmodelᚐReportFormat(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["format"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_reportsByGenerator_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "projectId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["projectId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "generatedById",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["generatedById"] = arg1
 	return args, nil
 }
 
 func (ec *executionContext) field_Query_reportsByStatus_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "status",
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "projectId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["projectId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "status",
 		func(ctx context.Context, v any) (model.ReportStatus, error) {
 			return ec.unmarshalNReportStatus2exampleᚋhelloᚋgraphᚋmodelᚐReportStatus(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["status"] = arg0
+	args["status"] = arg1
 	return args, nil
 }
 
@@ -10991,7 +11015,7 @@ func (ec *executionContext) _Query_reportsByGenerator(ctx context.Context, field
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().ReportsByGenerator(ctx, fc.Args["generatedById"].(string))
+			return ec.Resolvers.Query().ReportsByGenerator(ctx, fc.Args["projectId"].(string), fc.Args["generatedById"].(string))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v []*model.Report) graphql.Marshaler {
@@ -11035,7 +11059,7 @@ func (ec *executionContext) _Query_reportsByFormat(ctx context.Context, field gr
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().ReportsByFormat(ctx, fc.Args["format"].(model.ReportFormat))
+			return ec.Resolvers.Query().ReportsByFormat(ctx, fc.Args["projectId"].(string), fc.Args["format"].(model.ReportFormat))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v []*model.Report) graphql.Marshaler {
@@ -11079,7 +11103,7 @@ func (ec *executionContext) _Query_reportsByStatus(ctx context.Context, field gr
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().ReportsByStatus(ctx, fc.Args["status"].(model.ReportStatus))
+			return ec.Resolvers.Query().ReportsByStatus(ctx, fc.Args["projectId"].(string), fc.Args["status"].(model.ReportStatus))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v []*model.Report) graphql.Marshaler {

@@ -27,16 +27,18 @@ extend type Query {
   # Reports by chat
   reportsByChat(sourceChatId: ID!): [Report!]!
 
-  # Reports by generator
-  reportsByGenerator(generatedById: ID!): [Report!]!
+  # Reports by generator, scoped to a project
+  reportsByGenerator(projectId: ID!, generatedById: ID!): [Report!]!
 
-  # Reports by format
+  # Reports by format, scoped to a project
   reportsByFormat(
+    projectId: ID!
     format: ReportFormat!
   ): [Report!]!
 
-  # Reports by status
+  # Reports by status, scoped to a project
   reportsByStatus(
+    projectId: ID!
     status: ReportStatus!
   ): [Report!]!
 

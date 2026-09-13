@@ -451,9 +451,15 @@ SELECT
 FROM reports r
 JOIN report_properties rp
 ON r.id = rp.report_id
-WHERE rp.generated_by = $1
+WHERE r.project_id = $1
+  AND rp.generated_by = $2
 ORDER BY r.created_at DESC
 `
+
+type GetReportsByGeneratorParams struct {
+	ProjectID   pgtype.UUID
+	GeneratedBy pgtype.UUID
+}
 
 type GetReportsByGeneratorRow struct {
 	ID            pgtype.UUID
@@ -469,8 +475,8 @@ type GetReportsByGeneratorRow struct {
 	SourceChatID  pgtype.UUID
 }
 
-func (q *Queries) GetReportsByGenerator(ctx context.Context, generatedBy pgtype.UUID) ([]GetReportsByGeneratorRow, error) {
-	rows, err := q.db.Query(ctx, getReportsByGenerator, generatedBy)
+func (q *Queries) GetReportsByGenerator(ctx context.Context, arg GetReportsByGeneratorParams) ([]GetReportsByGeneratorRow, error) {
+	rows, err := q.db.Query(ctx, getReportsByGenerator, arg.ProjectID, arg.GeneratedBy)
 	if err != nil {
 		return nil, err
 	}
