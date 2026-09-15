@@ -86,3 +86,11 @@ extend type Mutation {
   updateChatMessage(input: UpdateChatMessageInput!): ChatMessage!
   deleteChatMessage(id: ID!): Boolean!
 }
+
+# Real-time: pushes every new message (user-sent or AI-generated) for a
+# chat to subscribed clients over the GraphQL WebSocket transport, instead
+# of clients polling chatMessages(chatId). Requires the same project
+# membership as the chat's other operations - see resolver.
+extend type Subscription {
+  chatMessageAdded(chatId: ID!): ChatMessage!
+}

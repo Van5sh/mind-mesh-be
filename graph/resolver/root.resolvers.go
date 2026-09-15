@@ -21,13 +21,22 @@ func (r *queryResolver) Empty(ctx context.Context) (*bool, error) {
 	panic(fmt.Errorf("not implemented: Empty - _empty"))
 }
 
+// Empty is the resolver for the _empty field.
+func (r *subscriptionResolver) Empty(ctx context.Context) (<-chan *bool, error) {
+	panic(fmt.Errorf("not implemented: Empty - _empty"))
+}
+
 // Mutation returns graph.MutationResolver implementation.
 func (r *Resolver) Mutation() graph.MutationResolver { return &mutationResolver{r} }
 
 // Query returns graph.QueryResolver implementation.
 func (r *Resolver) Query() graph.QueryResolver { return &queryResolver{r} }
 
+// Subscription returns graph.SubscriptionResolver implementation.
+func (r *Resolver) Subscription() graph.SubscriptionResolver { return &subscriptionResolver{r} }
+
 type (
-	mutationResolver struct{ *Resolver }
-	queryResolver    struct{ *Resolver }
+	mutationResolver     struct{ *Resolver }
+	queryResolver        struct{ *Resolver }
+	subscriptionResolver struct{ *Resolver }
 )

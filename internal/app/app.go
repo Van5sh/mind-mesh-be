@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"example/hello/internal/auth"
 	"example/hello/internal/database"
 	"example/hello/internal/guards"
+	"example/hello/internal/realtime"
 	"example/hello/internal/repository"
 	"example/hello/internal/services"
 	"example/hello/internal/services/ai"
@@ -21,8 +21,6 @@ type App struct {
 	Repositories Repositories
 	Guards       Guards
 	Services     Services
-	OAuth        OAuthProviders
-	AuthHandler  *auth.OAuthHandler
 }
 
 // ============================================================
@@ -68,27 +66,16 @@ type Services struct {
 	Report    *services.ReportService
 	User      *services.UserService
 	Session   *services.SessionService
-
-	// Authentication / OAuth service.
-	Auth *auth.Service
-}
-
-// ============================================================
-// OAuth Providers
-// ============================================================
-
-// type Helpers struct {
-// 	projectHelpers helpers
-// }
-
-type OAuthProviders struct {
-	Google *auth.GoogleProvider
-	GitHub *auth.GitHubProvider
 }
 
 // ============================================================
 // Constructor
 // ============================================================
+
+// Note: authentication (Firebase-backed OAuth + sessions) is constructed
+// separately in cmd/server/main.go via auth.NewOAuthHandlerFromEnvironment,
+// not here - it isn't part of App/Services because nothing in this package
+// tree needs to read it back out; only main.go wires it into HTTP routes.
 
 func New(
 	ctx context.Context,
@@ -244,52 +231,17 @@ func New(
 	aiClient := ai.NewClient(aiServiceURL)
 
 	// --------------------------------------------------------
+	// Real-time (in-process pub/sub, see internal/realtime)
+	// --------------------------------------------------------
+
+	chatBroker := realtime.NewChatBroker()
+
+	// --------------------------------------------------------
 	// Session Service
 	// --------------------------------------------------------
 
 	sessionService := services.NewSessionService(
 		repositories.Session,
-	)
-
-	// --------------------------------------------------------
-	// OAuth Providers
-	// --------------------------------------------------------
-
-	googleProvider := auth.NewGoogleProvider(
-		os.Getenv("GOOGLE_CLIENT_ID"),
-		os.Getenv("GOOGLE_CLIENT_SECRET"),
-		os.Getenv("GOOGLE_REDIRECT_URL"),
-	)
-
-	githubProvider := auth.NewGitHubProvider(
-		os.Getenv("GITHUB_CLIENT_ID"),
-		os.Getenv("GITHUB_CLIENT_SECRET"),
-		os.Getenv("GITHUB_REDIRECT_URL"),
-	)
-
-	// --------------------------------------------------------
-	// Authentication Service
-	// --------------------------------------------------------
-
-	authService := auth.NewService(
-		repositories.User,
-		repositories.OAuth,
-		sessionService,
-		googleProvider,
-		githubProvider,
-	)
-
-	// --------------------------------------------------------
-	// OAuth Handler
-	// --------------------------------------------------------
-
-	oauthHandler := auth.NewOAuthHandler(
-		authService,
-		googleProvider,
-		githubProvider,
-		os.Getenv("FRONTEND_URL"),
-		os.Getenv("AUTH_COOKIE_SECURE") == "true",
-		7*24*60*60*1000000000, // 7 days
 	)
 
 	// --------------------------------------------------------
@@ -303,13 +255,6 @@ func New(
 
 		Guards: appGuards,
 
-		OAuth: OAuthProviders{
-			Google: googleProvider,
-			GitHub: githubProvider,
-		},
-
-		AuthHandler: oauthHandler,
-
 		Services: Services{
 			Activity: services.NewActivityService(
 				repositories.Activity,
@@ -320,6 +265,7 @@ func New(
 				repositories.Chat,
 				appGuards.Chat,
 				aiClient,
+				chatBroker,
 			),
 
 			File: services.NewFileService(
@@ -351,8 +297,6 @@ func New(
 			),
 
 			Session: sessionService,
-
-			Auth: authService,
 		},
 	}, nil
 }

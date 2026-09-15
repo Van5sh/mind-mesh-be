@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"example/hello/internal/apperrors"
@@ -21,23 +22,20 @@ type Service struct {
 	oauthRepo  *repository.OAuthRepository
 	sessionSvc *services.SessionService
 
-	google *GoogleProvider
-	github *GitHubProvider
+	firebase *FirebaseProvider
 }
 
 func NewService(
 	userRepo *repository.UserRepository,
 	oauthRepo *repository.OAuthRepository,
 	sessionSvc *services.SessionService,
-	google *GoogleProvider,
-	github *GitHubProvider,
+	firebase *FirebaseProvider,
 ) *Service {
 	return &Service{
 		userRepo:   userRepo,
 		oauthRepo:  oauthRepo,
 		sessionSvc: sessionSvc,
-		google:     google,
-		github:     github,
+		firebase:   firebase,
 	}
 }
 
@@ -56,44 +54,38 @@ type OAuthUser struct {
 // OAuth Login
 // ============================================================
 
-func (s *Service) LoginWithGoogle(
+// LoginWithFirebase verifies a Firebase ID token - obtained client-side via
+// the Firebase JS SDK after the user completes a Google or GitHub sign-in -
+// and finds-or-creates the matching local user, exactly like the old
+// direct-OAuth2 flow did. This is the only entry point into
+// LoginWithOAuth now; Firebase's console is configured with both Google
+// and GitHub as sign-in providers, so both arrive here identically.
+func (s *Service) LoginWithFirebase(
 	ctx context.Context,
-	code string,
+	idToken string,
 ) (database.User, database.Session, error) {
 
-	googleUser, err := s.google.Exchange(ctx, code)
+	identity, err := s.firebase.VerifyIDToken(ctx, idToken)
 	if err != nil {
-		return database.User{}, database.Session{}, err
+		return database.User{}, database.Session{},
+			apperrors.UnauthorizedError("invalid firebase id token")
+	}
+
+	firstName, lastName := splitName(identity.Name)
+
+	username := firstName
+	if username == "" {
+		username = emailLocalPart(identity.Email)
 	}
 
 	oauthUser := OAuthUser{
-		Provider:       "GOOGLE",
-		ProviderUserID: googleUser.Sub,
-		Email:          googleUser.Email,
-		Username:       googleUser.GivenName,
-		FirstName:      googleUser.GivenName,
-		LastName:       googleUser.FamilyName,
-		AvatarURL:      googleUser.Picture,
-	}
-
-	return s.LoginWithOAuth(ctx, oauthUser)
-}
-
-func (s *Service) LoginWithGitHub(
-	ctx context.Context,
-	code string,
-) (database.User, database.Session, error) {
-
-	githubUser, err := s.github.Exchange(ctx, code)
-	if err != nil {
-		return database.User{}, database.Session{}, err
-	}
-
-	oauthUser := OAuthUser{
-		Provider:       "GITHUB",
-		ProviderUserID: GitHubUserID(githubUser),
-		Email:          githubUser.Email,
-		Username:       githubUser.Login,
+		Provider:       identity.Provider,
+		ProviderUserID: identity.ProviderUserID,
+		Email:          identity.Email,
+		Username:       username,
+		FirstName:      firstName,
+		LastName:       lastName,
+		AvatarURL:      identity.AvatarURL,
 	}
 
 	return s.LoginWithOAuth(ctx, oauthUser)
@@ -360,6 +352,33 @@ func newUUID() pgtype.UUID {
 		Bytes: id,
 		Valid: true,
 	}
+}
+
+// splitName splits a Firebase display name ("Ada Lovelace") into a first
+// and last name the way the old Google flow's given_name/family_name
+// claims used to arrive pre-split. Firebase only gives one "name" claim,
+// so this is a best-effort heuristic, not a guarantee.
+func splitName(name string) (first string, last string) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", ""
+	}
+
+	parts := strings.SplitN(name, " ", 2)
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return parts[0], parts[1]
+}
+
+// emailLocalPart returns the part of an email before "@", used as a
+// username seed when there's no display name to derive one from.
+func emailLocalPart(email string) string {
+	at := strings.Index(email, "@")
+	if at <= 0 {
+		return email
+	}
+	return email[:at]
 }
 
 func textFromString(value string) pgtype.Text {

@@ -1,50 +1,37 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"example/hello/internal/repository"
 	"example/hello/internal/services"
 )
 
-const (
-	defaultFrontendURL = "http://localhost:3000"
-	googleCallbackPath = "/auth/google/callback"
-	githubCallbackPath = "/auth/github/callback"
-)
+const defaultFrontendURL = "http://localhost:3000"
 
-// NewOAuthHandlerFromEnvironment builds the complete OAuth flow from the
-// application's environment. Register the returned handler's four HTTP
-// methods at the callback URLs configured with Google and GitHub.
+// NewOAuthHandlerFromEnvironment builds authentication from the
+// application's environment: a Firebase Admin SDK client (verifies ID
+// tokens for Google/GitHub sign-ins that happened client-side via the
+// Firebase JS SDK) plus the existing session-cookie machinery. Register
+// the returned handler's FirebaseLogin method at POST /auth/firebase.
 func NewOAuthHandlerFromEnvironment(
+	ctx context.Context,
 	userRepo *repository.UserRepository,
 	oauthRepo *repository.OAuthRepository,
 	sessionSvc *services.SessionService,
 ) (*OAuthHandler, error) {
-	baseURL := strings.TrimRight(os.Getenv("API_BASE_URL"), "/")
-	if baseURL == "" {
-		baseURL = "http://localhost:8080"
+	credentialsPath, err := requiredEnv("FIREBASE_CREDENTIALS_PATH")
+	if err != nil {
+		return nil, err
 	}
 
-	googleClientID, err := requiredEnv("GOOGLE_CLIENT_ID")
+	firebaseProvider, err := NewFirebaseProvider(ctx, credentialsPath)
 	if err != nil {
-		return nil, err
-	}
-	googleClientSecret, err := requiredEnv("GOOGLE_CLIENT_SECRET")
-	if err != nil {
-		return nil, err
-	}
-	githubClientID, err := requiredEnv("GITHUB_CLIENT_ID")
-	if err != nil {
-		return nil, err
-	}
-	githubClientSecret, err := requiredEnv("GITHUB_CLIENT_SECRET")
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("initialize firebase: %w", err)
 	}
 
 	frontendURL := os.Getenv("FRONTEND_URL")
@@ -61,17 +48,15 @@ func NewOAuthHandlerFromEnvironment(
 		secureCookie = parsed
 	}
 
-	google := NewGoogleProvider(googleClientID, googleClientSecret, baseURL+googleCallbackPath)
-	github := NewGitHubProvider(githubClientID, githubClientSecret, baseURL+githubCallbackPath)
-	service := NewService(userRepo, oauthRepo, sessionSvc, google, github)
+	service := NewService(userRepo, oauthRepo, sessionSvc, firebaseProvider)
 
-	return NewOAuthHandler(service, google, github, frontendURL, secureCookie, 7*24*time.Hour), nil
+	return NewOAuthHandler(service, frontendURL, secureCookie, 7*24*time.Hour), nil
 }
 
 func requiredEnv(name string) (string, error) {
 	value := os.Getenv(name)
 	if value == "" {
-		return "", fmt.Errorf("%s is required for OAuth", name)
+		return "", fmt.Errorf("%s is required for authentication", name)
 	}
 	return value, nil
 }

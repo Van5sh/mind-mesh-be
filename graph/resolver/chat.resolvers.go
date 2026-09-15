@@ -525,6 +525,58 @@ func (r *queryResolver) ActiveChats(ctx context.Context, projectID string) ([]*m
 	return result, nil
 }
 
+// ChatMessageAdded is the resolver for the chatMessageAdded field. It
+// authorizes exactly like every other chat resolver (must be the chat's
+// project owner or a member), then bridges the in-process ChatBroker's raw
+// database.ChatMessage channel into a channel of *model.ChatMessage, which
+// is the shape gqlgen's websocket transport expects: it reads from the
+// returned channel for as long as the client stays subscribed and pushes
+// each value down as a "next" message, stopping when the channel closes.
+func (r *subscriptionResolver) ChatMessageAdded(ctx context.Context, chatID string) (<-chan *model.ChatMessage, error) {
+	cID, err := parseUUID(chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	chat, err := r.App.Services.Chat.GetChatByID(ctx, cID)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, chat.ProjectID); err != nil {
+		return nil, err
+	}
+
+	source, unsubscribe, err := r.App.Services.Chat.SubscribeToMessages(ctx, cID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(chan *model.ChatMessage, 1)
+
+	go func() {
+		defer close(out)
+		defer unsubscribe()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case message, ok := <-source:
+				if !ok {
+					return
+				}
+				select {
+				case out <- helpers.ChatMessageToModel(message):
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+
+	return out, nil
+}
+
 // Chat returns graph.ChatResolver implementation.
 func (r *Resolver) Chat() graph.ChatResolver { return &chatResolver{r} }
 

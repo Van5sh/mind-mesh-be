@@ -314,6 +314,9 @@ type ShareFileInput struct {
 	Permission FilePermission `json:"permission"`
 }
 
+type Subscription struct {
+}
+
 type TransferProjectOwnershipInput struct {
 	ProjectID string `json:"projectId"`
 	OwnerID   string `json:"ownerId"`

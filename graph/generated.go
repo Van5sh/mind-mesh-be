@@ -36,6 +36,7 @@ type ResolverRoot interface {
 	Mutation() MutationResolver
 	Project() ProjectResolver
 	Query() QueryResolver
+	Subscription() SubscriptionResolver
 	User() UserResolver
 }
 
@@ -328,6 +329,11 @@ type ComplexityRoot struct {
 		Status        func(childComplexity int) int
 	}
 
+	Subscription struct {
+		ChatMessageAdded func(childComplexity int, chatID string) int
+		Empty            func(childComplexity int) int
+	}
+
 	User struct {
 		CreatedAt          func(childComplexity int) int
 		Email              func(childComplexity int) int
@@ -471,6 +477,10 @@ type QueryResolver interface {
 	UserProfile(ctx context.Context, userID string) (*model.UserProfile, error)
 	AllUsers(ctx context.Context) ([]*model.User, error)
 	Users(ctx context.Context, ids []string) ([]*model.User, error)
+}
+type SubscriptionResolver interface {
+	Empty(ctx context.Context) (<-chan *bool, error)
+	ChatMessageAdded(ctx context.Context, chatID string) (<-chan *model.ChatMessage, error)
 }
 type UserResolver interface {
 	Profile(ctx context.Context, obj *model.User) (*model.UserProfile, error)
@@ -2274,6 +2284,24 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.ReportProperties.Status(childComplexity), true
 
+	case "Subscription.chatMessageAdded":
+		if e.ComplexityRoot.Subscription.ChatMessageAdded == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_chatMessageAdded_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Subscription.ChatMessageAdded(childComplexity, args["chatId"].(string)), true
+	case "Subscription._empty":
+		if e.ComplexityRoot.Subscription.Empty == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Subscription.Empty(childComplexity), true
+
 	case "User.createdAt":
 		if e.ComplexityRoot.User.CreatedAt == nil {
 			break
@@ -2453,6 +2481,23 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
 			data := ec._Mutation(ctx, opCtx.Operation.SelectionSet)
 			var buf bytes.Buffer
+			data.MarshalGQL(&buf)
+
+			return &graphql.Response{
+				Data: buf.Bytes(),
+			}
+		}
+	case ast.Subscription:
+		next := ec._Subscription(ctx, opCtx.Operation.SelectionSet)
+
+		var buf bytes.Buffer
+		return func(ctx context.Context) *graphql.Response {
+			buf.Reset()
+			data := next(ctx)
+
+			if data == nil {
+				return nil
+			}
 			data.MarshalGQL(&buf)
 
 			return &graphql.Response{
@@ -4366,6 +4411,20 @@ func (ec *executionContext) field_Query_users_args(ctx context.Context, rawArgs 
 		return nil, err
 	}
 	args["ids"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Subscription_chatMessageAdded_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["chatId"] = arg0
 	return args, nil
 }
 
@@ -11885,6 +11944,73 @@ func (ec *executionContext) fieldContext_ReportProperties_sourceChat(_ context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _Subscription__empty(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Subscription__empty(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Subscription().Empty(ctx)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *bool) graphql.Marshaler {
+			return ec.marshalOBoolean2ᚖbool(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Subscription__empty(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Subscription", field, true, true, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _Subscription_chatMessageAdded(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Subscription_chatMessageAdded(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Subscription().ChatMessageAdded(ctx, fc.Args["chatId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ChatMessage) graphql.Marshaler {
+			return ec.marshalNChatMessage2ᚖexampleᚋhelloᚋgraphᚋmodelᚐChatMessage(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Subscription_chatMessageAdded(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ChatMessage(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_chatMessageAdded_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _User_id(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -17741,6 +17867,28 @@ func (ec *executionContext) _ReportProperties(ctx context.Context, sel ast.Selec
 	})
 
 	return out
+}
+
+var subscriptionImplementors = []string{"Subscription"}
+
+func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func(ctx context.Context) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, subscriptionImplementors)
+	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
+		Object: "Subscription",
+	})
+	if len(fields) != 1 {
+		graphql.AddErrorf(ctx, "must subscribe to exactly one stream")
+		return nil
+	}
+
+	switch fields[0].Name {
+	case "_empty":
+		return ec._Subscription__empty(ctx, fields[0])
+	case "chatMessageAdded":
+		return ec._Subscription_chatMessageAdded(ctx, fields[0])
+	default:
+		panic("unknown field " + strconv.Quote(fields[0].Name))
+	}
 }
 
 var userImplementors = []string{"User"}

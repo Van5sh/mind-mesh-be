@@ -30,6 +30,16 @@ func (h *OAuthHandler) CORS(next http.Handler) http.Handler {
 	})
 }
 
+// FrontendOrigin returns the scheme://host this handler treats as the
+// single allowed origin - the same value CORS() checks incoming HTTP
+// requests against. Used by cmd/server/main.go to configure the same
+// allow-list for the WebSocket (subscriptions) transport's origin check,
+// which is a separate mechanism from CORS (browsers don't send CORS
+// preflight requests for WebSocket connections).
+func (h *OAuthHandler) FrontendOrigin() string {
+	return originFromURL(h.frontendURL)
+}
+
 func originFromURL(rawURL string) string {
 	parsed, err := url.Parse(rawURL)
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {

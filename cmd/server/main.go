@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"example/hello/graph"
 	graphresolver "example/hello/graph/resolver"
@@ -17,6 +18,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/coder/websocket"
 	"github.com/gofiber/fiber"
 	"github.com/joho/godotenv"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
@@ -24,6 +26,17 @@ import (
 )
 
 const defaultPort = "8080"
+
+// defaultWSPort is where GraphQL subscriptions (WebSocket) are served -
+// deliberately a *separate* listener from defaultPort. See
+// BACKEND_HANDOFF.md's "Real-time chat" section for why: this server uses
+// Fiber v1 over fasthttp for the main port, and fasthttp's net/http bridge
+// (fasthttpadaptor) can't perform a WebSocket upgrade - it buffers the
+// whole response instead of exposing a hijackable connection. Subscriptions
+// are instead served by a second, plain net/http listener running the same
+// gqlgen handler (same schema, resolvers, and auth middleware - just a
+// second transport door into the identical server).
+const defaultWSPort = "8081"
 
 func StartServer() {
 
@@ -74,6 +87,7 @@ func StartServer() {
 
 	oauthHandler, err :=
 		auth.NewOAuthHandlerFromEnvironment(
+			ctx,
 			application.Repositories.User,
 			application.Repositories.OAuth,
 			application.Services.Session,
@@ -81,7 +95,7 @@ func StartServer() {
 
 	if err != nil {
 		log.Fatalf(
-			"initialize OAuth: %v",
+			"initialize authentication: %v",
 			err,
 		)
 	}
@@ -111,6 +125,24 @@ func StartServer() {
 
 	srv.AddTransport(
 		transport.MultipartForm{},
+	)
+
+	srv.AddTransport(
+		transport.Websocket{
+			KeepAlivePingInterval: 15 * time.Second,
+			Implementation: transport.CoderWebsocketImplementation{
+				AcceptOptions: websocket.AcceptOptions{
+					// The API and frontend are different origins in every
+					// real deployment, so the default (same-origin only)
+					// would reject every browser subscription. Restrict
+					// this to exactly the configured frontend, matching
+					// the HTTP CORS policy above.
+					OriginPatterns: []string{
+						oauthHandler.FrontendOrigin(),
+					},
+				},
+			},
+		},
 	)
 
 	srv.SetQueryCache(
@@ -167,49 +199,17 @@ func StartServer() {
 		},
 	)
 
-	server.Get(
-		"/auth/google",
+	// The actual Google/GitHub OAuth handshake happens client-side via the
+	// Firebase JS SDK now - this is the only auth route left on this
+	// server, and it just verifies the Firebase ID token the frontend
+	// already has afterward. See BACKEND_HANDOFF.md §3.
+	server.Post(
+		"/auth/firebase",
 		func(c *fiber.Ctx) {
 
 			fasthttpadaptor.NewFastHTTPHandler(
 				http.HandlerFunc(
-					oauthHandler.GoogleLogin,
-				),
-			)(c.Fasthttp)
-		},
-	)
-
-	server.Get(
-		"/auth/google/callback",
-		func(c *fiber.Ctx) {
-
-			fasthttpadaptor.NewFastHTTPHandler(
-				http.HandlerFunc(
-					oauthHandler.GoogleCallback,
-				),
-			)(c.Fasthttp)
-		},
-	)
-
-	server.Get(
-		"/auth/github",
-		func(c *fiber.Ctx) {
-
-			fasthttpadaptor.NewFastHTTPHandler(
-				http.HandlerFunc(
-					oauthHandler.GitHubLogin,
-				),
-			)(c.Fasthttp)
-		},
-	)
-
-	server.Get(
-		"/auth/github/callback",
-		func(c *fiber.Ctx) {
-
-			fasthttpadaptor.NewFastHTTPHandler(
-				http.HandlerFunc(
-					oauthHandler.GitHubCallback,
+					oauthHandler.FirebaseLogin,
 				),
 			)(c.Fasthttp)
 		},
@@ -236,6 +236,29 @@ func StartServer() {
 		awsConfig.S3Bucket,
 		awsConfig.DynamoDBTable,
 	)
+
+	wsPort := os.Getenv("WS_PORT")
+	if wsPort == "" {
+		wsPort = defaultWSPort
+	}
+
+	// Runs the identical graphqlHandler (same schema, resolvers, auth) on
+	// a second, plain net/http listener so GraphQL subscriptions
+	// (WebSocket) work - see the defaultWSPort comment above for why this
+	// can't just be another route on the Fiber server above.
+	go func() {
+		log.Printf(
+			"📡 GraphQL subscriptions (WebSocket) at ws://localhost:%s/query",
+			wsPort,
+		)
+
+		if err := http.ListenAndServe(":"+wsPort, graphqlHandler); err != nil {
+			log.Fatalf(
+				"start websocket server: %v",
+				err,
+			)
+		}
+	}()
 
 	if err := server.Listen(":" + port); err != nil {
 		log.Fatalf(

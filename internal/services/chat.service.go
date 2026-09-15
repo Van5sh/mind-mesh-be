@@ -7,6 +7,7 @@ import (
 	"example/hello/internal/apperrors"
 	"example/hello/internal/database"
 	"example/hello/internal/guards"
+	"example/hello/internal/realtime"
 	"example/hello/internal/repository"
 	"example/hello/internal/services/ai"
 	"example/hello/internal/validators"
@@ -18,18 +19,42 @@ type ChatService struct {
 	repo   *repository.ChatRepository
 	guard  *guards.ChatGuard
 	aiChat *ai.Client
+	broker *realtime.ChatBroker
 }
 
 func NewChatService(
 	repo *repository.ChatRepository,
 	guard *guards.ChatGuard,
 	aiChat *ai.Client,
+	broker *realtime.ChatBroker,
 ) *ChatService {
 	return &ChatService{
 		repo:   repo,
 		guard:  guard,
 		aiChat: aiChat,
+		broker: broker,
 	}
+}
+
+// SubscribeToMessages registers a listener for a chat's messages, for the
+// chatMessageAdded GraphQL subscription. The caller (the subscription
+// resolver) is responsible for authorization - this mirrors every other
+// ChatService method, which only guards for existence and leaves project
+// membership checks to the resolver layer.
+func (s *ChatService) SubscribeToMessages(
+	ctx context.Context,
+	chatID pgtype.UUID,
+) (<-chan database.ChatMessage, func(), error) {
+	if err := validators.ValidateUUID("chat id", chatID); err != nil {
+		return nil, nil, err
+	}
+
+	if _, err := s.guard.EnsureChatExists(ctx, chatID); err != nil {
+		return nil, nil, err
+	}
+
+	source, unsubscribe := s.broker.Subscribe(chatID)
+	return source, unsubscribe, nil
 }
 
 // CreateChat creates a new chat.
@@ -331,6 +356,8 @@ func (s *ChatService) CreateChatMessage(
 		)
 	}
 
+	s.broker.Publish(message)
+
 	// AI_ASSISTANT chats get an automatic reply to user messages. A
 	// failure here must not fail message creation: the user's message
 	// is already saved, and the AI companion being unavailable is a
@@ -360,14 +387,17 @@ func (s *ChatService) generateAIReply(
 		return
 	}
 
-	if _, err := s.repo.CreateChatMessage(ctx, database.CreateChatMessageParams{
+	aiMessage, err := s.repo.CreateChatMessage(ctx, database.CreateChatMessageParams{
 		ChatID:  chat.ID,
 		Role:    database.MessageRoleAI,
 		Content: result.Answer,
-	}); err != nil {
+	})
+	if err != nil {
 		log.Printf("failed to save AI reply for chat %s: %v", chat.ID.String(), err)
 		return
 	}
+
+	s.broker.Publish(aiMessage)
 
 	if err := s.repo.UpdateChatActivity(ctx, chat.ID); err != nil {
 		log.Printf("failed to update chat activity after AI reply for chat %s: %v", chat.ID.String(), err)
