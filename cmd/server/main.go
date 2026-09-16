@@ -25,7 +25,7 @@ import (
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
-const defaultPort = "8080"
+const defaultPort = "8090"
 
 // defaultWSPort is where GraphQL subscriptions (WebSocket) are served -
 // deliberately a *separate* listener from defaultPort. See
