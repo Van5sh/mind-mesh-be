@@ -1,6 +1,6 @@
 import logging
 
-from langchain_ollama import OllamaLLM
+from langchain_groq import ChatGroq
 
 from ai.config.settings import settings
 
@@ -16,12 +16,12 @@ _SYSTEM_PROMPT = (
 
 
 class LLMProvider:
-    """Generates grounded chat answers using the configured Ollama model."""
+    """Generates grounded chat answers using the configured Groq model."""
 
     def __init__(self):
-        self.llm = OllamaLLM(
-            model=settings.OLLAMA_MODEL,
-            base_url=settings.OLLAMA_BASE_URL,
+        self.llm = ChatGroq(
+            model=settings.GROQ_MODEL,
+            api_key=settings.GROQ_API_KEY,
         )
 
     def generate_answer(self, question: str, context_chunks: list[str]) -> str:
@@ -49,8 +49,8 @@ class LLMProvider:
         )
 
         try:
-            answer = self.llm.invoke(prompt)
-            return answer.strip()
+            response = self.llm.invoke(prompt)
+            return response.content.strip()
         except Exception as e:
             logger.error(f"Error generating LLM answer: {e}")
             raise
