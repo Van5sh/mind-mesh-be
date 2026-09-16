@@ -38,6 +38,7 @@ func (r *mutationResolver) CreateProject(ctx context.Context, input model.Create
 			OwnerID:     userId,
 			Name:        input.Name,
 			Description: description,
+			Visibility:  database.ProjectVisibility(input.Visibility),
 		},
 	)
 	if err != nil {
