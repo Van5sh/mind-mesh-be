@@ -7,123 +7,442 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"time"
+
+	"github.com/99designs/gqlgen/graphql"
 )
 
-type AuthPayload struct {
-	Token string `json:"token"`
-	User  *User  `json:"user"`
+type FolderItem interface {
+	IsFolderItem()
+}
+
+type ActivityLog struct {
+	ID         string    `json:"id"`
+	Project    *Project  `json:"project,omitempty"`
+	User       *User     `json:"user,omitempty"`
+	Action     string    `json:"action"`
+	EntityType *string   `json:"entityType,omitempty"`
+	EntityID   *string   `json:"entityId,omitempty"`
+	CreatedAt  time.Time `json:"createdAt"`
+}
+
+type AddProjectMemberInput struct {
+	ProjectID string            `json:"projectId"`
+	UserID    string            `json:"userId"`
+	Role      ProjectMemberRole `json:"role"`
 }
 
 type Chat struct {
-	ID        string  `json:"id"`
-	ProjectID *string `json:"project_id,omitempty"`
-	Prompt    string  `json:"prompt"`
-	Response  string  `json:"response"`
-	CreatedAt *string `json:"createdAt,omitempty"`
-	UpdatedAt *string `json:"updatedAt,omitempty"`
+	ID             string             `json:"id"`
+	Project        *Project           `json:"project"`
+	Title          *string            `json:"title,omitempty"`
+	Type           ChatType           `json:"type"`
+	Status         ChatStatus         `json:"status"`
+	LastActivityAt time.Time          `json:"lastActivityAt"`
+	Participants   []*ChatParticipant `json:"participants"`
+	Messages       []*ChatMessage     `json:"messages"`
+	CreatedAt      time.Time          `json:"createdAt"`
+	UpdatedAt      time.Time          `json:"updatedAt"`
+}
+
+type ChatAIMetadata struct {
+	Message         *ChatMessage `json:"message"`
+	EmbeddingModel  *string      `json:"embeddingModel,omitempty"`
+	EmbeddingSynced bool         `json:"embeddingSynced"`
+	IndexedAt       *time.Time   `json:"indexedAt,omitempty"`
+}
+
+type ChatMessage struct {
+	ID              string          `json:"id"`
+	Chat            *Chat           `json:"chat"`
+	Sender          *User           `json:"sender,omitempty"`
+	Role            MessageRole     `json:"role"`
+	Content         string          `json:"content"`
+	AiMetadata      *ChatAIMetadata `json:"aiMetadata,omitempty"`
+	MentionedUsers  []*User         `json:"mentionedUsers"`
+	ReferencedFiles []*File         `json:"referencedFiles"`
+	CreatedAt       time.Time       `json:"createdAt"`
+	UpdatedAt       time.Time       `json:"updatedAt"`
+}
+
+type ChatParticipant struct {
+	User     *User     `json:"user"`
+	JoinedAt time.Time `json:"joinedAt"`
+}
+
+type CreateActivityLogInput struct {
+	ProjectID  *string `json:"projectId,omitempty"`
+	UserID     *string `json:"userId,omitempty"`
+	Action     string  `json:"action"`
+	EntityType string  `json:"entityType"`
+	EntityID   string  `json:"entityId"`
+}
+
+type CreateChatInput struct {
+	ProjectID string   `json:"projectId"`
+	Title     string   `json:"title"`
+	Type      ChatType `json:"type"`
+}
+
+type CreateChatMessageInput struct {
+	ChatID  string      `json:"chatId"`
+	Role    MessageRole `json:"role"`
+	Content string      `json:"content"`
+}
+
+type CreateChatParticipantInput struct {
+	ChatID string `json:"chatId"`
+	UserID string `json:"userId"`
+}
+
+type CreateFileInput struct {
+	ProjectID string         `json:"projectId"`
+	FolderID  *string        `json:"folderId,omitempty"`
+	Name      string         `json:"name"`
+	File      graphql.Upload `json:"file"`
+}
+
+type CreateFlowchartInput struct {
+	ProjectID     string           `json:"projectId"`
+	Name          string           `json:"name"`
+	Data          string           `json:"data"`
+	GeneratedByID *string          `json:"generatedById,omitempty"`
+	GeneratedByAi *bool            `json:"generatedByAI,omitempty"`
+	Status        *FlowchartStatus `json:"status,omitempty"`
+	SourceChatID  *string          `json:"sourceChatId,omitempty"`
+}
+
+type CreateFolderInput struct {
+	ProjectID      string  `json:"projectId"`
+	ParentFolderID *string `json:"parentFolderId,omitempty"`
+	Name           string  `json:"name"`
+}
+
+type CreateProjectInput struct {
+	OwnerID     string            `json:"ownerId"`
+	Name        string            `json:"name"`
+	Description *string           `json:"description,omitempty"`
+	Visibility  ProjectVisibility `json:"visibility"`
+}
+
+type CreateReportInput struct {
+	ProjectID     string        `json:"projectId"`
+	Title         string        `json:"title"`
+	Content       string        `json:"content"`
+	Format        ReportFormat  `json:"format"`
+	GeneratedBy   *string       `json:"generatedBy,omitempty"`
+	GeneratedByAi *bool         `json:"generatedByAi,omitempty"`
+	Status        *ReportStatus `json:"status,omitempty"`
+	SourceChatID  *string       `json:"sourceChatId,omitempty"`
+}
+
+type CreateUserInput struct {
+	Username string `json:"username"`
+	Email    string `json:"email"`
 }
 
 type File struct {
-	ID        string  `json:"id"`
-	FileName  string  `json:"file_name"`
-	FileType  string  `json:"file_type"`
-	Size      *int32  `json:"size,omitempty"`
-	CreatedAt *string `json:"createdAt,omitempty"`
-	UpdatedAt *string `json:"updatedAt,omitempty"`
+	ID           string            `json:"id"`
+	Folder       *Folder           `json:"folder,omitempty"`
+	Name         string            `json:"name"`
+	Size         int               `json:"size"`
+	Storage      *FileStorage      `json:"storage,omitempty"`
+	Properties   *FileProperties   `json:"properties"`
+	AiMetadata   *FileAIMetadata   `json:"aiMetadata,omitempty"`
+	Shares       []*FileShare      `json:"shares"`
+	Preferences  []*FilePreference `json:"preferences"`
+	ProjectFiles []*ProjectFile    `json:"projectFiles"`
+	CreatedAt    time.Time         `json:"createdAt"`
+	UpdatedAt    time.Time         `json:"updatedAt"`
+}
+
+func (File) IsFolderItem() {}
+
+type FileAIMetadata struct {
+	File             *File                `json:"file"`
+	ExtractedText    *string              `json:"extractedText,omitempty"`
+	EmbeddingModel   *string              `json:"embeddingModel,omitempty"`
+	EmbeddingSynced  bool                 `json:"embeddingSynced"`
+	IndexedAt        *time.Time           `json:"indexedAt,omitempty"`
+	ProcessingStatus FileProcessingStatus `json:"processingStatus"`
+	Summary          *string              `json:"summary,omitempty"`
+	ErrorMessage     *string              `json:"errorMessage,omitempty"`
+	CreatedAt        time.Time            `json:"createdAt"`
+	UpdatedAt        time.Time            `json:"updatedAt"`
+}
+
+type FilePreference struct {
+	User       *User     `json:"user"`
+	File       *File     `json:"file"`
+	IsFavorite bool      `json:"isFavorite"`
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
+}
+
+type FileProperties struct {
+	File         *File      `json:"file"`
+	OriginalName *string    `json:"originalName,omitempty"`
+	IsIndexed    bool       `json:"isIndexed"`
+	DeletedAt    *time.Time `json:"deletedAt,omitempty"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	UpdatedAt    time.Time  `json:"updatedAt"`
+}
+
+type FileShare struct {
+	ID         string         `json:"id"`
+	File       *File          `json:"file"`
+	SharedBy   *User          `json:"sharedBy"`
+	SharedWith *User          `json:"sharedWith"`
+	Permission FilePermission `json:"permission"`
+	CreatedAt  time.Time      `json:"createdAt"`
+}
+
+type FileStorage struct {
+	File        *File     `json:"file"`
+	BucketName  string    `json:"bucketName"`
+	ObjectKey   string    `json:"objectKey"`
+	Etag        *string   `json:"etag,omitempty"`
+	VersionID   *string   `json:"versionId,omitempty"`
+	Checksum    *string   `json:"checksum,omitempty"`
+	MimeType    string    `json:"mimeType"`
+	UploadedBy  *User     `json:"uploadedBy"`
+	DownloadURL string    `json:"downloadUrl"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type Flowchart struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Data string `json:"data"`
+	ID            string          `json:"id"`
+	Project       *Project        `json:"project"`
+	Name          string          `json:"name"`
+	Data          string          `json:"data"`
+	GeneratedBy   *User           `json:"generatedBy,omitempty"`
+	GeneratedByAi bool            `json:"generatedByAI"`
+	Status        FlowchartStatus `json:"status"`
+	SourceChat    *Chat           `json:"sourceChat,omitempty"`
+	CreatedAt     time.Time       `json:"createdAt"`
+	UpdatedAt     time.Time       `json:"updatedAt"`
 }
 
 type Folder struct {
-	ID          string  `json:"id"`
-	FolderName  string  `json:"folder_name"`
-	FolderSize  *int32  `json:"folder_size,omitempty"`
-	FolderItems []*File `json:"folder_items"`
-	CreatedAt   *string `json:"createdAt,omitempty"`
-	UpdatedAt   *string `json:"updatedAt,omitempty"`
+	ID           string    `json:"id"`
+	Project      *Project  `json:"project,omitempty"`
+	ParentFolder *Folder   `json:"parentFolder,omitempty"`
+	ChildFolders []*Folder `json:"childFolders"`
+	Files        []*File   `json:"files"`
+	Name         string    `json:"name"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+}
+
+func (Folder) IsFolderItem() {}
+
+type MoveFileInput struct {
+	FileID   string  `json:"fileId"`
+	FolderID *string `json:"folderId,omitempty"`
 }
 
 type Mutation struct {
 }
 
-type NewUser struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+type Project struct {
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	Description  *string           `json:"description,omitempty"`
+	Visibility   ProjectVisibility `json:"visibility"`
+	Owner        *User             `json:"owner"`
+	Members      []*ProjectMember  `json:"members"`
+	Folders      []*Folder         `json:"folders"`
+	Files        []*ProjectFile    `json:"files"`
+	Chats        []*Chat           `json:"chats"`
+	Reports      []*Report         `json:"reports"`
+	Flowcharts   []*Flowchart      `json:"flowcharts"`
+	ActivityLogs []*ActivityLog    `json:"activityLogs"`
+	ArchivedAt   *time.Time        `json:"archivedAt,omitempty"`
+	CreatedAt    time.Time         `json:"createdAt"`
+	UpdatedAt    time.Time         `json:"updatedAt"`
 }
 
-type Project struct {
-	ID          string       `json:"id"`
-	ProjectName string       `json:"project_name"`
-	Description *string      `json:"description,omitempty"`
-	Chats       []*Chat      `json:"chats,omitempty"`
-	TechStacks  []*TechStack `json:"techStacks,omitempty"`
-	Flowcharts  []*Flowchart `json:"flowcharts,omitempty"`
+type ProjectFile struct {
+	Project   *Project  `json:"project"`
+	File      *File     `json:"file"`
+	Folder    *Folder   `json:"folder,omitempty"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+type ProjectMember struct {
+	ID        string      `json:"id"`
+	Role      ProjectRole `json:"role"`
+	User      *User       `json:"user"`
+	Project   *Project    `json:"project"`
+	CreatedAt time.Time   `json:"createdAt"`
+	UpdatedAt time.Time   `json:"updatedAt"`
 }
 
 type Query struct {
 }
 
-type TechStack struct {
-	Stacks []string `json:"Stacks"`
+type Report struct {
+	ID         string            `json:"id"`
+	Project    *Project          `json:"project"`
+	Title      string            `json:"title"`
+	Content    string            `json:"content"`
+	Format     ReportFormat      `json:"format"`
+	Properties *ReportProperties `json:"properties"`
+	CreatedAt  time.Time         `json:"createdAt"`
+	UpdatedAt  time.Time         `json:"updatedAt"`
+}
+
+type ReportProperties struct {
+	Report        *Report      `json:"report"`
+	GeneratedBy   *User        `json:"generatedBy"`
+	GeneratedByAi bool         `json:"generatedByAI"`
+	Status        ReportStatus `json:"status"`
+	SourceChat    *Chat        `json:"sourceChat,omitempty"`
+}
+
+type SetFileFavoriteInput struct {
+	UserID     string `json:"userId"`
+	FileID     string `json:"fileId"`
+	IsFavorite bool   `json:"isFavorite"`
+}
+
+type ShareFileInput struct {
+	FileID     string         `json:"fileId"`
+	SharedBy   string         `json:"sharedBy"`
+	SharedWith string         `json:"sharedWith"`
+	Permission FilePermission `json:"permission"`
+}
+
+type Subscription struct {
+}
+
+type TransferProjectOwnershipInput struct {
+	ProjectID string `json:"projectId"`
+	OwnerID   string `json:"ownerId"`
+}
+
+type UpdateChatInput struct {
+	Title  *string     `json:"title,omitempty"`
+	Type   *ChatType   `json:"type,omitempty"`
+	Status *ChatStatus `json:"status,omitempty"`
+}
+
+type UpdateChatMessageInput struct {
+	ID      string `json:"id"`
+	Content string `json:"content"`
+}
+
+type UpdateFlowchartInput struct {
+	Name          *string          `json:"name,omitempty"`
+	Data          *string          `json:"data,omitempty"`
+	GeneratedBy   *string          `json:"generatedBy,omitempty"`
+	GeneratedByAi *bool            `json:"generatedByAI,omitempty"`
+	Status        *FlowchartStatus `json:"status,omitempty"`
+	SourceChatID  *string          `json:"sourceChatId,omitempty"`
+}
+
+type UpdateProjectInput struct {
+	Name        *string            `json:"name,omitempty"`
+	Description *string            `json:"description,omitempty"`
+	Visibility  *ProjectVisibility `json:"visibility,omitempty"`
+}
+
+type UpdateProjectMemberRoleInput struct {
+	ProjectID string            `json:"projectId"`
+	UserID    string            `json:"userId"`
+	Role      ProjectMemberRole `json:"role"`
+}
+
+type UpdateReportInput struct {
+	Title   *string       `json:"title,omitempty"`
+	Content *string       `json:"content,omitempty"`
+	Format  *ReportFormat `json:"format,omitempty"`
+}
+
+type UpdateUserAvatarInput struct {
+	AvatarURL string `json:"avatarUrl"`
+}
+
+type UpdateUserInput struct {
+	Username string `json:"username"`
+	Email    string `json:"email"`
+}
+
+type UpdateUserProfileInput struct {
+	FirstName string  `json:"firstName"`
+	LastName  string  `json:"lastName"`
+	Bio       *string `json:"bio,omitempty"`
+	AvatarURL *string `json:"avatarUrl,omitempty"`
 }
 
 type User struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	Email     string  `json:"email"`
-	Password  string  `json:"password"`
-	CreatedAt *string `json:"createdAt,omitempty"`
-	UpdatedAt *string `json:"updatedAt,omitempty"`
+	ID                 string           `json:"id"`
+	Username           string           `json:"username"`
+	Email              string           `json:"email"`
+	Profile            *UserProfile     `json:"profile,omitempty"`
+	OwnedProjects      []*Project       `json:"ownedProjects"`
+	ProjectMemberships []*ProjectMember `json:"projectMemberships"`
+	UploadedFiles      []*File          `json:"uploadedFiles"`
+	SharedFiles        []*FileShare     `json:"sharedFiles"`
+	CreatedAt          time.Time        `json:"createdAt"`
+	UpdatedAt          time.Time        `json:"updatedAt"`
 }
 
-type Types string
+type UserProfile struct {
+	User      *User     `json:"user"`
+	FirstName string    `json:"firstName"`
+	LastName  string    `json:"lastName"`
+	Bio       *string   `json:"bio,omitempty"`
+	AvatarURL *string   `json:"avatarUrl,omitempty"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type ChatStatus string
 
 const (
-	TypesReport  Types = "Report"
-	TypesProject Types = "Project"
+	ChatStatusActive     ChatStatus = "ACTIVE"
+	ChatStatusGenerating ChatStatus = "GENERATING"
+	ChatStatusArchived   ChatStatus = "ARCHIVED"
 )
 
-var AllTypes = []Types{
-	TypesReport,
-	TypesProject,
+var AllChatStatus = []ChatStatus{
+	ChatStatusActive,
+	ChatStatusGenerating,
+	ChatStatusArchived,
 }
 
-func (e Types) IsValid() bool {
+func (e ChatStatus) IsValid() bool {
 	switch e {
-	case TypesReport, TypesProject:
+	case ChatStatusActive, ChatStatusGenerating, ChatStatusArchived:
 		return true
 	}
 	return false
 }
 
-func (e Types) String() string {
+func (e ChatStatus) String() string {
 	return string(e)
 }
 
-func (e *Types) UnmarshalGQL(v any) error {
+func (e *ChatStatus) UnmarshalGQL(v any) error {
 	str, ok := v.(string)
 	if !ok {
 		return fmt.Errorf("enums must be strings")
 	}
 
-	*e = Types(str)
+	*e = ChatStatus(str)
 	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid Types", str)
+		return fmt.Errorf("%s is not a valid ChatStatus", str)
 	}
 	return nil
 }
 
-func (e Types) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+func (e ChatStatus) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
-func (e *Types) UnmarshalJSON(b []byte) error {
+func (e *ChatStatus) UnmarshalJSON(b []byte) error {
 	s, err := strconv.Unquote(string(b))
 	if err != nil {
 		return err
@@ -131,7 +450,581 @@ func (e *Types) UnmarshalJSON(b []byte) error {
 	return e.UnmarshalGQL(s)
 }
 
-func (e Types) MarshalJSON() ([]byte, error) {
+func (e ChatStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type ChatType string
+
+const (
+	ChatTypeGeneral     ChatType = "GENERAL"
+	ChatTypeAiAssistant ChatType = "AI_ASSISTANT"
+)
+
+var AllChatType = []ChatType{
+	ChatTypeGeneral,
+	ChatTypeAiAssistant,
+}
+
+func (e ChatType) IsValid() bool {
+	switch e {
+	case ChatTypeGeneral, ChatTypeAiAssistant:
+		return true
+	}
+	return false
+}
+
+func (e ChatType) String() string {
+	return string(e)
+}
+
+func (e *ChatType) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ChatType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ChatType", str)
+	}
+	return nil
+}
+
+func (e ChatType) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ChatType) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ChatType) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type FilePermission string
+
+const (
+	FilePermissionRead  FilePermission = "READ"
+	FilePermissionWrite FilePermission = "WRITE"
+)
+
+var AllFilePermission = []FilePermission{
+	FilePermissionRead,
+	FilePermissionWrite,
+}
+
+func (e FilePermission) IsValid() bool {
+	switch e {
+	case FilePermissionRead, FilePermissionWrite:
+		return true
+	}
+	return false
+}
+
+func (e FilePermission) String() string {
+	return string(e)
+}
+
+func (e *FilePermission) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FilePermission(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FilePermission", str)
+	}
+	return nil
+}
+
+func (e FilePermission) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *FilePermission) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e FilePermission) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type FileProcessingStatus string
+
+const (
+	FileProcessingStatusPending    FileProcessingStatus = "PENDING"
+	FileProcessingStatusProcessing FileProcessingStatus = "PROCESSING"
+	FileProcessingStatusCompleted  FileProcessingStatus = "COMPLETED"
+	FileProcessingStatusFailed     FileProcessingStatus = "FAILED"
+)
+
+var AllFileProcessingStatus = []FileProcessingStatus{
+	FileProcessingStatusPending,
+	FileProcessingStatusProcessing,
+	FileProcessingStatusCompleted,
+	FileProcessingStatusFailed,
+}
+
+func (e FileProcessingStatus) IsValid() bool {
+	switch e {
+	case FileProcessingStatusPending, FileProcessingStatusProcessing, FileProcessingStatusCompleted, FileProcessingStatusFailed:
+		return true
+	}
+	return false
+}
+
+func (e FileProcessingStatus) String() string {
+	return string(e)
+}
+
+func (e *FileProcessingStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FileProcessingStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FileProcessingStatus", str)
+	}
+	return nil
+}
+
+func (e FileProcessingStatus) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *FileProcessingStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e FileProcessingStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type FlowchartStatus string
+
+const (
+	FlowchartStatusDraft      FlowchartStatus = "DRAFT"
+	FlowchartStatusGenerating FlowchartStatus = "GENERATING"
+	FlowchartStatusReady      FlowchartStatus = "READY"
+	FlowchartStatusFailed     FlowchartStatus = "FAILED"
+)
+
+var AllFlowchartStatus = []FlowchartStatus{
+	FlowchartStatusDraft,
+	FlowchartStatusGenerating,
+	FlowchartStatusReady,
+	FlowchartStatusFailed,
+}
+
+func (e FlowchartStatus) IsValid() bool {
+	switch e {
+	case FlowchartStatusDraft, FlowchartStatusGenerating, FlowchartStatusReady, FlowchartStatusFailed:
+		return true
+	}
+	return false
+}
+
+func (e FlowchartStatus) String() string {
+	return string(e)
+}
+
+func (e *FlowchartStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FlowchartStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FlowchartStatus", str)
+	}
+	return nil
+}
+
+func (e FlowchartStatus) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *FlowchartStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e FlowchartStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type MessageRole string
+
+const (
+	MessageRoleUser   MessageRole = "USER"
+	MessageRoleAi     MessageRole = "AI"
+	MessageRoleSystem MessageRole = "SYSTEM"
+)
+
+var AllMessageRole = []MessageRole{
+	MessageRoleUser,
+	MessageRoleAi,
+	MessageRoleSystem,
+}
+
+func (e MessageRole) IsValid() bool {
+	switch e {
+	case MessageRoleUser, MessageRoleAi, MessageRoleSystem:
+		return true
+	}
+	return false
+}
+
+func (e MessageRole) String() string {
+	return string(e)
+}
+
+func (e *MessageRole) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = MessageRole(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid MessageRole", str)
+	}
+	return nil
+}
+
+func (e MessageRole) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *MessageRole) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e MessageRole) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type ProjectMemberRole string
+
+const (
+	ProjectMemberRoleOwner  ProjectMemberRole = "OWNER"
+	ProjectMemberRoleAdmin  ProjectMemberRole = "ADMIN"
+	ProjectMemberRoleMember ProjectMemberRole = "MEMBER"
+	ProjectMemberRoleViewer ProjectMemberRole = "VIEWER"
+)
+
+var AllProjectMemberRole = []ProjectMemberRole{
+	ProjectMemberRoleOwner,
+	ProjectMemberRoleAdmin,
+	ProjectMemberRoleMember,
+	ProjectMemberRoleViewer,
+}
+
+func (e ProjectMemberRole) IsValid() bool {
+	switch e {
+	case ProjectMemberRoleOwner, ProjectMemberRoleAdmin, ProjectMemberRoleMember, ProjectMemberRoleViewer:
+		return true
+	}
+	return false
+}
+
+func (e ProjectMemberRole) String() string {
+	return string(e)
+}
+
+func (e *ProjectMemberRole) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ProjectMemberRole(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ProjectMemberRole", str)
+	}
+	return nil
+}
+
+func (e ProjectMemberRole) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ProjectMemberRole) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ProjectMemberRole) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type ProjectRole string
+
+const (
+	ProjectRoleOwner  ProjectRole = "OWNER"
+	ProjectRoleAdmin  ProjectRole = "ADMIN"
+	ProjectRoleEditor ProjectRole = "EDITOR"
+	ProjectRoleViewer ProjectRole = "VIEWER"
+)
+
+var AllProjectRole = []ProjectRole{
+	ProjectRoleOwner,
+	ProjectRoleAdmin,
+	ProjectRoleEditor,
+	ProjectRoleViewer,
+}
+
+func (e ProjectRole) IsValid() bool {
+	switch e {
+	case ProjectRoleOwner, ProjectRoleAdmin, ProjectRoleEditor, ProjectRoleViewer:
+		return true
+	}
+	return false
+}
+
+func (e ProjectRole) String() string {
+	return string(e)
+}
+
+func (e *ProjectRole) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ProjectRole(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ProjectRole", str)
+	}
+	return nil
+}
+
+func (e ProjectRole) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ProjectRole) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ProjectRole) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type ProjectVisibility string
+
+const (
+	ProjectVisibilityPrivate ProjectVisibility = "PRIVATE"
+	ProjectVisibilityTeam    ProjectVisibility = "TEAM"
+)
+
+var AllProjectVisibility = []ProjectVisibility{
+	ProjectVisibilityPrivate,
+	ProjectVisibilityTeam,
+}
+
+func (e ProjectVisibility) IsValid() bool {
+	switch e {
+	case ProjectVisibilityPrivate, ProjectVisibilityTeam:
+		return true
+	}
+	return false
+}
+
+func (e ProjectVisibility) String() string {
+	return string(e)
+}
+
+func (e *ProjectVisibility) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ProjectVisibility(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ProjectVisibility", str)
+	}
+	return nil
+}
+
+func (e ProjectVisibility) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ProjectVisibility) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ProjectVisibility) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type ReportFormat string
+
+const (
+	ReportFormatMarkdown ReportFormat = "MARKDOWN"
+	ReportFormatPDF      ReportFormat = "PDF"
+	ReportFormatDocx     ReportFormat = "DOCX"
+)
+
+var AllReportFormat = []ReportFormat{
+	ReportFormatMarkdown,
+	ReportFormatPDF,
+	ReportFormatDocx,
+}
+
+func (e ReportFormat) IsValid() bool {
+	switch e {
+	case ReportFormatMarkdown, ReportFormatPDF, ReportFormatDocx:
+		return true
+	}
+	return false
+}
+
+func (e ReportFormat) String() string {
+	return string(e)
+}
+
+func (e *ReportFormat) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ReportFormat(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ReportFormat", str)
+	}
+	return nil
+}
+
+func (e ReportFormat) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ReportFormat) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ReportFormat) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type ReportStatus string
+
+const (
+	ReportStatusDraft      ReportStatus = "DRAFT"
+	ReportStatusGenerating ReportStatus = "GENERATING"
+	ReportStatusReady      ReportStatus = "READY"
+	ReportStatusFailed     ReportStatus = "FAILED"
+)
+
+var AllReportStatus = []ReportStatus{
+	ReportStatusDraft,
+	ReportStatusGenerating,
+	ReportStatusReady,
+	ReportStatusFailed,
+}
+
+func (e ReportStatus) IsValid() bool {
+	switch e {
+	case ReportStatusDraft, ReportStatusGenerating, ReportStatusReady, ReportStatusFailed:
+		return true
+	}
+	return false
+}
+
+func (e ReportStatus) String() string {
+	return string(e)
+}
+
+func (e *ReportStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ReportStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ReportStatus", str)
+	}
+	return nil
+}
+
+func (e ReportStatus) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ReportStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ReportStatus) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

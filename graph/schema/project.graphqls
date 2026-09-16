@@ -1,0 +1,104 @@
+type Project {
+  id: ID!
+  name: String!
+  description: String
+  visibility: ProjectVisibility!
+  owner: User!
+  members: [ProjectMember!]!
+  folders: [Folder!]!
+  files: [ProjectFile!]!
+  chats: [Chat!]!
+  reports: [Report!]!
+  flowcharts: [Flowchart!]!
+  activityLogs: [ActivityLog!]!
+  archivedAt: Time
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type ProjectMember {
+  id: ID!
+  role: ProjectRole!
+  user: User!
+  project: Project!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+enum ProjectMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+extend type Query {
+  # Single project
+  project(id: ID!): Project
+
+  # Projects
+  projects: [Project!]!
+  projectsByOwner(ownerId: ID!): [Project!]!
+  projectsForUser(userId: ID!): [Project!]!
+
+  # Archived projects
+  archivedProjectsByOwner(ownerId: ID!): [Project!]!
+  archivedProjectsForUser(userId: ID!): [Project!]!
+
+  # Members
+  projectMembers(projectId: ID!): [ProjectMember!]!
+}
+
+extend type Mutation {
+  # Project
+  createProject(input: CreateProjectInput!): Project!
+  updateProject(id: ID!, input: UpdateProjectInput!): Project!
+  archiveProject(projectId: ID!): Boolean!
+  restoreProject(projectId: ID!): Boolean!
+  deleteProject(id: ID!): Boolean!
+
+  # Ownership
+  transferProjectOwnership(
+    input: TransferProjectOwnershipInput!
+  ): Project!
+
+  # Members
+  addProjectMember(input: AddProjectMemberInput!): ProjectMember!
+  updateProjectMemberRole(
+    input: UpdateProjectMemberRoleInput!
+  ): ProjectMember!
+  removeProjectMember(
+    projectId: ID!
+    userId: ID!
+  ): Boolean!
+}
+
+input CreateProjectInput {
+  ownerId: ID!
+  name: String!
+  description: String
+  visibility: ProjectVisibility!
+}
+
+input UpdateProjectInput {
+  name: String
+  description: String
+  visibility: ProjectVisibility
+}
+
+input AddProjectMemberInput {
+  projectId: ID!
+  userId: ID!
+  role: ProjectMemberRole!
+}
+
+input UpdateProjectMemberRoleInput {
+  projectId: ID!
+  userId: ID!
+  role: ProjectMemberRole!
+}
+
+input TransferProjectOwnershipInput {
+  projectId: ID!
+  ownerId: ID!
+}

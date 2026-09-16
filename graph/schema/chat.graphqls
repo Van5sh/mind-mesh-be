@@ -1,0 +1,96 @@
+type Chat {
+  id: ID!
+  project: Project!
+  title: String
+  type: ChatType!
+  status: ChatStatus!
+  lastActivityAt: Time!
+  participants: [ChatParticipant!]!
+  messages: [ChatMessage!]!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type ChatParticipant {
+  user: User!
+  joinedAt: Time!
+}
+
+type ChatMessage {
+  id: ID!
+  chat: Chat!
+  sender: User
+  role: MessageRole!
+  content: String!
+  aiMetadata: ChatAIMetadata
+  mentionedUsers: [User!]!
+  referencedFiles: [File!]!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type ChatAIMetadata {
+  message: ChatMessage!
+  embeddingModel: String
+  embeddingSynced: Boolean!
+  indexedAt: Time
+}
+
+extend type Query {
+  chat(id: ID!): Chat
+  chats(projectId: ID!): [Chat!]!
+  myChats(projectId: ID): [Chat!]!
+  chatMessages(chatId: ID!): [ChatMessage!]!
+
+  archivedChats(projectId: ID!): [Chat!]!
+  activeChats(projectId: ID!): [Chat!]!
+}
+
+input CreateChatInput {
+  projectId: ID!
+  title: String!
+  type: ChatType!
+}
+
+input UpdateChatInput {
+  title: String
+  type: ChatType
+  status: ChatStatus
+}
+
+input CreateChatParticipantInput {
+  chatId: ID!
+  userId: ID!
+}
+
+input CreateChatMessageInput {
+  chatId: ID!
+  role: MessageRole!
+  content: String!
+}
+
+input UpdateChatMessageInput {
+  id: ID!
+  content: String!
+}
+
+extend type Mutation {
+  createChat(input: CreateChatInput!): Chat!
+  updateChat(id: ID!, input: UpdateChatInput!): Chat!
+  deleteChat(id: ID!): Boolean!
+
+  createChatParticipant(input: CreateChatParticipantInput!): ChatParticipant!
+  removeChatParticipant(chatId: ID!, userId: ID!): Boolean!
+
+  createChatMessage(input: CreateChatMessageInput!): ChatMessage!
+  updateChatMessage(input: UpdateChatMessageInput!): ChatMessage!
+  deleteChatMessage(id: ID!): Boolean!
+}
+
+# Real-time: pushes every new message (user-sent or AI-generated) for a
+# chat to subscribed clients over the GraphQL WebSocket transport, instead
+# of clients polling chatMessages(chatId). Requires the same project
+# membership as the chat's other operations - see resolver.
+extend type Subscription {
+  chatMessageAdded(chatId: ID!): ChatMessage!
+}

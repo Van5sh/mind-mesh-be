@@ -1,0 +1,103 @@
+type User {
+  id: ID!
+  username: String!
+  email: String!
+
+  profile: UserProfile
+
+  ownedProjects: [Project!]!
+  projectMemberships: [ProjectMember!]!
+  uploadedFiles: [File!]!
+  sharedFiles: [FileShare!]!
+
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type UserProfile {
+  user: User!
+
+  firstName: String!
+  lastName: String!
+
+  bio: String
+  avatarUrl: String
+
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+# ============================================================
+# Queries
+# ============================================================
+
+extend type Query {
+  me: User
+
+  user(id: ID!): User
+  userByEmail(email: String!): User
+  userByUsername(username: String!): User
+
+  userProfile(userId: ID!): UserProfile
+
+  allUsers: [User!]!
+  users(ids: [ID!]!): [User!]!
+}
+
+# ============================================================
+# Mutations
+# ============================================================
+
+extend type Mutation {
+  createUser(
+    input: CreateUserInput!
+  ): User!
+
+  updateUser(
+    id: ID!
+    input: UpdateUserInput!
+  ): User!
+
+  deleteUser(
+    id: ID!
+  ): Boolean!
+
+  updateUserProfile(
+    id: ID!
+    input: UpdateUserProfileInput!
+  ): UserProfile!
+
+  updateUserAvatar(
+    id: ID!
+    input: UpdateUserAvatarInput!
+  ): UserProfile!
+}
+
+# ============================================================
+# User Inputs
+# ============================================================
+
+input CreateUserInput {
+  username: String!
+  email: String!
+}
+
+input UpdateUserInput {
+  username: String!
+  email: String!
+}
+
+# ============================================================
+# User Profile Inputs
+# ============================================================
+
+input UpdateUserProfileInput {
+  firstName: String!
+  lastName: String!
+  bio: String
+  avatarUrl: String
+}
+
+input UpdateUserAvatarInput {
+  avatarUrl: String!
+}

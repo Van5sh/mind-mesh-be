@@ -1,0 +1,4 @@
+scalar Time
+scalar Int64
+scalar JSON
+scalar Upload

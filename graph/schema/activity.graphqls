@@ -1,0 +1,29 @@
+type ActivityLog {
+  id: ID!
+  project: Project
+  user: User
+  action: String!
+  entityType: String
+  entityId: ID
+  createdAt: Time!
+}
+
+input CreateActivityLogInput {
+  projectId: ID
+  userId: ID
+  action: String!
+  entityType: String!
+  entityId: String!
+}
+
+extend type Query {
+  activityLogs(
+    projectId: ID
+    userId: ID
+  ): [ActivityLog!]!
+}
+
+extend type Mutation {
+  createActivityLog(input: CreateActivityLogInput!): ActivityLog!
+  deleteActivityLogByID(id: ID!): Boolean!
+}

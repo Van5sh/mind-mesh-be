@@ -1,0 +1,154 @@
+services:
+
+  # =========================
+  # Go API
+  # =========================
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+
+    container_name: meshmind-api
+
+    env_file:
+      - .env
+
+    environment:
+      # Reach the AI service by its compose service name, not localhost
+      # (the value in .env is correct for running the binary directly
+      # on the host, but meaningless from inside this container).
+      AI_SERVICE_URL: http://ai-api:8000
+
+    ports:
+      - "8080:8080"
+
+    depends_on:
+      - ai-api
+
+    restart: unless-stopped
+
+
+  # =========================
+  # Python AI Worker (SQS consumer)
+  # =========================
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+
+    container_name: meshmind-worker
+
+    env_file:
+      # ai/.env, not root .env: the worker needs DB_HOST/DB_USER/... and
+      # OLLAMA_BASE_URL/OLLAMA_EMBEDDING_MODEL, none of which exist in
+      # the Go backend's .env.
+      - ./ai/.env
+
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      OLLAMA_BASE_URL: http://ollama:11434
+
+    depends_on:
+      qdrant:
+        condition: service_started
+      ollama-init:
+        condition: service_completed_successfully
+
+    restart: unless-stopped
+
+
+  # =========================
+  # Python AI API (chat Q&A over HTTP, called by the Go backend)
+  # =========================
+  ai-api:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+
+    container_name: meshmind-ai-api
+
+    command: ["uv", "run", "uvicorn", "ai.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+    env_file:
+      - ./ai/.env
+
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      OLLAMA_BASE_URL: http://ollama:11434
+
+    ports:
+      - "8000:8000"
+
+    depends_on:
+      qdrant:
+        condition: service_started
+      ollama-init:
+        condition: service_completed_successfully
+
+    restart: unless-stopped
+
+
+  # =========================
+  # Qdrant
+  # =========================
+  qdrant:
+    image: qdrant/qdrant:latest
+
+    container_name: qdrant
+
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+    restart: unless-stopped
+
+
+  # =========================
+  # Ollama (chat + embedding models)
+  # =========================
+  ollama:
+    image: ollama/ollama:latest
+
+    container_name: ollama
+
+    ports:
+      - "11434:11434"
+
+    volumes:
+      - ollama_data:/root/.ollama
+
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+    restart: unless-stopped
+
+  # One-shot: pulls the models worker/ai-api need, then exits. worker
+  # and ai-api wait for this to complete successfully before starting,
+  # so they never hit a "model not found" error on first request.
+  ollama-init:
+    image: ollama/ollama:latest
+
+    container_name: meshmind-ollama-init
+
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+
+    entrypoint: ["sh", "-c", "ollama pull mistral && ollama pull nomic-embed-text"]
+
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+    restart: "no"
+
+
+volumes:
+  qdrant_data:
+  ollama_data:
