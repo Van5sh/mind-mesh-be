@@ -215,6 +215,18 @@ func StartServer() {
 		},
 	)
 
+	server.Post(
+		"/auth/logout",
+		func(c *fiber.Ctx) {
+
+			fasthttpadaptor.NewFastHTTPHandler(
+				http.HandlerFunc(
+					oauthHandler.Logout,
+				),
+			)(c.Fasthttp)
+		},
+	)
+
 	log.Printf(
 		"🚀 Server ready at http://localhost:%s/",
 		port,

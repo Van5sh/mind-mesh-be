@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -103,6 +104,43 @@ func (h *OAuthHandler) FirebaseLogin(
 		Username: user.Username,
 		Email:    user.Email,
 	})
+}
+
+// ============================================================
+// Logout
+// ============================================================
+
+// Logout invalidates the current session server-side (deletes the row, so
+// the cookie can't be replayed even if someone captured it) and clears the
+// cookie. A missing or already-invalid cookie is not an error - logging
+// out a session that's already gone still counts as success, matching how
+// logout endpoints are generally expected to behave (idempotent, never
+// blocks the client from ending up logged out).
+func (h *OAuthHandler) Logout(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if cookie, err := r.Cookie(sessionCookieName); err == nil {
+		if sessionID, err := parseSessionID(cookie.Value); err == nil {
+			if err := h.service.Logout(r.Context(), sessionID); err != nil {
+				// The cookie gets cleared regardless (below) - a failed
+				// server-side delete shouldn't leave the client stuck
+				// thinking it's still logged in.
+				log.Printf("logout: failed to delete session: %v", err)
+			}
+		}
+	}
+
+	ClearSessionCookie(w)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 // ============================================================
