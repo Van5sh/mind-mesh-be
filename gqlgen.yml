@@ -35,6 +35,14 @@ models:
         resolver: true
   User:
     fields:
+      username:
+        resolver: true
+      email:
+        resolver: true
+      createdAt:
+        resolver: true
+      updatedAt:
+        resolver: true
       profile:
         resolver: true
       ownedProjects:

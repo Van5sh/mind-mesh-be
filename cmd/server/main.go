@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"example/hello/graph"
+	"example/hello/graph/loaders"
 	graphresolver "example/hello/graph/resolver"
 	"example/hello/internal/app"
 	"example/hello/internal/auth"
@@ -145,6 +146,15 @@ func StartServer() {
 		},
 	)
 
+	// Fresh dataloaders per GraphQL operation - batch the nested
+	// Project.files and user lookups into one query each (see graph/loaders).
+	srv.AroundOperations(
+		loaders.OperationMiddleware(
+			application.Services.File,
+			application.Services.User,
+		),
+	)
+
 	srv.SetQueryCache(
 		lru.New[*ast.QueryDocument](1000),
 	)
@@ -203,25 +213,40 @@ func StartServer() {
 	// Firebase JS SDK now - this is the only auth route left on this
 	// server, and it just verifies the Firebase ID token the frontend
 	// already has afterward. See BACKEND_HANDOFF.md §3.
-	server.Post(
+	//
+	// server.All (not server.Post) + oauthHandler.CORS wrapping, same
+	// pattern as /query below: a cross-origin POST with a JSON body
+	// triggers a browser CORS preflight (an OPTIONS request) before the
+	// real POST is ever sent. server.Post only routes POST, so that
+	// preflight had nowhere to go but Fiber's default 405 - the browser
+	// then refuses to send the real request at all, surfacing as a CORS
+	// error client-side even though the endpoint "worked" fine over curl
+	// (curl doesn't send preflights or enforce CORS, so this was invisible
+	// to every curl-based test earlier). CORS() itself answers OPTIONS
+	// with the right headers and a 204 before it ever reaches the handler.
+	server.All(
 		"/auth/firebase",
 		func(c *fiber.Ctx) {
 
 			fasthttpadaptor.NewFastHTTPHandler(
-				http.HandlerFunc(
-					oauthHandler.FirebaseLogin,
+				oauthHandler.CORS(
+					http.HandlerFunc(
+						oauthHandler.FirebaseLogin,
+					),
 				),
 			)(c.Fasthttp)
 		},
 	)
 
-	server.Post(
+	server.All(
 		"/auth/logout",
 		func(c *fiber.Ctx) {
 
 			fasthttpadaptor.NewFastHTTPHandler(
-				http.HandlerFunc(
-					oauthHandler.Logout,
+				oauthHandler.CORS(
+					http.HandlerFunc(
+						oauthHandler.Logout,
+					),
 				),
 			)(c.Fasthttp)
 		},

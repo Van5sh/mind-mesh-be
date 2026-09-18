@@ -9,6 +9,7 @@ import (
 	"context"
 	"example/hello/graph"
 	"example/hello/graph/helpers"
+	"example/hello/graph/loaders"
 	"example/hello/graph/model"
 	"example/hello/internal/apperrors"
 	"example/hello/internal/database"
@@ -351,7 +352,15 @@ func (r *projectResolver) Files(ctx context.Context, obj *model.Project) ([]*mod
 		return nil, err
 	}
 
-	files, err := r.App.Services.File.GetFilesByProjectID(ctx, projectID)
+	// Batched across every project resolved in the same operation (see
+	// graph/loaders); falls back to a direct query when no loaders are
+	// installed on the context.
+	var files []database.File
+	if l := loaders.From(ctx); l != nil {
+		files, err = l.FilesByProject.Load(ctx, projectID)
+	} else {
+		files, err = r.App.Services.File.GetFilesByProjectID(ctx, projectID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -640,6 +649,33 @@ func (r *queryResolver) ProjectMembers(ctx context.Context, projectID string) ([
 	}
 
 	return result, nil
+}
+
+// ProjectStats is the resolver for the projectStats field.
+func (r *queryResolver) ProjectStats(ctx context.Context, projectID string) (*model.ProjectStats, error) {
+	pID, err := parseUUID(projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Without this, any logged-in user could read any project's counts.
+	if err := r.requireProjectMember(ctx, pID); err != nil {
+		return nil, err
+	}
+
+	stats, err := r.App.Services.Activity.GetProjectStats(ctx, pID)
+	if err != nil {
+		return nil, err
+	}
+
+	// The DB returns int64 counts; GraphQL's Int is 32-bit.
+	return &model.ProjectStats{
+		MemberCount:    int(stats.MemberCount),
+		FileCount:      int(stats.FileCount),
+		ChatCount:      int(stats.ChatCount),
+		ReportCount:    int(stats.ReportCount),
+		FlowchartCount: int(stats.FlowchartCount),
+	}, nil
 }
 
 // Project returns graph.ProjectResolver implementation.

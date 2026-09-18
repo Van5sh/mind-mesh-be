@@ -477,7 +477,10 @@ func (q *Queries) GetActivityLogsPaginated(ctx context.Context, arg GetActivityL
 const getProjectStats = `-- name: GetProjectStats :one
 SELECT
     (SELECT COUNT(*) FROM project_members pm WHERE pm.project_id = $1) AS member_count,
-    (SELECT COUNT(*) FROM project_files pf WHERE pf.project_id = $1) AS file_count,
+    -- files.project_id, not the project_files join table: nothing writes to
+    -- project_files (CreateProjectFile has no caller), so counting it always
+    -- returned 0. Project.files resolves through files.project_id too.
+    (SELECT COUNT(*) FROM files fi WHERE fi.project_id = $1) AS file_count,
     (SELECT COUNT(*) FROM chats c WHERE c.project_id = $1) AS chat_count,
     (SELECT COUNT(*) FROM reports r WHERE r.project_id = $1) AS report_count,
     (SELECT COUNT(*) FROM flowcharts f WHERE f.project_id = $1) AS flowchart_count

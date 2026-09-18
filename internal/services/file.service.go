@@ -194,6 +194,36 @@ func (s *FileService) GetFilesByProjectID(
 	return files, nil
 }
 
+// GetFilesByProjectIDs fetches the files of many projects in one query and
+// returns them grouped by project ID (every requested ID is present in the
+// map, with a nil slice when that project has no files). It exists for the
+// Project.files dataloader - see graph/loaders.
+func (s *FileService) GetFilesByProjectIDs(
+	ctx context.Context,
+	projectIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.File, error) {
+	for _, id := range projectIDs {
+		if err := validators.ValidateUUID("project id", id); err != nil {
+			return nil, err
+		}
+	}
+
+	files, err := s.repo.GetFilesByProjectIDs(ctx, projectIDs)
+	if err != nil {
+		return nil, apperrors.InternalError("failed to get files by projects", err)
+	}
+
+	grouped := make(map[pgtype.UUID][]database.File, len(projectIDs))
+	for _, id := range projectIDs {
+		grouped[id] = nil
+	}
+	for _, f := range files {
+		grouped[f.ProjectID] = append(grouped[f.ProjectID], f)
+	}
+
+	return grouped, nil
+}
+
 func (s *FileService) GetFilesByFolderID(
 	ctx context.Context,
 	folderID pgtype.UUID,

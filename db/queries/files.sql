@@ -48,6 +48,14 @@ FROM files f
 WHERE f.project_id = $1
 ORDER BY f.name;
 
+-- name: GetFilesByProjectIDs :many
+-- Batched form of GetFilesByProjectID, used by the Project.files dataloader
+-- so resolving files for N projects is one query instead of N.
+SELECT f.*
+FROM files f
+WHERE f.project_id = ANY($1::uuid[])
+ORDER BY f.project_id, f.name;
+
 -- name: CountProjectFiles :one
 SELECT COUNT(*) AS count
 FROM files

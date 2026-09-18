@@ -279,6 +279,14 @@ type ProjectMember struct {
 	UpdatedAt time.Time   `json:"updatedAt"`
 }
 
+type ProjectStats struct {
+	MemberCount    int `json:"memberCount"`
+	FileCount      int `json:"fileCount"`
+	ChatCount      int `json:"chatCount"`
+	ReportCount    int `json:"reportCount"`
+	FlowchartCount int `json:"flowchartCount"`
+}
+
 type Query struct {
 }
 

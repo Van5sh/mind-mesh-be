@@ -264,6 +264,14 @@ type ComplexityRoot struct {
 		User      func(childComplexity int) int
 	}
 
+	ProjectStats struct {
+		ChatCount      func(childComplexity int) int
+		FileCount      func(childComplexity int) int
+		FlowchartCount func(childComplexity int) int
+		MemberCount    func(childComplexity int) int
+		ReportCount    func(childComplexity int) int
+	}
+
 	Query struct {
 		ActiveChats             func(childComplexity int, projectID string) int
 		ActivityLogs            func(childComplexity int, projectID *string, userID *string) int
@@ -291,6 +299,7 @@ type ComplexityRoot struct {
 		MyChats                 func(childComplexity int, projectID *string) int
 		Project                 func(childComplexity int, id string) int
 		ProjectMembers          func(childComplexity int, projectID string) int
+		ProjectStats            func(childComplexity int, projectID string) int
 		Projects                func(childComplexity int) int
 		ProjectsByOwner         func(childComplexity int, ownerID string) int
 		ProjectsForUser         func(childComplexity int, userID string) int
@@ -463,6 +472,7 @@ type QueryResolver interface {
 	ArchivedProjectsByOwner(ctx context.Context, ownerID string) ([]*model.Project, error)
 	ArchivedProjectsForUser(ctx context.Context, userID string) ([]*model.Project, error)
 	ProjectMembers(ctx context.Context, projectID string) ([]*model.ProjectMember, error)
+	ProjectStats(ctx context.Context, projectID string) (*model.ProjectStats, error)
 	Report(ctx context.Context, id string) (*model.Report, error)
 	Reports(ctx context.Context, projectID string) ([]*model.Report, error)
 	ReportsByChat(ctx context.Context, sourceChatID string) ([]*model.Report, error)
@@ -483,11 +493,15 @@ type SubscriptionResolver interface {
 	ChatMessageAdded(ctx context.Context, chatID string) (<-chan *model.ChatMessage, error)
 }
 type UserResolver interface {
+	Username(ctx context.Context, obj *model.User) (string, error)
+	Email(ctx context.Context, obj *model.User) (string, error)
 	Profile(ctx context.Context, obj *model.User) (*model.UserProfile, error)
 	OwnedProjects(ctx context.Context, obj *model.User) ([]*model.Project, error)
 	ProjectMemberships(ctx context.Context, obj *model.User) ([]*model.ProjectMember, error)
 	UploadedFiles(ctx context.Context, obj *model.User) ([]*model.File, error)
 	SharedFiles(ctx context.Context, obj *model.User) ([]*model.FileShare, error)
+	CreatedAt(ctx context.Context, obj *model.User) (*time.Time, error)
+	UpdatedAt(ctx context.Context, obj *model.User) (*time.Time, error)
 }
 
 // endregion ************************** generated!.gotpl **************************
@@ -1749,6 +1763,37 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.ProjectMember.User(childComplexity), true
 
+	case "ProjectStats.chatCount":
+		if e.ComplexityRoot.ProjectStats.ChatCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProjectStats.ChatCount(childComplexity), true
+	case "ProjectStats.fileCount":
+		if e.ComplexityRoot.ProjectStats.FileCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProjectStats.FileCount(childComplexity), true
+	case "ProjectStats.flowchartCount":
+		if e.ComplexityRoot.ProjectStats.FlowchartCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProjectStats.FlowchartCount(childComplexity), true
+	case "ProjectStats.memberCount":
+		if e.ComplexityRoot.ProjectStats.MemberCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProjectStats.MemberCount(childComplexity), true
+	case "ProjectStats.reportCount":
+		if e.ComplexityRoot.ProjectStats.ReportCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProjectStats.ReportCount(childComplexity), true
+
 	case "Query.activeChats":
 		if e.ComplexityRoot.Query.ActiveChats == nil {
 			break
@@ -2021,6 +2066,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.ProjectMembers(childComplexity, args["projectId"].(string)), true
+	case "Query.projectStats":
+		if e.ComplexityRoot.Query.ProjectStats == nil {
+			break
+		}
+
+		args, err := ec.field_Query_projectStats_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ProjectStats(childComplexity, args["projectId"].(string)), true
 	case "Query.projects":
 		if e.ComplexityRoot.Query.Projects == nil {
 			break
@@ -2904,6 +2960,22 @@ func (ec *executionContext) childFields_ProjectMember(ctx context.Context, field
 		return ec.fieldContext_ProjectMember_updatedAt(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type ProjectMember", field.Name)
+}
+
+func (ec *executionContext) childFields_ProjectStats(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "memberCount":
+		return ec.fieldContext_ProjectStats_memberCount(ctx, field)
+	case "fileCount":
+		return ec.fieldContext_ProjectStats_fileCount(ctx, field)
+	case "chatCount":
+		return ec.fieldContext_ProjectStats_chatCount(ctx, field)
+	case "reportCount":
+		return ec.fieldContext_ProjectStats_reportCount(ctx, field)
+	case "flowchartCount":
+		return ec.fieldContext_ProjectStats_flowchartCount(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ProjectStats", field.Name)
 }
 
 func (ec *executionContext) childFields_Report(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -4139,6 +4211,20 @@ func (ec *executionContext) field_Query_myChats_args(ctx context.Context, rawArg
 }
 
 func (ec *executionContext) field_Query_projectMembers_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "projectId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["projectId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_projectStats_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "projectId",
@@ -9689,6 +9775,121 @@ func (ec *executionContext) fieldContext_ProjectMember_updatedAt(_ context.Conte
 	return graphql.NewScalarFieldContext("ProjectMember", field, false, false, errors.New("field of type Time does not have child fields"))
 }
 
+func (ec *executionContext) _ProjectStats_memberCount(ctx context.Context, field graphql.CollectedField, obj *model.ProjectStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProjectStats_memberCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MemberCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProjectStats_memberCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProjectStats", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProjectStats_fileCount(ctx context.Context, field graphql.CollectedField, obj *model.ProjectStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProjectStats_fileCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.FileCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProjectStats_fileCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProjectStats", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProjectStats_chatCount(ctx context.Context, field graphql.CollectedField, obj *model.ProjectStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProjectStats_chatCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ChatCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProjectStats_chatCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProjectStats", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProjectStats_reportCount(ctx context.Context, field graphql.CollectedField, obj *model.ProjectStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProjectStats_reportCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ReportCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProjectStats_reportCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProjectStats", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProjectStats_flowchartCount(ctx context.Context, field graphql.CollectedField, obj *model.ProjectStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProjectStats_flowchartCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.FlowchartCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProjectStats_flowchartCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProjectStats", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
 func (ec *executionContext) _Query__empty(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -10932,6 +11133,50 @@ func (ec *executionContext) fieldContext_Query_projectMembers(ctx context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_projectStats(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_projectStats(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ProjectStats(ctx, fc.Args["projectId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ProjectStats) graphql.Marshaler {
+			return ec.marshalNProjectStats2ᚖexampleᚋhelloᚋgraphᚋmodelᚐProjectStats(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_projectStats(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ProjectStats(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_projectStats_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_report(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -12043,7 +12288,7 @@ func (ec *executionContext) _User_username(ctx context.Context, field graphql.Co
 			return ec.fieldContext_User_username(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.Username, nil
+			return ec.Resolvers.User().Username(ctx, obj)
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
@@ -12054,7 +12299,7 @@ func (ec *executionContext) _User_username(ctx context.Context, field graphql.Co
 	)
 }
 func (ec *executionContext) fieldContext_User_username(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("User", field, false, false, errors.New("field of type String does not have child fields"))
+	return graphql.NewScalarFieldContext("User", field, true, true, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _User_email(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
@@ -12066,7 +12311,7 @@ func (ec *executionContext) _User_email(ctx context.Context, field graphql.Colle
 			return ec.fieldContext_User_email(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.Email, nil
+			return ec.Resolvers.User().Email(ctx, obj)
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
@@ -12077,7 +12322,7 @@ func (ec *executionContext) _User_email(ctx context.Context, field graphql.Colle
 	)
 }
 func (ec *executionContext) fieldContext_User_email(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("User", field, false, false, errors.New("field of type String does not have child fields"))
+	return graphql.NewScalarFieldContext("User", field, true, true, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _User_profile(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
@@ -12249,18 +12494,18 @@ func (ec *executionContext) _User_createdAt(ctx context.Context, field graphql.C
 			return ec.fieldContext_User_createdAt(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.CreatedAt, nil
+			return ec.Resolvers.User().CreatedAt(ctx, obj)
 		},
 		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
-			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		func(ctx context.Context, selections ast.SelectionSet, v *time.Time) graphql.Marshaler {
+			return ec.marshalNTime2ᚖtimeᚐTime(ctx, selections, v)
 		},
 		true,
 		true,
 	)
 }
 func (ec *executionContext) fieldContext_User_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("User", field, false, false, errors.New("field of type Time does not have child fields"))
+	return graphql.NewScalarFieldContext("User", field, true, true, errors.New("field of type Time does not have child fields"))
 }
 
 func (ec *executionContext) _User_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
@@ -12272,18 +12517,18 @@ func (ec *executionContext) _User_updatedAt(ctx context.Context, field graphql.C
 			return ec.fieldContext_User_updatedAt(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.UpdatedAt, nil
+			return ec.Resolvers.User().UpdatedAt(ctx, obj)
 		},
 		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
-			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		func(ctx context.Context, selections ast.SelectionSet, v *time.Time) graphql.Marshaler {
+			return ec.marshalNTime2ᚖtimeᚐTime(ctx, selections, v)
 		},
 		true,
 		true,
 	)
 }
 func (ec *executionContext) fieldContext_User_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("User", field, false, false, errors.New("field of type Time does not have child fields"))
+	return graphql.NewScalarFieldContext("User", field, true, true, errors.New("field of type Time does not have child fields"))
 }
 
 func (ec *executionContext) _UserProfile_user(ctx context.Context, field graphql.CollectedField, obj *model.UserProfile) (ret graphql.Marshaler) {
@@ -16737,6 +16982,64 @@ func (ec *executionContext) _ProjectMember(ctx context.Context, sel ast.Selectio
 	return out
 }
 
+var projectStatsImplementors = []string{"ProjectStats"}
+
+func (ec *executionContext) _ProjectStats(ctx context.Context, sel ast.SelectionSet, obj *model.ProjectStats) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, projectStatsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ProjectStats")
+		case "memberCount":
+			out.Values[i] = ec._ProjectStats_memberCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "fileCount":
+			out.Values[i] = ec._ProjectStats_fileCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "chatCount":
+			out.Values[i] = ec._ProjectStats_chatCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "reportCount":
+			out.Values[i] = ec._ProjectStats_reportCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "flowchartCount":
+			out.Values[i] = ec._ProjectStats_flowchartCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var queryImplementors = []string{"Query"}
 
 func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -17395,6 +17698,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "projectStats":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_projectStats(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "report":
 			field := field
 
@@ -17909,15 +18234,81 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "username":
-			out.Values[i] = ec._User_username(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_username(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "email":
-			out.Values[i] = ec._User_email(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_email(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "profile":
 			field := field
 
@@ -18109,15 +18500,81 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "createdAt":
-			out.Values[i] = ec._User_createdAt(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_createdAt(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "updatedAt":
-			out.Values[i] = ec._User_updatedAt(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_updatedAt(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -19035,6 +19492,22 @@ func (ec *executionContext) marshalNID2ᚕstringᚄ(ctx context.Context, sel ast
 	return ret
 }
 
+func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v any) (int, error) {
+	res, err := graphql.UnmarshalInt(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalInt(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) unmarshalNInt642int(ctx context.Context, v any) (int, error) {
 	res, err := graphql.UnmarshalInt(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -19180,6 +19653,16 @@ func (ec *executionContext) marshalNProjectRole2exampleᚋhelloᚋgraphᚋmodel�
 	return v
 }
 
+func (ec *executionContext) marshalNProjectStats2ᚖexampleᚋhelloᚋgraphᚋmodelᚐProjectStats(ctx context.Context, sel ast.SelectionSet, v *model.ProjectStats) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ProjectStats(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNProjectVisibility2exampleᚋhelloᚋgraphᚋmodelᚐProjectVisibility(ctx context.Context, v any) (model.ProjectVisibility, error) {
 	var res model.ProjectVisibility
 	err := res.UnmarshalGQL(v)
@@ -19280,6 +19763,28 @@ func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v an
 func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel ast.SelectionSet, v time.Time) graphql.Marshaler {
 	_ = sel
 	res := graphql.MarshalTime(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNTime2ᚖtimeᚐTime(ctx context.Context, v any) (*time.Time, error) {
+	res, err := graphql.UnmarshalTime(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNTime2ᚖtimeᚐTime(ctx context.Context, sel ast.SelectionSet, v *time.Time) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	_ = sel
+	res := graphql.MarshalTime(*v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")

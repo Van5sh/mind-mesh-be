@@ -25,6 +25,14 @@ type ProjectMember {
   updatedAt: Time!
 }
 
+type ProjectStats {
+  memberCount: Int!
+  fileCount: Int!
+  chatCount: Int!
+  reportCount: Int!
+  flowchartCount: Int!
+}
+
 enum ProjectMemberRole {
   OWNER
   ADMIN
@@ -47,6 +55,9 @@ extend type Query {
 
   # Members
   projectMembers(projectId: ID!): [ProjectMember!]!
+
+  # Counts for a project's dashboard/summary widgets
+  projectStats(projectId: ID!): ProjectStats!
 }
 
 extend type Mutation {

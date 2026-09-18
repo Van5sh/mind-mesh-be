@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"example/hello/internal/database"
+	"example/hello/internal/dbtrace"
 	"example/hello/internal/guards"
 	"example/hello/internal/realtime"
 	"example/hello/internal/repository"
@@ -103,10 +104,20 @@ func New(
 	// PostgreSQL
 	// --------------------------------------------------------
 
-	db, err := pgxpool.New(
-		ctx,
-		databaseURL,
-	)
+	poolConfig, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"parse DATABASE_URL: %w",
+			err,
+		)
+	}
+
+	// Dev aid: SQL_LOG=true logs every query's name (see internal/dbtrace).
+	if os.Getenv("SQL_LOG") == "true" {
+		poolConfig.ConnConfig.Tracer = dbtrace.Tracer{}
+	}
+
+	db, err := pgxpool.NewWithConfig(ctx, poolConfig)
 
 	if err != nil {
 		return nil, fmt.Errorf(

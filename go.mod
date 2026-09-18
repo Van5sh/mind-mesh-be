@@ -17,6 +17,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/valyala/fasthttp v1.16.0
 	github.com/vektah/gqlparser/v2 v2.5.37
+	github.com/vikstrous/dataloadgen v0.0.10
 	google.golang.org/api v0.279.0
 )
 

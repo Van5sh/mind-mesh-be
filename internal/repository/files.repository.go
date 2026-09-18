@@ -165,6 +165,10 @@ func (r *FileRepository) GetFilesByProjectID(ctx context.Context, projectID pgty
 	return r.q.GetFilesByProjectID(ctx, projectID)
 }
 
+func (r *FileRepository) GetFilesByProjectIDs(ctx context.Context, projectIDs []pgtype.UUID) ([]database.File, error) {
+	return r.q.GetFilesByProjectIDs(ctx, projectIDs)
+}
+
 func (r *FileRepository) GetFilesPendingEmbedding(ctx context.Context) ([]database.File, error) {
 	return r.q.GetFilesPendingEmbedding(ctx)
 }

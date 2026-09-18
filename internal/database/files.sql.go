@@ -1131,6 +1131,43 @@ func (q *Queries) GetFilesByProjectID(ctx context.Context, projectID pgtype.UUID
 	return items, nil
 }
 
+const getFilesByProjectIDs = `-- name: GetFilesByProjectIDs :many
+SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
+FROM files f
+WHERE f.project_id = ANY($1::uuid[])
+ORDER BY f.project_id, f.name
+`
+
+// Batched form of GetFilesByProjectID, used by the Project.files dataloader
+// so resolving files for N projects is one query instead of N.
+func (q *Queries) GetFilesByProjectIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]File, error) {
+	rows, err := q.db.Query(ctx, getFilesByProjectIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []File
+	for rows.Next() {
+		var i File
+		if err := rows.Scan(
+			&i.ID,
+			&i.FolderID,
+			&i.ProjectID,
+			&i.Name,
+			&i.Size,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFilesPendingEmbedding = `-- name: GetFilesPendingEmbedding :many
 SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
 FROM files f

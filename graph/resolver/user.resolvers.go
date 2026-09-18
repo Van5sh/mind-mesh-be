@@ -14,6 +14,7 @@ import (
 	"example/hello/internal/auth"
 	"example/hello/internal/database"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -211,6 +212,33 @@ func (r *queryResolver) Users(ctx context.Context, ids []string) ([]*model.User,
 	return result, nil
 }
 
+// Username is the resolver for the username field.
+func (r *userResolver) Username(ctx context.Context, obj *model.User) (string, error) {
+	// Already populated (a full user from UserToModel) - no lookup needed.
+	if obj.Username != "" {
+		return obj.Username, nil
+	}
+
+	user, err := r.loadUser(ctx, obj)
+	if err != nil {
+		return "", err
+	}
+	return user.Username, nil
+}
+
+// Email is the resolver for the email field.
+func (r *userResolver) Email(ctx context.Context, obj *model.User) (string, error) {
+	if obj.Email != "" {
+		return obj.Email, nil
+	}
+
+	user, err := r.loadUser(ctx, obj)
+	if err != nil {
+		return "", err
+	}
+	return user.Email, nil
+}
+
 // Profile is the resolver for the profile field.
 func (r *userResolver) Profile(ctx context.Context, obj *model.User) (*model.UserProfile, error) {
 	userID, err := parseUUID(obj.ID)
@@ -301,6 +329,34 @@ func (r *userResolver) SharedFiles(ctx context.Context, obj *model.User) ([]*mod
 		result = append(result, helpers.FileShareToModel(share))
 	}
 	return result, nil
+}
+
+// CreatedAt is the resolver for the createdAt field.
+func (r *userResolver) CreatedAt(ctx context.Context, obj *model.User) (*time.Time, error) {
+	if !obj.CreatedAt.IsZero() {
+		return &obj.CreatedAt, nil
+	}
+
+	user, err := r.loadUser(ctx, obj)
+	if err != nil {
+		return nil, err
+	}
+	createdAt := user.CreatedAt.Time
+	return &createdAt, nil
+}
+
+// UpdatedAt is the resolver for the updatedAt field.
+func (r *userResolver) UpdatedAt(ctx context.Context, obj *model.User) (*time.Time, error) {
+	if !obj.UpdatedAt.IsZero() {
+		return &obj.UpdatedAt, nil
+	}
+
+	user, err := r.loadUser(ctx, obj)
+	if err != nil {
+		return nil, err
+	}
+	updatedAt := user.UpdatedAt.Time
+	return &updatedAt, nil
 }
 
 // User returns graph.UserResolver implementation.
