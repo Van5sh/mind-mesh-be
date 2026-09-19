@@ -284,3 +284,14 @@ func (s *ReportService) UpdateReportStatus(
 	}
 	return report, nil
 }
+
+// GetReportsByProjectIDs fetches the reports of many projects in one query,
+// grouped by project ID. It exists for the Project.reports dataloader.
+func (s *ReportService) GetReportsByProjectIDs(
+	ctx context.Context,
+	projectIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.GetReportsByProjectIDsRow, error) {
+	return fetchGrouped(ctx, projectIDs, "reports by projects",
+		s.repo.GetReportsByProjectIDs,
+		func(r database.GetReportsByProjectIDsRow) pgtype.UUID { return r.ProjectID })
+}

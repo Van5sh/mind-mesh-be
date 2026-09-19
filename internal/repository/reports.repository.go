@@ -64,3 +64,7 @@ func (r *ReportRepository) UpdateReport(ctx context.Context, params database.Upd
 func (r *ReportRepository) UpdateReportStatus(ctx context.Context, params database.UpdateReportStatusParams) (database.UpdateReportStatusRow, error) {
 	return r.q.UpdateReportStatus(ctx, params)
 }
+
+func (r *ReportRepository) GetReportsByProjectIDs(ctx context.Context, projectIDs []pgtype.UUID) ([]database.GetReportsByProjectIDsRow, error) {
+	return r.q.GetReportsByProjectIDs(ctx, projectIDs)
+}

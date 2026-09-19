@@ -114,3 +114,11 @@ WHERE id = $1;
 DELETE
 FROM activity_logs
 WHERE project_id = $1;
+
+
+-- name: GetActivityLogsByProjectIDs :many
+-- Batched form of GetActivityLogsByProjectID, used by the Project.activityLogs dataloader.
+SELECT *
+FROM activity_logs
+WHERE project_id = ANY($1::uuid[])
+ORDER BY project_id, created_at DESC;

@@ -350,3 +350,35 @@ func (r *FileRepository) FileNameExistsInFolder(
 ) (bool, error) {
 	return r.q.FileNameExistsInFolder(ctx, params)
 }
+
+func (r *FileRepository) GetFoldersByProjectIDs(ctx context.Context, projectIDs []pgtype.UUID) ([]database.Folder, error) {
+	return r.q.GetFoldersByProjectIDs(ctx, projectIDs)
+}
+
+func (r *FileRepository) GetFilesByFolderIDs(ctx context.Context, folderIDs []pgtype.UUID) ([]database.File, error) {
+	return r.q.GetFilesByFolderIDs(ctx, folderIDs)
+}
+
+func (r *FileRepository) GetFoldersByParentFolderIDs(ctx context.Context, parentIDs []pgtype.UUID) ([]database.Folder, error) {
+	return r.q.GetFoldersByParentFolderIDs(ctx, parentIDs)
+}
+
+func (r *FileRepository) GetFoldersByIDs(ctx context.Context, ids []pgtype.UUID) ([]database.Folder, error) {
+	return r.q.GetFoldersByIDs(ctx, ids)
+}
+
+func (r *FileRepository) GetFileAIMetadataByFileIDs(ctx context.Context, fileIDs []pgtype.UUID) ([]database.FileAiMetadatum, error) {
+	return r.q.GetFileAIMetadataByFileIDs(ctx, fileIDs)
+}
+
+func (r *FileRepository) GetFileStoragesByFileIDs(ctx context.Context, fileIDs []pgtype.UUID) ([]database.FileStorage, error) {
+	return r.q.GetFileStoragesByFileIDs(ctx, fileIDs)
+}
+
+func (r *FileRepository) GetFileSharesByFileIDs(ctx context.Context, fileIDs []pgtype.UUID) ([]database.FileShare, error) {
+	return r.q.GetFileSharesByFileIDs(ctx, fileIDs)
+}
+
+func (r *FileRepository) GetFileSharesBySharedWithIDs(ctx context.Context, userIDs []pgtype.UUID) ([]database.FileShare, error) {
+	return r.q.GetFileSharesBySharedWithIDs(ctx, userIDs)
+}

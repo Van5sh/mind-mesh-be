@@ -114,3 +114,11 @@ FROM flowcharts
 WHERE project_id = $1
     AND status = $2
 ORDER BY created_at DESC;
+
+
+-- name: GetFlowchartsByProjectIDs :many
+-- Batched form of GetFlowchartsByProjectID, used by the Project.flowcharts dataloader.
+SELECT *
+FROM flowcharts
+WHERE project_id = ANY($1::uuid[])
+ORDER BY project_id, created_at DESC;

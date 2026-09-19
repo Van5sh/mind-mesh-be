@@ -136,3 +136,37 @@ RETURNING *;
 SELECT *
 FROM projects
 WHERE name = $1 AND owner_id = $2;
+
+-- name: GetProjectMembersByProjectIDs :many
+-- Batched form of GetProjectMembers, used by the Project.members dataloader.
+SELECT *
+FROM project_members
+WHERE project_id = ANY($1::uuid[])
+ORDER BY project_id, created_at;
+
+
+-- name: GetProjectsByIDs :many
+-- Batched project lookup, used by the Project scalar-field dataloader that
+-- fills in "stub" projects (an object that only carries an ID).
+SELECT *
+FROM projects
+WHERE id = ANY($1::uuid[]);
+
+
+-- name: GetProjectsByOwnerIDs :many
+-- Batched form of GetProjectsByOwnerID, used by the User.ownedProjects dataloader.
+SELECT *
+FROM projects
+WHERE owner_id = ANY($1::uuid[])
+  AND archived_at IS NULL
+ORDER BY owner_id, created_at;
+
+
+-- name: GetProjectMembersByUserIDs :many
+-- Every membership row of many users, used by the User.projectMemberships
+-- dataloader. (This replaces "list each user's projects, then look up the
+-- membership row per project": a membership row is exactly what that produced.)
+SELECT *
+FROM project_members
+WHERE user_id = ANY($1::uuid[])
+ORDER BY user_id, created_at;

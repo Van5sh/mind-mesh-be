@@ -689,3 +689,65 @@ SELECT EXISTS (
       AND folder_id IS NOT DISTINCT FROM $2
       AND name = $3
 );
+
+-- name: GetFoldersByProjectIDs :many
+-- Batched form of GetFoldersByProjectID, used by the Project.folders dataloader.
+SELECT *
+FROM folders
+WHERE project_id = ANY($1::uuid[])
+ORDER BY project_id, name;
+
+
+-- name: GetFilesByFolderIDs :many
+-- Batched form of GetFilesByFolderID, used by the Folder.files dataloader.
+SELECT *
+FROM files
+WHERE folder_id = ANY($1::uuid[])
+ORDER BY folder_id, name;
+
+
+-- name: GetFoldersByParentFolderIDs :many
+-- Batched form of GetChildFolders, used by the Folder.childFolders
+-- dataloader.
+SELECT *
+FROM folders
+WHERE parent_folder_id = ANY($1::uuid[])
+ORDER BY parent_folder_id, name;
+
+
+-- name: GetFoldersByIDs :many
+-- Batched folder lookup, used by the Folder.parentFolder dataloader.
+SELECT *
+FROM folders
+WHERE id = ANY($1::uuid[]);
+
+
+-- name: GetFileAIMetadataByFileIDs :many
+-- Batched form of GetFileAIMetadata, used by the File.aiMetadata dataloader.
+SELECT *
+FROM file_ai_metadata
+WHERE file_id = ANY($1::uuid[]);
+
+
+-- name: GetFileStoragesByFileIDs :many
+-- Batched form of GetFileStorage, used by the File.storage dataloader.
+SELECT *
+FROM file_storage
+WHERE file_id = ANY($1::uuid[]);
+
+
+-- name: GetFileSharesByFileIDs :many
+-- Batched form of GetFileSharesByFileID, used by the File.shares dataloader.
+SELECT *
+FROM file_shares
+WHERE file_id = ANY($1::uuid[])
+ORDER BY file_id, created_at DESC;
+
+
+-- name: GetFileSharesBySharedWithIDs :many
+-- Batched form of GetFileSharesBySharedWith, used by the User.sharedFiles
+-- dataloader.
+SELECT *
+FROM file_shares
+WHERE shared_with = ANY($1::uuid[])
+ORDER BY shared_with, created_at DESC;

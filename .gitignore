@@ -26,6 +26,8 @@ ollama_data/
 .idea/
 .DS_Store
 
+*.pdf
+
 mind-mesh-258df-firebase-adminsdk-fbsvc-723d66ca51.json
 BACKEND_HANDOFF.md
 *.pdf

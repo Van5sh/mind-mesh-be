@@ -9,6 +9,7 @@ import (
 	"context"
 	"example/hello/graph"
 	"example/hello/graph/helpers"
+	"example/hello/graph/loaders"
 	"example/hello/graph/model"
 	"example/hello/internal/database"
 
@@ -22,7 +23,12 @@ func (r *chatResolver) Participants(ctx context.Context, obj *model.Chat) ([]*mo
 		return nil, err
 	}
 
-	participants, err := r.App.Services.Chat.GetChatParticipants(ctx, chatID)
+	var participants []database.ChatParticipant
+	if l := loaders.From(ctx); l != nil {
+		participants, err = l.ParticipantsByChat.Load(ctx, chatID)
+	} else {
+		participants, err = r.App.Services.Chat.GetChatParticipants(ctx, chatID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +50,14 @@ func (r *chatResolver) Messages(ctx context.Context, obj *model.Chat) ([]*model.
 		return nil, err
 	}
 
-	messages, err := r.App.Services.Chat.GetChatMessagesByChatID(ctx, chatID)
+	// Batched across every chat in the operation (see graph/loaders); falls
+	// back to a direct query when no loaders are on the context.
+	var messages []database.ChatMessage
+	if l := loaders.From(ctx); l != nil {
+		messages, err = l.MessagesByChat.Load(ctx, chatID)
+	} else {
+		messages, err = r.App.Services.Chat.GetChatMessagesByChatID(ctx, chatID)
+	}
 	if err != nil {
 		return nil, err
 	}

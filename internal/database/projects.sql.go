@@ -290,6 +290,115 @@ func (q *Queries) GetProjectMembers(ctx context.Context, projectID pgtype.UUID) 
 	return items, nil
 }
 
+const getProjectMembersByProjectIDs = `-- name: GetProjectMembersByProjectIDs :many
+SELECT id, project_id, user_id, role, created_at, updated_at
+FROM project_members
+WHERE project_id = ANY($1::uuid[])
+ORDER BY project_id, created_at
+`
+
+// Batched form of GetProjectMembers, used by the Project.members dataloader.
+func (q *Queries) GetProjectMembersByProjectIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]ProjectMember, error) {
+	rows, err := q.db.Query(ctx, getProjectMembersByProjectIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ProjectMember
+	for rows.Next() {
+		var i ProjectMember
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.UserID,
+			&i.Role,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getProjectMembersByUserIDs = `-- name: GetProjectMembersByUserIDs :many
+SELECT id, project_id, user_id, role, created_at, updated_at
+FROM project_members
+WHERE user_id = ANY($1::uuid[])
+ORDER BY user_id, created_at
+`
+
+// Every membership row of many users, used by the User.projectMemberships
+// dataloader. (This replaces "list each user's projects, then look up the
+// membership row per project": a membership row is exactly what that produced.)
+func (q *Queries) GetProjectMembersByUserIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]ProjectMember, error) {
+	rows, err := q.db.Query(ctx, getProjectMembersByUserIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ProjectMember
+	for rows.Next() {
+		var i ProjectMember
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.UserID,
+			&i.Role,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getProjectsByIDs = `-- name: GetProjectsByIDs :many
+SELECT id, owner_id, name, description, visibility, archived_at, created_at, updated_at
+FROM projects
+WHERE id = ANY($1::uuid[])
+`
+
+// Batched project lookup, used by the Project scalar-field dataloader that
+// fills in "stub" projects (an object that only carries an ID).
+func (q *Queries) GetProjectsByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]Project, error) {
+	rows, err := q.db.Query(ctx, getProjectsByIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Project
+	for rows.Next() {
+		var i Project
+		if err := rows.Scan(
+			&i.ID,
+			&i.OwnerID,
+			&i.Name,
+			&i.Description,
+			&i.Visibility,
+			&i.ArchivedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getProjectsByOwnerID = `-- name: GetProjectsByOwnerID :many
 SELECT id, owner_id, name, description, visibility, archived_at, created_at, updated_at
 FROM projects
@@ -299,6 +408,44 @@ WHERE owner_id = $1
 
 func (q *Queries) GetProjectsByOwnerID(ctx context.Context, ownerID pgtype.UUID) ([]Project, error) {
 	rows, err := q.db.Query(ctx, getProjectsByOwnerID, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Project
+	for rows.Next() {
+		var i Project
+		if err := rows.Scan(
+			&i.ID,
+			&i.OwnerID,
+			&i.Name,
+			&i.Description,
+			&i.Visibility,
+			&i.ArchivedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getProjectsByOwnerIDs = `-- name: GetProjectsByOwnerIDs :many
+SELECT id, owner_id, name, description, visibility, archived_at, created_at, updated_at
+FROM projects
+WHERE owner_id = ANY($1::uuid[])
+  AND archived_at IS NULL
+ORDER BY owner_id, created_at
+`
+
+// Batched form of GetProjectsByOwnerID, used by the User.ownedProjects dataloader.
+func (q *Queries) GetProjectsByOwnerIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]Project, error) {
+	rows, err := q.db.Query(ctx, getProjectsByOwnerIDs, dollar_1)
 	if err != nil {
 		return nil, err
 	}

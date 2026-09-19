@@ -148,3 +148,14 @@ func (s *FlowchartService) GetFlowchartsByProjectID(
 
 	return flowcharts, nil
 }
+
+// GetFlowchartsByProjectIDs fetches the flowcharts of many projects in one
+// query, grouped by project ID. It exists for the Project.flowcharts dataloader.
+func (s *FlowchartService) GetFlowchartsByProjectIDs(
+	ctx context.Context,
+	projectIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.Flowchart, error) {
+	return fetchGrouped(ctx, projectIDs, "flowcharts by projects",
+		s.repo.GetFlowchartsByProjectIDs,
+		func(f database.Flowchart) pgtype.UUID { return f.ProjectID })
+}

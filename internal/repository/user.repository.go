@@ -210,3 +210,7 @@ func (r *UserRepository) DeleteUserProfile(
 ) error {
 	return r.q.DeleteUserProfile(ctx, userID)
 }
+
+func (r *UserRepository) GetUserProfilesByUserIDs(ctx context.Context, userIDs []pgtype.UUID) ([]database.UserProfile, error) {
+	return r.q.GetUserProfilesByUserIDs(ctx, userIDs)
+}

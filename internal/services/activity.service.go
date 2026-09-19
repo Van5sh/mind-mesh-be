@@ -294,3 +294,15 @@ func (s *ActivityService) GetRecentActivityLogs(
 	}
 	return activities, nil
 }
+
+// GetActivityLogsByProjectIDs fetches the activity logs of many projects in
+// one query, grouped by project ID. It exists for the Project.activityLogs
+// dataloader.
+func (s *ActivityService) GetActivityLogsByProjectIDs(
+	ctx context.Context,
+	projectIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.ActivityLog, error) {
+	return fetchGrouped(ctx, projectIDs, "activity logs by projects",
+		s.repo.GetActivityLogsByProjectIDs,
+		func(a database.ActivityLog) pgtype.UUID { return a.ProjectID })
+}

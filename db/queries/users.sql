@@ -147,3 +147,9 @@ RETURNING *;
 -- name: DeleteUserProfile :exec
 DELETE FROM user_profiles
 WHERE user_id = $1;
+
+-- name: GetUserProfilesByUserIDs :many
+-- Batched form of GetUserProfile, used by the User.profile dataloader.
+SELECT *
+FROM user_profiles
+WHERE user_id = ANY($1::uuid[]);

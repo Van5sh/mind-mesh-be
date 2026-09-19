@@ -146,12 +146,36 @@ func StartServer() {
 		},
 	)
 
-	// Fresh dataloaders per GraphQL operation - batch the nested
-	// Project.files and user lookups into one query each (see graph/loaders).
+	// Fresh dataloaders per GraphQL operation: every nested "list of X per
+	// parent" and "row for this ID" field is batched into one query per field
+	// instead of one per parent (see graph/loaders).
 	srv.AroundOperations(
 		loaders.OperationMiddleware(
-			application.Services.File,
-			application.Services.User,
+			loaders.Sources{
+				FilesByProject:      application.Services.File.GetFilesByProjectIDs,
+				FoldersByProject:    application.Services.File.GetFoldersByProjectIDs,
+				MembersByProject:    application.Services.Project.GetProjectMembersByProjectIDs,
+				ChatsByProject:      application.Services.Chat.GetChatsByProjectIDs,
+				ReportsByProject:    application.Services.Report.GetReportsByProjectIDs,
+				FlowchartsByProject: application.Services.Flowchart.GetFlowchartsByProjectIDs,
+				ActivityByProject:   application.Services.Activity.GetActivityLogsByProjectIDs,
+
+				MessagesByChat:       application.Services.Chat.GetChatMessagesByChatIDs,
+				ParticipantsByChat:   application.Services.Chat.GetChatParticipantsByChatIDs,
+				SharesByFile:         application.Services.File.GetFileSharesByFileIDs,
+				FilesByFolder:        application.Services.File.GetFilesByFolderIDs,
+				ChildFoldersByParent: application.Services.File.GetFoldersByParentFolderIDs,
+				OwnedProjectsByOwner: application.Services.Project.GetProjectsByOwnerIDs,
+				MembershipsByUser:    application.Services.Project.GetProjectMembersByUserIDs,
+				SharesBySharedWith:   application.Services.File.GetFileSharesBySharedWithIDs,
+
+				Users:      application.Services.User.GetUsersByIDs,
+				Projects:   application.Services.Project.GetProjectsByIDs,
+				Folders:    application.Services.File.GetFoldersByIDs,
+				Profiles:   application.Services.User.GetUserProfilesByUserIDs,
+				AIMetadata: application.Services.File.GetFileAIMetadataByFileIDs,
+				Storages:   application.Services.File.GetFileStoragesByFileIDs,
+			},
 		),
 	)
 

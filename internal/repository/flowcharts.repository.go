@@ -72,3 +72,7 @@ func (r *FlowchartRepository) UpdateFlowchart(ctx context.Context, params databa
 func (r *FlowchartRepository) UpdateFlowchartStatus(ctx context.Context, params database.UpdateFlowchartStatusParams) (database.Flowchart, error) {
 	return r.q.UpdateFlowchartStatus(ctx, params)
 }
+
+func (r *FlowchartRepository) GetFlowchartsByProjectIDs(ctx context.Context, projectIDs []pgtype.UUID) ([]database.Flowchart, error) {
+	return r.q.GetFlowchartsByProjectIDs(ctx, projectIDs)
+}

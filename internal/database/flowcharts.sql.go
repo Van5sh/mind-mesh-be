@@ -341,6 +341,45 @@ func (q *Queries) GetFlowchartsByProjectID(ctx context.Context, projectID pgtype
 	return items, nil
 }
 
+const getFlowchartsByProjectIDs = `-- name: GetFlowchartsByProjectIDs :many
+SELECT id, project_id, name, data, generated_by, generated_by_ai, status, source_chat_id, created_at, updated_at
+FROM flowcharts
+WHERE project_id = ANY($1::uuid[])
+ORDER BY project_id, created_at DESC
+`
+
+// Batched form of GetFlowchartsByProjectID, used by the Project.flowcharts dataloader.
+func (q *Queries) GetFlowchartsByProjectIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]Flowchart, error) {
+	rows, err := q.db.Query(ctx, getFlowchartsByProjectIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Flowchart
+	for rows.Next() {
+		var i Flowchart
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.Name,
+			&i.Data,
+			&i.GeneratedBy,
+			&i.GeneratedByAi,
+			&i.Status,
+			&i.SourceChatID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFlowchartsByStatus = `-- name: GetFlowchartsByStatus :many
 SELECT id, project_id, name, data, generated_by, generated_by_ai, status, source_chat_id, created_at, updated_at
 FROM flowcharts

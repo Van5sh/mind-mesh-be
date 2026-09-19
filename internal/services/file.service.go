@@ -921,3 +921,88 @@ func (s *FileService) GetFileSharesBySharedWith(
 
 	return shares, nil
 }
+
+// GetFoldersByProjectIDs fetches the folders of many projects in one query,
+// grouped by project ID. It exists for the Project.folders dataloader.
+func (s *FileService) GetFoldersByProjectIDs(
+	ctx context.Context,
+	projectIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.Folder, error) {
+	return fetchGrouped(ctx, projectIDs, "folders by projects",
+		s.repo.GetFoldersByProjectIDs,
+		func(f database.Folder) pgtype.UUID { return f.ProjectID })
+}
+
+// GetFilesByFolderIDs fetches the files inside many folders in one query,
+// grouped by folder ID. It exists for the Folder.files dataloader.
+func (s *FileService) GetFilesByFolderIDs(
+	ctx context.Context,
+	folderIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.File, error) {
+	return fetchGrouped(ctx, folderIDs, "files by folders",
+		s.repo.GetFilesByFolderIDs,
+		func(f database.File) pgtype.UUID { return f.FolderID })
+}
+
+// GetFoldersByParentFolderIDs fetches the child folders of many folders in
+// one query, grouped by parent folder ID. It exists for the
+// Folder.childFolders dataloader.
+func (s *FileService) GetFoldersByParentFolderIDs(
+	ctx context.Context,
+	parentIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.Folder, error) {
+	return fetchGrouped(ctx, parentIDs, "child folders by parent folders",
+		s.repo.GetFoldersByParentFolderIDs,
+		func(f database.Folder) pgtype.UUID { return f.ParentFolderID })
+}
+
+// GetFoldersByIDs fetches many folders in one query (IDs with no folder are
+// absent). It exists for the Folder.parentFolder dataloader.
+func (s *FileService) GetFoldersByIDs(
+	ctx context.Context,
+	ids []pgtype.UUID,
+) ([]database.Folder, error) {
+	return fetchRows(ctx, ids, "folders", s.repo.GetFoldersByIDs)
+}
+
+// GetFileAIMetadataByFileIDs fetches the AI metadata of many files in one
+// query (files with none are absent). It exists for the File.aiMetadata
+// dataloader.
+func (s *FileService) GetFileAIMetadataByFileIDs(
+	ctx context.Context,
+	fileIDs []pgtype.UUID,
+) ([]database.FileAiMetadatum, error) {
+	return fetchRows(ctx, fileIDs, "file AI metadata", s.repo.GetFileAIMetadataByFileIDs)
+}
+
+// GetFileStoragesByFileIDs fetches the storage rows of many files in one
+// query (files with none are absent). It exists for the File.storage
+// dataloader.
+func (s *FileService) GetFileStoragesByFileIDs(
+	ctx context.Context,
+	fileIDs []pgtype.UUID,
+) ([]database.FileStorage, error) {
+	return fetchRows(ctx, fileIDs, "file storage", s.repo.GetFileStoragesByFileIDs)
+}
+
+// GetFileSharesByFileIDs fetches the shares of many files in one query,
+// grouped by file ID. It exists for the File.shares dataloader.
+func (s *FileService) GetFileSharesByFileIDs(
+	ctx context.Context,
+	fileIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.FileShare, error) {
+	return fetchGrouped(ctx, fileIDs, "file shares by files",
+		s.repo.GetFileSharesByFileIDs,
+		func(s database.FileShare) pgtype.UUID { return s.FileID })
+}
+
+// GetFileSharesBySharedWithIDs fetches the shares made with many users in one
+// query, grouped by recipient. It exists for the User.sharedFiles dataloader.
+func (s *FileService) GetFileSharesBySharedWithIDs(
+	ctx context.Context,
+	userIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.FileShare, error) {
+	return fetchGrouped(ctx, userIDs, "file shares by recipients",
+		s.repo.GetFileSharesBySharedWithIDs,
+		func(s database.FileShare) pgtype.UUID { return s.SharedWith })
+}

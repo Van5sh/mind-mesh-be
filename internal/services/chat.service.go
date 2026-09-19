@@ -956,3 +956,36 @@ func (s *ChatService) SearchChatsByTitle(
 
 	return chats, nil
 }
+
+// GetChatsByProjectIDs fetches the chats of many projects in one query,
+// grouped by project ID. It exists for the Project.chats dataloader.
+func (s *ChatService) GetChatsByProjectIDs(
+	ctx context.Context,
+	projectIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.Chat, error) {
+	return fetchGrouped(ctx, projectIDs, "chats by projects",
+		s.repo.GetChatsByProjectIDs,
+		func(c database.Chat) pgtype.UUID { return c.ProjectID })
+}
+
+// GetChatMessagesByChatIDs fetches the messages of many chats in one query,
+// grouped by chat ID, oldest first. It exists for the Chat.messages dataloader.
+func (s *ChatService) GetChatMessagesByChatIDs(
+	ctx context.Context,
+	chatIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.ChatMessage, error) {
+	return fetchGrouped(ctx, chatIDs, "chat messages by chats",
+		s.repo.GetChatMessagesByChatIDs,
+		func(m database.ChatMessage) pgtype.UUID { return m.ChatID })
+}
+
+// GetChatParticipantsByChatIDs fetches the participants of many chats in one
+// query, grouped by chat ID. It exists for the Chat.participants dataloader.
+func (s *ChatService) GetChatParticipantsByChatIDs(
+	ctx context.Context,
+	chatIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.ChatParticipant, error) {
+	return fetchGrouped(ctx, chatIDs, "chat participants by chats",
+		s.repo.GetChatParticipantsByChatIDs,
+		func(p database.ChatParticipant) pgtype.UUID { return p.ChatID })
+}

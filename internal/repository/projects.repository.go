@@ -108,3 +108,19 @@ func (r *ProjectRepository) UpdateProject(ctx context.Context, params database.U
 func (r *ProjectRepository) UpdateProjectMemberRole(ctx context.Context, params database.UpdateProjectMemberRoleParams) (database.ProjectMember, error) {
 	return r.q.UpdateProjectMemberRole(ctx, params)
 }
+
+func (r *ProjectRepository) GetProjectMembersByProjectIDs(ctx context.Context, projectIDs []pgtype.UUID) ([]database.ProjectMember, error) {
+	return r.q.GetProjectMembersByProjectIDs(ctx, projectIDs)
+}
+
+func (r *ProjectRepository) GetProjectsByIDs(ctx context.Context, ids []pgtype.UUID) ([]database.Project, error) {
+	return r.q.GetProjectsByIDs(ctx, ids)
+}
+
+func (r *ProjectRepository) GetProjectsByOwnerIDs(ctx context.Context, ownerIDs []pgtype.UUID) ([]database.Project, error) {
+	return r.q.GetProjectsByOwnerIDs(ctx, ownerIDs)
+}
+
+func (r *ProjectRepository) GetProjectMembersByUserIDs(ctx context.Context, userIDs []pgtype.UUID) ([]database.ProjectMember, error) {
+	return r.q.GetProjectMembersByUserIDs(ctx, userIDs)
+}

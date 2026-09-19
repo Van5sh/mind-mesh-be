@@ -261,6 +261,42 @@ func (q *Queries) GetUserProfile(ctx context.Context, userID pgtype.UUID) (UserP
 	return i, err
 }
 
+const getUserProfilesByUserIDs = `-- name: GetUserProfilesByUserIDs :many
+SELECT id, user_id, first_name, last_name, bio, avatar_url, created_at, updated_at
+FROM user_profiles
+WHERE user_id = ANY($1::uuid[])
+`
+
+// Batched form of GetUserProfile, used by the User.profile dataloader.
+func (q *Queries) GetUserProfilesByUserIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]UserProfile, error) {
+	rows, err := q.db.Query(ctx, getUserProfilesByUserIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UserProfile
+	for rows.Next() {
+		var i UserProfile
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Bio,
+			&i.AvatarUrl,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUserWithProfile = `-- name: GetUserWithProfile :one
 SELECT
     u.id,

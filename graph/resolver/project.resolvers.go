@@ -14,6 +14,7 @@ import (
 	"example/hello/internal/apperrors"
 	"example/hello/internal/database"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -307,6 +308,59 @@ func (r *mutationResolver) RemoveProjectMember(ctx context.Context, projectID st
 	return true, nil
 }
 
+// Name is the resolver for the name field.
+func (r *projectResolver) Name(ctx context.Context, obj *model.Project) (string, error) {
+	if !isStubProject(obj) {
+		return obj.Name, nil
+	}
+
+	project, err := r.loadProject(ctx, obj)
+	if err != nil {
+		return "", err
+	}
+	return project.Name, nil
+}
+
+// Description is the resolver for the description field.
+func (r *projectResolver) Description(ctx context.Context, obj *model.Project) (*string, error) {
+	if !isStubProject(obj) {
+		return obj.Description, nil
+	}
+
+	project, err := r.loadProject(ctx, obj)
+	if err != nil {
+		return nil, err
+	}
+	return helpers.ProjectToModel(project).Description, nil
+}
+
+// Visibility is the resolver for the visibility field.
+func (r *projectResolver) Visibility(ctx context.Context, obj *model.Project) (model.ProjectVisibility, error) {
+	if !isStubProject(obj) {
+		return obj.Visibility, nil
+	}
+
+	project, err := r.loadProject(ctx, obj)
+	if err != nil {
+		return "", err
+	}
+	return model.ProjectVisibility(project.Visibility), nil
+}
+
+// Owner is the resolver for the owner field.
+func (r *projectResolver) Owner(ctx context.Context, obj *model.Project) (*model.User, error) {
+	if !isStubProject(obj) && obj.Owner != nil {
+		return obj.Owner, nil
+	}
+
+	project, err := r.loadProject(ctx, obj)
+	if err != nil {
+		return nil, err
+	}
+	// An ID-only user; its own field resolvers batch the rest.
+	return &model.User{ID: project.OwnerID.String()}, nil
+}
+
 // Members is the resolver for the members field.
 func (r *projectResolver) Members(ctx context.Context, obj *model.Project) ([]*model.ProjectMember, error) {
 	projectID, err := parseUUID(obj.ID)
@@ -314,7 +368,14 @@ func (r *projectResolver) Members(ctx context.Context, obj *model.Project) ([]*m
 		return nil, err
 	}
 
-	members, err := r.App.Services.Project.GetProjectMembers(ctx, projectID)
+	// Batched across every project in the operation (see graph/loaders);
+	// falls back to a direct query when no loaders are on the context.
+	var members []database.ProjectMember
+	if l := loaders.From(ctx); l != nil {
+		members, err = l.MembersByProject.Load(ctx, projectID)
+	} else {
+		members, err = r.App.Services.Project.GetProjectMembers(ctx, projectID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -333,7 +394,12 @@ func (r *projectResolver) Folders(ctx context.Context, obj *model.Project) ([]*m
 		return nil, err
 	}
 
-	folders, err := r.App.Services.File.GetFoldersByProjectID(ctx, projectID)
+	var folders []database.Folder
+	if l := loaders.From(ctx); l != nil {
+		folders, err = l.FoldersByProject.Load(ctx, projectID)
+	} else {
+		folders, err = r.App.Services.File.GetFoldersByProjectID(ctx, projectID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -382,7 +448,12 @@ func (r *projectResolver) Chats(ctx context.Context, obj *model.Project) ([]*mod
 		return nil, err
 	}
 
-	chats, err := r.App.Services.Chat.GetChatsByProjectID(ctx, projectID)
+	var chats []database.Chat
+	if l := loaders.From(ctx); l != nil {
+		chats, err = l.ChatsByProject.Load(ctx, projectID)
+	} else {
+		chats, err = r.App.Services.Chat.GetChatsByProjectID(ctx, projectID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -401,7 +472,17 @@ func (r *projectResolver) Reports(ctx context.Context, obj *model.Project) ([]*m
 		return nil, err
 	}
 
-	reports, err := r.App.Services.Report.GetReportsByProjectID(ctx, projectID)
+	// The single and batched queries return identically-shaped rows.
+	var reports []database.GetReportsByProjectIDsRow
+	if l := loaders.From(ctx); l != nil {
+		reports, err = l.ReportsByProject.Load(ctx, projectID)
+	} else {
+		var single []database.GetReportsByProjectIDRow
+		single, err = r.App.Services.Report.GetReportsByProjectID(ctx, projectID)
+		for _, row := range single {
+			reports = append(reports, database.GetReportsByProjectIDsRow(row))
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -420,7 +501,12 @@ func (r *projectResolver) Flowcharts(ctx context.Context, obj *model.Project) ([
 		return nil, err
 	}
 
-	flowcharts, err := r.App.Services.Flowchart.GetFlowchartsByProjectID(ctx, projectID)
+	var flowcharts []database.Flowchart
+	if l := loaders.From(ctx); l != nil {
+		flowcharts, err = l.FlowchartsByProject.Load(ctx, projectID)
+	} else {
+		flowcharts, err = r.App.Services.Flowchart.GetFlowchartsByProjectID(ctx, projectID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -439,7 +525,12 @@ func (r *projectResolver) ActivityLogs(ctx context.Context, obj *model.Project) 
 		return nil, err
 	}
 
-	activities, err := r.App.Services.Activity.GetActivityLogsByProjectID(ctx, projectID)
+	var activities []database.ActivityLog
+	if l := loaders.From(ctx); l != nil {
+		activities, err = l.ActivityByProject.Load(ctx, projectID)
+	} else {
+		activities, err = r.App.Services.Activity.GetActivityLogsByProjectID(ctx, projectID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -449,6 +540,47 @@ func (r *projectResolver) ActivityLogs(ctx context.Context, obj *model.Project) 
 		result = append(result, helpers.ActivityLogToModel(activity))
 	}
 	return result, nil
+}
+
+// ArchivedAt is the resolver for the archivedAt field.
+func (r *projectResolver) ArchivedAt(ctx context.Context, obj *model.Project) (*time.Time, error) {
+	if !isStubProject(obj) {
+		return obj.ArchivedAt, nil
+	}
+
+	project, err := r.loadProject(ctx, obj)
+	if err != nil {
+		return nil, err
+	}
+	return helpers.ProjectToModel(project).ArchivedAt, nil
+}
+
+// CreatedAt is the resolver for the createdAt field.
+func (r *projectResolver) CreatedAt(ctx context.Context, obj *model.Project) (*time.Time, error) {
+	if !isStubProject(obj) {
+		return &obj.CreatedAt, nil
+	}
+
+	project, err := r.loadProject(ctx, obj)
+	if err != nil {
+		return nil, err
+	}
+	createdAt := project.CreatedAt.Time
+	return &createdAt, nil
+}
+
+// UpdatedAt is the resolver for the updatedAt field.
+func (r *projectResolver) UpdatedAt(ctx context.Context, obj *model.Project) (*time.Time, error) {
+	if !isStubProject(obj) {
+		return &obj.UpdatedAt, nil
+	}
+
+	project, err := r.loadProject(ctx, obj)
+	if err != nil {
+		return nil, err
+	}
+	updatedAt := project.UpdatedAt.Time
+	return &updatedAt, nil
 }
 
 // Project is the resolver for the project field.

@@ -467,6 +467,42 @@ func (q *Queries) GetChatMessagesByChatID(ctx context.Context, chatID pgtype.UUI
 	return items, nil
 }
 
+const getChatMessagesByChatIDs = `-- name: GetChatMessagesByChatIDs :many
+SELECT id, chat_id, sender_id, role, content, created_at, updated_at
+FROM chat_messages
+WHERE chat_id = ANY($1::uuid[])
+ORDER BY chat_id, created_at ASC
+`
+
+// Batched form of GetChatMessagesByChatID, used by the Chat.messages dataloader.
+func (q *Queries) GetChatMessagesByChatIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]ChatMessage, error) {
+	rows, err := q.db.Query(ctx, getChatMessagesByChatIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ChatMessage
+	for rows.Next() {
+		var i ChatMessage
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChatID,
+			&i.SenderID,
+			&i.Role,
+			&i.Content,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getChatMessagesByIDs = `-- name: GetChatMessagesByIDs :many
 SELECT id, chat_id, sender_id, role, content, created_at, updated_at
 FROM chat_messages
@@ -681,6 +717,34 @@ func (q *Queries) GetChatParticipants(ctx context.Context, chatID pgtype.UUID) (
 	return items, nil
 }
 
+const getChatParticipantsByChatIDs = `-- name: GetChatParticipantsByChatIDs :many
+SELECT chat_id, user_id, joined_at
+FROM chat_participants
+WHERE chat_id = ANY($1::uuid[])
+ORDER BY chat_id, joined_at ASC
+`
+
+// Batched form of GetChatParticipants, used by the Chat.participants dataloader.
+func (q *Queries) GetChatParticipantsByChatIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]ChatParticipant, error) {
+	rows, err := q.db.Query(ctx, getChatParticipantsByChatIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ChatParticipant
+	for rows.Next() {
+		var i ChatParticipant
+		if err := rows.Scan(&i.ChatID, &i.UserID, &i.JoinedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getChatParticipantsWithUsers = `-- name: GetChatParticipantsWithUsers :many
 SELECT
     cp.chat_id,
@@ -824,6 +888,43 @@ ORDER BY last_activity_at DESC
 
 func (q *Queries) GetChatsByProjectID(ctx context.Context, projectID pgtype.UUID) ([]Chat, error) {
 	rows, err := q.db.Query(ctx, getChatsByProjectID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Chat
+	for rows.Next() {
+		var i Chat
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.Title,
+			&i.Type,
+			&i.LastActivityAt,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getChatsByProjectIDs = `-- name: GetChatsByProjectIDs :many
+SELECT id, project_id, title, type, last_activity_at, status, created_at, updated_at
+FROM chats
+WHERE project_id = ANY($1::uuid[])
+ORDER BY project_id, last_activity_at DESC
+`
+
+// Batched form of GetChatsByProjectID, used by the Project.chats dataloader.
+func (q *Queries) GetChatsByProjectIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]Chat, error) {
+	rows, err := q.db.Query(ctx, getChatsByProjectIDs, dollar_1)
 	if err != nil {
 		return nil, err
 	}

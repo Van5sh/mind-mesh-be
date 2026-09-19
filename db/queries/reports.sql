@@ -263,3 +263,24 @@ ON r.id = rp.report_id
 JOIN projects p
 ON r.project_id = p.id
 WHERE r.id = $1;
+
+
+-- name: GetReportsByProjectIDs :many
+-- Batched form of GetReportsByProjectID, used by the Project.reports dataloader.
+SELECT
+    r.id,
+    r.project_id,
+    r.title,
+    r.content,
+    r.format,
+    r.created_at,
+    r.updated_at,
+    rp.generated_by,
+    rp.generated_by_ai,
+    rp.status,
+    rp.source_chat_id
+FROM reports r
+JOIN report_properties rp
+ON r.id = rp.report_id
+WHERE r.project_id = ANY($1::uuid[])
+ORDER BY r.project_id, r.created_at DESC;

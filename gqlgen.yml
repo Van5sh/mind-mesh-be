@@ -19,6 +19,20 @@ resolver:
 models:
   Project:
     fields:
+      name:
+        resolver: true
+      description:
+        resolver: true
+      visibility:
+        resolver: true
+      owner:
+        resolver: true
+      archivedAt:
+        resolver: true
+      createdAt:
+        resolver: true
+      updatedAt:
+        resolver: true
       members:
         resolver: true
       folders:

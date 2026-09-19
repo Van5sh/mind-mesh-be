@@ -777,6 +777,44 @@ func (q *Queries) GetFileAIMetadata(ctx context.Context, fileID pgtype.UUID) (Fi
 	return i, err
 }
 
+const getFileAIMetadataByFileIDs = `-- name: GetFileAIMetadataByFileIDs :many
+SELECT file_id, extracted_text, embedding_model, embedding_synced, indexed_at, processing_status, summary, error_message, created_at, updated_at
+FROM file_ai_metadata
+WHERE file_id = ANY($1::uuid[])
+`
+
+// Batched form of GetFileAIMetadata, used by the File.aiMetadata dataloader.
+func (q *Queries) GetFileAIMetadataByFileIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]FileAiMetadatum, error) {
+	rows, err := q.db.Query(ctx, getFileAIMetadataByFileIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FileAiMetadatum
+	for rows.Next() {
+		var i FileAiMetadatum
+		if err := rows.Scan(
+			&i.FileID,
+			&i.ExtractedText,
+			&i.EmbeddingModel,
+			&i.EmbeddingSynced,
+			&i.IndexedAt,
+			&i.ProcessingStatus,
+			&i.Summary,
+			&i.ErrorMessage,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFileByFolderAndName = `-- name: GetFileByFolderAndName :one
 SELECT id, folder_id, project_id, name, size, created_at, updated_at
 FROM files
@@ -925,6 +963,41 @@ func (q *Queries) GetFileSharesByFileID(ctx context.Context, fileID pgtype.UUID)
 	return items, nil
 }
 
+const getFileSharesByFileIDs = `-- name: GetFileSharesByFileIDs :many
+SELECT id, file_id, shared_by, shared_with, permission, created_at
+FROM file_shares
+WHERE file_id = ANY($1::uuid[])
+ORDER BY file_id, created_at DESC
+`
+
+// Batched form of GetFileSharesByFileID, used by the File.shares dataloader.
+func (q *Queries) GetFileSharesByFileIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]FileShare, error) {
+	rows, err := q.db.Query(ctx, getFileSharesByFileIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FileShare
+	for rows.Next() {
+		var i FileShare
+		if err := rows.Scan(
+			&i.ID,
+			&i.FileID,
+			&i.SharedBy,
+			&i.SharedWith,
+			&i.Permission,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFileSharesBySharedWith = `-- name: GetFileSharesBySharedWith :many
 SELECT id, file_id, shared_by, shared_with, permission, created_at
 FROM file_shares
@@ -934,6 +1007,42 @@ ORDER BY created_at DESC
 
 func (q *Queries) GetFileSharesBySharedWith(ctx context.Context, sharedWith pgtype.UUID) ([]FileShare, error) {
 	rows, err := q.db.Query(ctx, getFileSharesBySharedWith, sharedWith)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FileShare
+	for rows.Next() {
+		var i FileShare
+		if err := rows.Scan(
+			&i.ID,
+			&i.FileID,
+			&i.SharedBy,
+			&i.SharedWith,
+			&i.Permission,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFileSharesBySharedWithIDs = `-- name: GetFileSharesBySharedWithIDs :many
+SELECT id, file_id, shared_by, shared_with, permission, created_at
+FROM file_shares
+WHERE shared_with = ANY($1::uuid[])
+ORDER BY shared_with, created_at DESC
+`
+
+// Batched form of GetFileSharesBySharedWith, used by the User.sharedFiles
+// dataloader.
+func (q *Queries) GetFileSharesBySharedWithIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]FileShare, error) {
+	rows, err := q.db.Query(ctx, getFileSharesBySharedWithIDs, dollar_1)
 	if err != nil {
 		return nil, err
 	}
@@ -983,6 +1092,44 @@ func (q *Queries) GetFileStorage(ctx context.Context, fileID pgtype.UUID) (FileS
 	return i, err
 }
 
+const getFileStoragesByFileIDs = `-- name: GetFileStoragesByFileIDs :many
+SELECT file_id, bucket_name, object_key, etag, version_id, checksum, mime_type, created_at, updated_at, uploaded_by
+FROM file_storage
+WHERE file_id = ANY($1::uuid[])
+`
+
+// Batched form of GetFileStorage, used by the File.storage dataloader.
+func (q *Queries) GetFileStoragesByFileIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]FileStorage, error) {
+	rows, err := q.db.Query(ctx, getFileStoragesByFileIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FileStorage
+	for rows.Next() {
+		var i FileStorage
+		if err := rows.Scan(
+			&i.FileID,
+			&i.BucketName,
+			&i.ObjectKey,
+			&i.Etag,
+			&i.VersionID,
+			&i.Checksum,
+			&i.MimeType,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.UploadedBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFilesByFolderID = `-- name: GetFilesByFolderID :many
 SELECT id, folder_id, project_id, name, size, created_at, updated_at
 FROM files
@@ -992,6 +1139,42 @@ ORDER BY name
 
 func (q *Queries) GetFilesByFolderID(ctx context.Context, folderID pgtype.UUID) ([]File, error) {
 	rows, err := q.db.Query(ctx, getFilesByFolderID, folderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []File
+	for rows.Next() {
+		var i File
+		if err := rows.Scan(
+			&i.ID,
+			&i.FolderID,
+			&i.ProjectID,
+			&i.Name,
+			&i.Size,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFilesByFolderIDs = `-- name: GetFilesByFolderIDs :many
+SELECT id, folder_id, project_id, name, size, created_at, updated_at
+FROM files
+WHERE folder_id = ANY($1::uuid[])
+ORDER BY folder_id, name
+`
+
+// Batched form of GetFilesByFolderID, used by the Folder.files dataloader.
+func (q *Queries) GetFilesByFolderIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]File, error) {
+	rows, err := q.db.Query(ctx, getFilesByFolderIDs, dollar_1)
 	if err != nil {
 		return nil, err
 	}
@@ -1310,6 +1493,76 @@ func (q *Queries) GetFolderContents(ctx context.Context, parentFolderID pgtype.U
 	return items, nil
 }
 
+const getFoldersByIDs = `-- name: GetFoldersByIDs :many
+SELECT id, project_id, parent_folder_id, name, created_at, updated_at
+FROM folders
+WHERE id = ANY($1::uuid[])
+`
+
+// Batched folder lookup, used by the Folder.parentFolder dataloader.
+func (q *Queries) GetFoldersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]Folder, error) {
+	rows, err := q.db.Query(ctx, getFoldersByIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Folder
+	for rows.Next() {
+		var i Folder
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.ParentFolderID,
+			&i.Name,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFoldersByParentFolderIDs = `-- name: GetFoldersByParentFolderIDs :many
+SELECT id, project_id, parent_folder_id, name, created_at, updated_at
+FROM folders
+WHERE parent_folder_id = ANY($1::uuid[])
+ORDER BY parent_folder_id, name
+`
+
+// Batched form of GetChildFolders, used by the Folder.childFolders
+// dataloader.
+func (q *Queries) GetFoldersByParentFolderIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]Folder, error) {
+	rows, err := q.db.Query(ctx, getFoldersByParentFolderIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Folder
+	for rows.Next() {
+		var i Folder
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.ParentFolderID,
+			&i.Name,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFoldersByProjectID = `-- name: GetFoldersByProjectID :many
 SELECT id, project_id, parent_folder_id, name, created_at, updated_at
 FROM folders
@@ -1319,6 +1572,41 @@ ORDER BY name
 
 func (q *Queries) GetFoldersByProjectID(ctx context.Context, projectID pgtype.UUID) ([]Folder, error) {
 	rows, err := q.db.Query(ctx, getFoldersByProjectID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Folder
+	for rows.Next() {
+		var i Folder
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.ParentFolderID,
+			&i.Name,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFoldersByProjectIDs = `-- name: GetFoldersByProjectIDs :many
+SELECT id, project_id, parent_folder_id, name, created_at, updated_at
+FROM folders
+WHERE project_id = ANY($1::uuid[])
+ORDER BY project_id, name
+`
+
+// Batched form of GetFoldersByProjectID, used by the Project.folders dataloader.
+func (q *Queries) GetFoldersByProjectIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]Folder, error) {
+	rows, err := q.db.Query(ctx, getFoldersByProjectIDs, dollar_1)
 	if err != nil {
 		return nil, err
 	}

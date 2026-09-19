@@ -282,3 +282,13 @@ func (s *UserService) DeleteUser(
 
 	return nil
 }
+
+// GetUserProfilesByUserIDs fetches the profiles of many users in one query
+// (users with no profile are absent). It exists for the User.profile
+// dataloader.
+func (s *UserService) GetUserProfilesByUserIDs(
+	ctx context.Context,
+	userIDs []pgtype.UUID,
+) ([]database.UserProfile, error) {
+	return fetchRows(ctx, userIDs, "user profiles", s.repo.GetUserProfilesByUserIDs)
+}

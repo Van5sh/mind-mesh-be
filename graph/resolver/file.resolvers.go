@@ -7,8 +7,10 @@ package graph
 
 import (
 	"context"
+	"errors"
 	"example/hello/graph"
 	"example/hello/graph/helpers"
+	"example/hello/graph/loaders"
 	"example/hello/graph/model"
 	"example/hello/internal/apperrors"
 	"example/hello/internal/database"
@@ -24,11 +26,21 @@ func (r *fileResolver) Storage(ctx context.Context, obj *model.File) (*model.Fil
 		return nil, err
 	}
 
-	storage, err := r.App.Services.File.GetFileStorage(ctx, fileID)
-	if err != nil {
+	// The row lookup is batched; the download URL below is a local presign
+	// (no query), so it stays per file.
+	var storage database.FileStorage
+	if l := loaders.From(ctx); l != nil {
+		storage, err = l.StorageByFile.Load(ctx, fileID)
+		if errors.Is(err, loaders.ErrNotFound) {
+			return nil, nil
+		}
+	} else {
+		storage, err = r.App.Services.File.GetFileStorage(ctx, fileID)
 		if apperrors.IsCode(err, apperrors.NotFound) {
 			return nil, nil
 		}
+	}
+	if err != nil {
 		return nil, err
 	}
 
@@ -59,11 +71,22 @@ func (r *fileResolver) AiMetadata(ctx context.Context, obj *model.File) (*model.
 		return nil, err
 	}
 
-	metadata, err := r.App.Services.File.GetFileAIMetadata(ctx, fileID)
-	if err != nil {
+	// Batched across every file in the operation (see graph/loaders); falls
+	// back to a direct query when no loaders are on the context. A file with
+	// no metadata row yet is not an error - the field is nullable.
+	var metadata database.FileAiMetadatum
+	if l := loaders.From(ctx); l != nil {
+		metadata, err = l.AIMetadataByFile.Load(ctx, fileID)
+		if errors.Is(err, loaders.ErrNotFound) {
+			return nil, nil
+		}
+	} else {
+		metadata, err = r.App.Services.File.GetFileAIMetadata(ctx, fileID)
 		if apperrors.IsCode(err, apperrors.NotFound) {
 			return nil, nil
 		}
+	}
+	if err != nil {
 		return nil, err
 	}
 
@@ -88,7 +111,12 @@ func (r *fileResolver) Shares(ctx context.Context, obj *model.File) ([]*model.Fi
 		return nil, err
 	}
 
-	shares, err := r.App.Services.File.GetFileSharesByFileID(ctx, fileID)
+	var shares []database.FileShare
+	if l := loaders.From(ctx); l != nil {
+		shares, err = l.SharesByFile.Load(ctx, fileID)
+	} else {
+		shares, err = r.App.Services.File.GetFileSharesByFileID(ctx, fileID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +150,11 @@ func (r *folderResolver) ParentFolder(ctx context.Context, obj *model.Folder) (*
 		return nil, err
 	}
 
-	folder, err := r.App.Services.File.GetFolderByID(ctx, folderID)
+	// Two hops (this folder's row, then its parent's), each batched across
+	// every folder in the operation: N folders cost 2 queries, not 2N. Folders
+	// already loaded by an earlier hop or field are served from the loader's
+	// cache.
+	folder, err := r.loadFolder(ctx, folderID)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +163,7 @@ func (r *folderResolver) ParentFolder(ctx context.Context, obj *model.Folder) (*
 		return nil, nil
 	}
 
-	parent, err := r.App.Services.File.GetFolderByID(ctx, folder.ParentFolderID)
+	parent, err := r.loadFolder(ctx, folder.ParentFolderID)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +178,12 @@ func (r *folderResolver) ChildFolders(ctx context.Context, obj *model.Folder) ([
 		return nil, err
 	}
 
-	children, err := r.App.Services.File.GetFoldersByParentFolderID(ctx, folderID)
+	var children []database.Folder
+	if l := loaders.From(ctx); l != nil {
+		children, err = l.ChildFoldersByParent.Load(ctx, folderID)
+	} else {
+		children, err = r.App.Services.File.GetFoldersByParentFolderID(ctx, folderID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +202,12 @@ func (r *folderResolver) Files(ctx context.Context, obj *model.Folder) ([]*model
 		return nil, err
 	}
 
-	files, err := r.App.Services.File.GetFilesByFolderID(ctx, folderID)
+	var files []database.File
+	if l := loaders.From(ctx); l != nil {
+		files, err = l.FilesByFolder.Load(ctx, folderID)
+	} else {
+		files, err = r.App.Services.File.GetFilesByFolderID(ctx, folderID)
+	}
 	if err != nil {
 		return nil, err
 	}

@@ -84,3 +84,7 @@ func (r *ActivityRepository) GetProjectStats(ctx context.Context, projectID pgty
 func (r *ActivityRepository) GetRecentActivityLogs(ctx context.Context, limit int32) ([]database.ActivityLog, error) {
 	return r.q.GetRecentActivityLogs(ctx, limit)
 }
+
+func (r *ActivityRepository) GetActivityLogsByProjectIDs(ctx context.Context, projectIDs []pgtype.UUID) ([]database.ActivityLog, error) {
+	return r.q.GetActivityLogsByProjectIDs(ctx, projectIDs)
+}

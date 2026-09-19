@@ -338,3 +338,27 @@ ON cm.chat_id = c.id
 WHERE cm.chat_id = $1
     AND c.status = 'ARCHIVED'
 ORDER BY cm.created_at ASC;
+
+
+-- name: GetChatsByProjectIDs :many
+-- Batched form of GetChatsByProjectID, used by the Project.chats dataloader.
+SELECT *
+FROM chats
+WHERE project_id = ANY($1::uuid[])
+ORDER BY project_id, last_activity_at DESC;
+
+
+-- name: GetChatMessagesByChatIDs :many
+-- Batched form of GetChatMessagesByChatID, used by the Chat.messages dataloader.
+SELECT *
+FROM chat_messages
+WHERE chat_id = ANY($1::uuid[])
+ORDER BY chat_id, created_at ASC;
+
+
+-- name: GetChatParticipantsByChatIDs :many
+-- Batched form of GetChatParticipants, used by the Chat.participants dataloader.
+SELECT *
+FROM chat_participants
+WHERE chat_id = ANY($1::uuid[])
+ORDER BY chat_id, joined_at ASC;

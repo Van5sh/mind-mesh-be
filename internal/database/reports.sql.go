@@ -573,6 +573,73 @@ func (q *Queries) GetReportsByProjectID(ctx context.Context, projectID pgtype.UU
 	return items, nil
 }
 
+const getReportsByProjectIDs = `-- name: GetReportsByProjectIDs :many
+SELECT
+    r.id,
+    r.project_id,
+    r.title,
+    r.content,
+    r.format,
+    r.created_at,
+    r.updated_at,
+    rp.generated_by,
+    rp.generated_by_ai,
+    rp.status,
+    rp.source_chat_id
+FROM reports r
+JOIN report_properties rp
+ON r.id = rp.report_id
+WHERE r.project_id = ANY($1::uuid[])
+ORDER BY r.project_id, r.created_at DESC
+`
+
+type GetReportsByProjectIDsRow struct {
+	ID            pgtype.UUID
+	ProjectID     pgtype.UUID
+	Title         string
+	Content       string
+	Format        ReportFormat
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	GeneratedBy   pgtype.UUID
+	GeneratedByAi pgtype.Bool
+	Status        ReportStatus
+	SourceChatID  pgtype.UUID
+}
+
+// Batched form of GetReportsByProjectID, used by the Project.reports dataloader.
+func (q *Queries) GetReportsByProjectIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetReportsByProjectIDsRow, error) {
+	rows, err := q.db.Query(ctx, getReportsByProjectIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetReportsByProjectIDsRow
+	for rows.Next() {
+		var i GetReportsByProjectIDsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.Title,
+			&i.Content,
+			&i.Format,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.GeneratedBy,
+			&i.GeneratedByAi,
+			&i.Status,
+			&i.SourceChatID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getReportsByStatus = `-- name: GetReportsByStatus :many
 SELECT
     r.id,

@@ -184,3 +184,15 @@ func (r *ChatRepository) UpdateChatStatus(ctx context.Context, params database.U
 func (r *ChatRepository) UpdateChatType(ctx context.Context, params database.UpdateChatTypeParams) (database.Chat, error) {
 	return r.q.UpdateChatType(ctx, params)
 }
+
+func (r *ChatRepository) GetChatsByProjectIDs(ctx context.Context, projectIDs []pgtype.UUID) ([]database.Chat, error) {
+	return r.q.GetChatsByProjectIDs(ctx, projectIDs)
+}
+
+func (r *ChatRepository) GetChatMessagesByChatIDs(ctx context.Context, chatIDs []pgtype.UUID) ([]database.ChatMessage, error) {
+	return r.q.GetChatMessagesByChatIDs(ctx, chatIDs)
+}
+
+func (r *ChatRepository) GetChatParticipantsByChatIDs(ctx context.Context, chatIDs []pgtype.UUID) ([]database.ChatParticipant, error) {
+	return r.q.GetChatParticipantsByChatIDs(ctx, chatIDs)
+}

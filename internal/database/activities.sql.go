@@ -314,6 +314,42 @@ func (q *Queries) GetActivityLogsByProjectID(ctx context.Context, projectID pgty
 	return items, nil
 }
 
+const getActivityLogsByProjectIDs = `-- name: GetActivityLogsByProjectIDs :many
+SELECT id, project_id, user_id, action, entity_type, entity_id, created_at
+FROM activity_logs
+WHERE project_id = ANY($1::uuid[])
+ORDER BY project_id, created_at DESC
+`
+
+// Batched form of GetActivityLogsByProjectID, used by the Project.activityLogs dataloader.
+func (q *Queries) GetActivityLogsByProjectIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]ActivityLog, error) {
+	rows, err := q.db.Query(ctx, getActivityLogsByProjectIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ActivityLog
+	for rows.Next() {
+		var i ActivityLog
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.UserID,
+			&i.Action,
+			&i.EntityType,
+			&i.EntityID,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getActivityLogsByProjectUserAndAction = `-- name: GetActivityLogsByProjectUserAndAction :many
 SELECT id, project_id, user_id, action, entity_type, entity_id, created_at
 FROM activity_logs

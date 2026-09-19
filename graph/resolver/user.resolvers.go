@@ -7,8 +7,10 @@ package graph
 
 import (
 	"context"
+	"errors"
 	"example/hello/graph"
 	"example/hello/graph/helpers"
+	"example/hello/graph/loaders"
 	"example/hello/graph/model"
 	"example/hello/internal/apperrors"
 	"example/hello/internal/auth"
@@ -246,11 +248,22 @@ func (r *userResolver) Profile(ctx context.Context, obj *model.User) (*model.Use
 		return nil, err
 	}
 
-	profile, err := r.App.Services.User.GetUserProfile(ctx, userID)
-	if err != nil {
+	// Batched across every user in the operation (see graph/loaders); falls
+	// back to a direct query when no loaders are on the context. A user with
+	// no profile row yet is not an error - the field is nullable.
+	var profile database.UserProfile
+	if l := loaders.From(ctx); l != nil {
+		profile, err = l.ProfileByUser.Load(ctx, userID)
+		if errors.Is(err, loaders.ErrNotFound) {
+			return nil, nil
+		}
+	} else {
+		profile, err = r.App.Services.User.GetUserProfile(ctx, userID)
 		if apperrors.IsCode(err, apperrors.NotFound) {
 			return nil, nil
 		}
+	}
+	if err != nil {
 		return nil, err
 	}
 
@@ -264,7 +277,12 @@ func (r *userResolver) OwnedProjects(ctx context.Context, obj *model.User) ([]*m
 		return nil, err
 	}
 
-	projects, err := r.App.Services.Project.GetProjectsByOwnerID(ctx, userID)
+	var projects []database.Project
+	if l := loaders.From(ctx); l != nil {
+		projects, err = l.OwnedProjectsByOwner.Load(ctx, userID)
+	} else {
+		projects, err = r.App.Services.Project.GetProjectsByOwnerID(ctx, userID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -283,9 +301,25 @@ func (r *userResolver) ProjectMemberships(ctx context.Context, obj *model.User) 
 		return nil, err
 	}
 
-	// A membership record only exists for users explicitly added to a
-	// project; an owner who was never separately added has none, so
-	// each project the user can see is checked individually.
+	// One membership query for every user in the operation. A membership
+	// record only exists for users explicitly added to a project (an owner
+	// who was never separately added has none), which is exactly the set of
+	// rows this returns - so no per-project lookup is needed.
+	if l := loaders.From(ctx); l != nil {
+		members, err := l.MembershipsByUser.Load(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+
+		result := make([]*model.ProjectMember, 0, len(members))
+		for _, member := range members {
+			result = append(result, helpers.ProjectMemberToModel(member))
+		}
+		return result, nil
+	}
+
+	// No loaders installed: the original one-by-one lookup. Each project the
+	// user can see is checked individually.
 	projects, err := r.App.Services.Project.GetProjectsForUser(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -319,7 +353,12 @@ func (r *userResolver) SharedFiles(ctx context.Context, obj *model.User) ([]*mod
 		return nil, err
 	}
 
-	shares, err := r.App.Services.File.GetFileSharesBySharedWith(ctx, userID)
+	var shares []database.FileShare
+	if l := loaders.From(ctx); l != nil {
+		shares, err = l.SharesBySharedWith.Load(ctx, userID)
+	} else {
+		shares, err = r.App.Services.File.GetFileSharesBySharedWith(ctx, userID)
+	}
 	if err != nil {
 		return nil, err
 	}

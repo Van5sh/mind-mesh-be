@@ -350,3 +350,56 @@ func (s *ProjectService) GetArchivedProjectsForUser(ctx context.Context, userID 
 	}
 	return projects, nil
 }
+
+// GetProjectMembersByProjectIDs fetches the members of many projects in one
+// query, grouped by project ID. It exists for the Project.members dataloader.
+func (s *ProjectService) GetProjectMembersByProjectIDs(
+	ctx context.Context,
+	projectIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.ProjectMember, error) {
+	return fetchGrouped(ctx, projectIDs, "project members by projects",
+		s.repo.GetProjectMembersByProjectIDs,
+		func(m database.ProjectMember) pgtype.UUID { return m.ProjectID })
+}
+
+// GetProjectsByIDs fetches many projects in one query. IDs with no project
+// are simply absent from the result. It exists for the Project dataloader.
+func (s *ProjectService) GetProjectsByIDs(ctx context.Context, ids []pgtype.UUID) ([]database.Project, error) {
+	if len(ids) == 0 {
+		return []database.Project{}, nil
+	}
+	for _, id := range ids {
+		if err := validators.ValidateUUID("project id", id); err != nil {
+			return nil, err
+		}
+	}
+
+	projects, err := s.repo.GetProjectsByIDs(ctx, ids)
+	if err != nil {
+		return nil, apperrors.InternalError("failed to get projects", err)
+	}
+	return projects, nil
+}
+
+// GetProjectsByOwnerIDs fetches the (non-archived) projects owned by many
+// users in one query, grouped by owner. It exists for the User.ownedProjects
+// dataloader.
+func (s *ProjectService) GetProjectsByOwnerIDs(
+	ctx context.Context,
+	ownerIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.Project, error) {
+	return fetchGrouped(ctx, ownerIDs, "projects by owners",
+		s.repo.GetProjectsByOwnerIDs,
+		func(p database.Project) pgtype.UUID { return p.OwnerID })
+}
+
+// GetProjectMembersByUserIDs fetches every membership row of many users in one
+// query, grouped by user. It exists for the User.projectMemberships dataloader.
+func (s *ProjectService) GetProjectMembersByUserIDs(
+	ctx context.Context,
+	userIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.ProjectMember, error) {
+	return fetchGrouped(ctx, userIDs, "project memberships by users",
+		s.repo.GetProjectMembersByUserIDs,
+		func(m database.ProjectMember) pgtype.UUID { return m.UserID })
+}
