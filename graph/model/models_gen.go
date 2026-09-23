@@ -96,7 +96,7 @@ type CreateChatParticipantInput struct {
 }
 
 type CreateFileInput struct {
-	ProjectID string         `json:"projectId"`
+	ProjectID *string        `json:"projectId,omitempty"`
 	FolderID  *string        `json:"folderId,omitempty"`
 	Name      string         `json:"name"`
 	File      graphql.Upload `json:"file"`

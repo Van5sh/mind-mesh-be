@@ -59,7 +59,19 @@ func (s *FileService) CreateFile(
 	if err := validators.ValidateFileName(params.Name); err != nil {
 		return database.File{}, err
 	}
-	if err := validators.ValidateUUID("project id", params.ProjectID); err != nil {
+	// ProjectID is optional: unset means a personal file, uploaded to the
+	// user's own drive rather than any project. A personal file can't sit
+	// inside a folder, since folders are still project-scoped only.
+	if params.ProjectID.Valid {
+		if err := validators.ValidateUUID("project id", params.ProjectID); err != nil {
+			return database.File{}, err
+		}
+	} else if params.FolderID.Valid {
+		return database.File{}, apperrors.Validation(
+			"a personal file (no project) cannot be placed in a folder",
+		)
+	}
+	if err := validators.ValidateUUID("uploaded by", params.UploadedBy); err != nil {
 		return database.File{}, err
 	}
 	if !supportedProcessingContentTypes[contentType] {
@@ -107,12 +119,22 @@ func (s *FileService) CreateFile(
 		return database.File{}, apperrors.InternalError("failed to create file", err)
 	}
 
-	s3Key := fmt.Sprintf(
-		"projects/%s/files/%s/%s",
-		file.ProjectID,
-		file.ID,
-		file.Name,
-	)
+	var s3Key string
+	if file.ProjectID.Valid {
+		s3Key = fmt.Sprintf(
+			"projects/%s/files/%s/%s",
+			file.ProjectID,
+			file.ID,
+			file.Name,
+		)
+	} else {
+		s3Key = fmt.Sprintf(
+			"personal/%s/files/%s/%s",
+			file.UploadedBy,
+			file.ID,
+			file.Name,
+		)
+	}
 	if err := s.s3.S3Upload(
 		ctx,
 		s3Key,
@@ -134,6 +156,16 @@ func (s *FileService) CreateFile(
 		_ = s.repo.DeleteFile(ctx, file.ID)
 		return database.File{},
 			apperrors.InternalError("failed to initialize file processing status", err)
+	}
+
+	// Personal files (no project) aren't queued for AI processing: RAG/chat
+	// grounding is project-scoped, so there's nothing for the worker to
+	// associate the embeddings with. Its file_ai_metadata row (created
+	// above) is left at PENDING - there's no misleading "FAILED" state, it
+	// simply never gets processed. Revisit if a project-less chat/RAG
+	// feature is ever added.
+	if !file.ProjectID.Valid {
+		return file, nil
 	}
 
 	// Queue processing job. Field names must match ai/worker/main.py's
@@ -1005,4 +1037,43 @@ func (s *FileService) GetFileSharesBySharedWithIDs(
 	return fetchGrouped(ctx, userIDs, "file shares by recipients",
 		s.repo.GetFileSharesBySharedWithIDs,
 		func(s database.FileShare) pgtype.UUID { return s.SharedWith })
+}
+
+// GetPersonalFiles returns a user's root-level files that have no project -
+// their personal drive space.
+func (s *FileService) GetPersonalFiles(
+	ctx context.Context,
+	userID pgtype.UUID,
+) ([]database.File, error) {
+	if err := validators.ValidateUUID("user id", userID); err != nil {
+		return nil, err
+	}
+
+	files, err := s.repo.GetPersonalFiles(ctx, userID)
+	if err != nil {
+		return nil, apperrors.InternalError("failed to get personal files", err)
+	}
+	return files, nil
+}
+
+// GetFileShareByUser returns the share row granting userID access to
+// fileID, or a NotFound error if the file hasn't been shared with them.
+// Used to authorize access to a personal (project-less) file that isn't
+// theirs - the same FileShare mechanism project files could already use.
+func (s *FileService) GetFileShareByUser(
+	ctx context.Context,
+	fileID pgtype.UUID,
+	userID pgtype.UUID,
+) (database.FileShare, error) {
+	share, err := s.repo.GetFileShareByFileAndSharedWith(ctx, database.GetFileShareByFileAndSharedWithParams{
+		FileID:     fileID,
+		SharedWith: userID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return database.FileShare{}, apperrors.NotFoundError("file not shared with this user")
+		}
+		return database.FileShare{}, apperrors.InternalError("failed to check file share", err)
+	}
+	return share, nil
 }

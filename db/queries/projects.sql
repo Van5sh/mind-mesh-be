@@ -6,12 +6,17 @@ WHERE owner_id = $1
 
 
 -- name: GetProjectsForUser :many
+-- Active projects only: archived ones are served by GetArchivedProjectsForUser
+-- (the owner-scoped GetProjectsByOwnerID already excludes them the same way).
 SELECT DISTINCT p.*
 FROM projects p
 LEFT JOIN project_members pm
     ON p.id = pm.project_id
-WHERE p.owner_id = $1
-   OR pm.user_id = $1;
+WHERE p.archived_at IS NULL
+  AND (
+      p.owner_id = $1
+      OR pm.user_id = $1
+  );
 
 
 -- name: GetProjectByID :one

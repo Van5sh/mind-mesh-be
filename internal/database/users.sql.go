@@ -376,6 +376,47 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]
 	return items, nil
 }
 
+const searchUsersByUsername = `-- name: SearchUsersByUsername :many
+SELECT id, username, email, created_at, updated_at
+FROM users
+WHERE username ILIKE $1 || '%'
+ORDER BY username
+LIMIT $2
+`
+
+type SearchUsersByUsernameParams struct {
+	Query    pgtype.Text
+	RowLimit int32
+}
+
+// Prefix search for the "invite a member" picker, so the frontend doesn't
+// have to load every user (GetAllUsers) just to find one by name.
+func (q *Queries) SearchUsersByUsername(ctx context.Context, arg SearchUsersByUsernameParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, searchUsersByUsername, arg.Query, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.Email,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
 SET

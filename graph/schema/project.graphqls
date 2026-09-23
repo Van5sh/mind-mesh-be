@@ -41,34 +41,22 @@ enum ProjectMemberRole {
 }
 
 extend type Query {
-  # Single project
   project(id: ID!): Project
-
-  # Projects
   projects: [Project!]!
   projectsByOwner(ownerId: ID!): [Project!]!
   projectsForUser(userId: ID!): [Project!]!
-
-  # Archived projects
   archivedProjectsByOwner(ownerId: ID!): [Project!]!
   archivedProjectsForUser(userId: ID!): [Project!]!
-
-  # Members
   projectMembers(projectId: ID!): [ProjectMember!]!
-
-  # Counts for a project's dashboard/summary widgets
   projectStats(projectId: ID!): ProjectStats!
 }
 
 extend type Mutation {
-  # Project
   createProject(input: CreateProjectInput!): Project!
   updateProject(id: ID!, input: UpdateProjectInput!): Project!
   archiveProject(projectId: ID!): Boolean!
   restoreProject(projectId: ID!): Boolean!
   deleteProject(id: ID!): Boolean!
-
-  # Ownership
   transferProjectOwnership(
     input: TransferProjectOwnershipInput!
   ): Project!

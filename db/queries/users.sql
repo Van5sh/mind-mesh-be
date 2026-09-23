@@ -153,3 +153,12 @@ WHERE user_id = $1;
 SELECT *
 FROM user_profiles
 WHERE user_id = ANY($1::uuid[]);
+
+-- name: SearchUsersByUsername :many
+-- Prefix search for the "invite a member" picker, so the frontend doesn't
+-- have to load every user (GetAllUsers) just to find one by name.
+SELECT *
+FROM users
+WHERE username ILIKE sqlc.arg(query) || '%'
+ORDER BY username
+LIMIT sqlc.arg(row_limit);

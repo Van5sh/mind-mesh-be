@@ -309,8 +309,9 @@ type ComplexityRoot struct {
 		ReportsByFormat         func(childComplexity int, projectID string, format model.ReportFormat) int
 		ReportsByGenerator      func(childComplexity int, projectID string, generatedByID string) int
 		ReportsByStatus         func(childComplexity int, projectID string, status model.ReportStatus) int
-		RootFiles               func(childComplexity int, projectID string) int
+		RootFiles               func(childComplexity int, projectID *string) int
 		RootFolders             func(childComplexity int, projectID string) int
+		SearchUsers             func(childComplexity int, query string, limit *int) int
 		SharedWithMe            func(childComplexity int, userID string) int
 		User                    func(childComplexity int, id string) int
 		UserByEmail             func(childComplexity int, email string) int
@@ -465,7 +466,7 @@ type QueryResolver interface {
 	RootFolders(ctx context.Context, projectID string) ([]*model.Folder, error)
 	File(ctx context.Context, id string) (*model.File, error)
 	Files(ctx context.Context, projectID *string, folderID *string) ([]*model.File, error)
-	RootFiles(ctx context.Context, projectID string) ([]*model.File, error)
+	RootFiles(ctx context.Context, projectID *string) ([]*model.File, error)
 	FavoriteFiles(ctx context.Context, userID string, projectID *string) ([]*model.File, error)
 	FileShare(ctx context.Context, id string) (*model.FileShare, error)
 	FileShares(ctx context.Context, fileID string) ([]*model.FileShare, error)
@@ -494,6 +495,7 @@ type QueryResolver interface {
 	UserProfile(ctx context.Context, userID string) (*model.UserProfile, error)
 	AllUsers(ctx context.Context) ([]*model.User, error)
 	Users(ctx context.Context, ids []string) ([]*model.User, error)
+	SearchUsers(ctx context.Context, query string, limit *int) ([]*model.User, error)
 }
 type SubscriptionResolver interface {
 	Empty(ctx context.Context) (<-chan *bool, error)
@@ -2188,7 +2190,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.RootFiles(childComplexity, args["projectId"].(string)), true
+		return e.ComplexityRoot.Query.RootFiles(childComplexity, args["projectId"].(*string)), true
 	case "Query.rootFolders":
 		if e.ComplexityRoot.Query.RootFolders == nil {
 			break
@@ -2200,6 +2202,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.RootFolders(childComplexity, args["projectId"].(string)), true
+	case "Query.searchUsers":
+		if e.ComplexityRoot.Query.SearchUsers == nil {
+			break
+		}
+
+		args, err := ec.field_Query_searchUsers_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.SearchUsers(childComplexity, args["query"].(string), args["limit"].(*int)), true
 	case "Query.sharedWithMe":
 		if e.ComplexityRoot.Query.SharedWithMe == nil {
 			break
@@ -4399,8 +4412,8 @@ func (ec *executionContext) field_Query_rootFiles_args(ctx context.Context, rawA
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "projectId",
-		func(ctx context.Context, v any) (string, error) {
-			return ec.unmarshalNID2string(ctx, v)
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOID2ᚖstring(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -4420,6 +4433,28 @@ func (ec *executionContext) field_Query_rootFolders_args(ctx context.Context, ra
 		return nil, err
 	}
 	args["projectId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_searchUsers_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "query",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["query"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "limit",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOInt2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg1
 	return args, nil
 }
 
@@ -10546,7 +10581,7 @@ func (ec *executionContext) _Query_rootFiles(ctx context.Context, field graphql.
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().RootFiles(ctx, fc.Args["projectId"].(string))
+			return ec.Resolvers.Query().RootFiles(ctx, fc.Args["projectId"].(*string))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v []*model.File) graphql.Marshaler {
@@ -11770,6 +11805,50 @@ func (ec *executionContext) fieldContext_Query_users(ctx context.Context, field 
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_users_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_searchUsers(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_searchUsers(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().SearchUsers(ctx, fc.Args["query"].(string), fc.Args["limit"].(*int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.User) graphql.Marshaler {
+			return ec.marshalNUser2ᚕᚖexampleᚋhelloᚋgraphᚋmodelᚐUserᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_searchUsers(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_User(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_searchUsers_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -14014,7 +14093,7 @@ func (ec *executionContext) unmarshalInputCreateFileInput(ctx context.Context, o
 		switch k {
 		case "projectId":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("projectId"))
-			data, err := ec.unmarshalNID2string(ctx, v)
+			data, err := ec.unmarshalOID2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -18266,6 +18345,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "searchUsers":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_searchUsers(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -20422,6 +20523,24 @@ func (ec *executionContext) marshalOID2ᚖstring(ctx context.Context, sel ast.Se
 	_ = sel
 	_ = ctx
 	res := graphql.MarshalID(*v)
+	return res
+}
+
+func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalInt(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.SelectionSet, v *int) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalInt(*v)
 	return res
 }
 

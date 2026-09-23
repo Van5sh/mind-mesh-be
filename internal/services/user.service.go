@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"strings"
 
 	"example/hello/internal/apperrors"
 	"example/hello/internal/database"
@@ -291,4 +292,28 @@ func (s *UserService) GetUserProfilesByUserIDs(
 	userIDs []pgtype.UUID,
 ) ([]database.UserProfile, error) {
 	return fetchRows(ctx, userIDs, "user profiles", s.repo.GetUserProfilesByUserIDs)
+}
+
+// SearchUsersByUsername finds users whose username starts with query
+// (case-insensitive), for pickers like "invite a member" - bounded by limit
+// instead of returning the whole user table (see GetAllUsers).
+func (s *UserService) SearchUsersByUsername(
+	ctx context.Context,
+	query string,
+	limit int32,
+) ([]database.User, error) {
+	query = strings.TrimSpace(query)
+	if err := validators.ValidateRequiredString("query", query); err != nil {
+		return nil, err
+	}
+
+	if limit <= 0 || limit > 25 {
+		limit = 10
+	}
+
+	users, err := s.repo.SearchUsersByUsername(ctx, query, limit)
+	if err != nil {
+		return nil, apperrors.InternalError("failed to search users", err)
+	}
+	return users, nil
 }

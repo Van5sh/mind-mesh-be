@@ -529,13 +529,14 @@ type ChatParticipant struct {
 }
 
 type File struct {
-	ID        pgtype.UUID
-	FolderID  pgtype.UUID
-	ProjectID pgtype.UUID
-	Name      string
-	Size      int64
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+	ID         pgtype.UUID
+	FolderID   pgtype.UUID
+	ProjectID  pgtype.UUID
+	UploadedBy pgtype.UUID
+	Name       string
+	Size       int64
+	CreatedAt  pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
 }
 
 type FileAiMetadatum struct {

@@ -114,7 +114,8 @@ CREATE TABLE folders (
 CREATE TABLE files (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     folder_id UUID REFERENCES folders(id) ON DELETE SET NULL,
-    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+    uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
     name VARCHAR(255) NOT NULL,
     size BIGINT NOT NULL CHECK(size >= 0),
     created_at TIMESTAMPTZ DEFAULT NOW(),

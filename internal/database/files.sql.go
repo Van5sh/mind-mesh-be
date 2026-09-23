@@ -152,24 +152,27 @@ const createFile = `-- name: CreateFile :one
 INSERT INTO files (
     folder_id,
     project_id,
+    uploaded_by,
     name,
     size
 )
-VALUES ($1, $2, $3,$4)
-RETURNING id, folder_id, project_id, name, size, created_at, updated_at
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, folder_id, project_id, uploaded_by, name, size, created_at, updated_at
 `
 
 type CreateFileParams struct {
-	FolderID  pgtype.UUID
-	ProjectID pgtype.UUID
-	Name      string
-	Size      int64
+	FolderID   pgtype.UUID
+	ProjectID  pgtype.UUID
+	UploadedBy pgtype.UUID
+	Name       string
+	Size       int64
 }
 
 func (q *Queries) CreateFile(ctx context.Context, arg CreateFileParams) (File, error) {
 	row := q.db.QueryRow(ctx, createFile,
 		arg.FolderID,
 		arg.ProjectID,
+		arg.UploadedBy,
 		arg.Name,
 		arg.Size,
 	)
@@ -178,6 +181,7 @@ func (q *Queries) CreateFile(ctx context.Context, arg CreateFileParams) (File, e
 		&i.ID,
 		&i.FolderID,
 		&i.ProjectID,
+		&i.UploadedBy,
 		&i.Name,
 		&i.Size,
 		&i.CreatedAt,
@@ -559,7 +563,7 @@ const fileNameExistsInFolder = `-- name: FileNameExistsInFolder :one
 SELECT EXISTS (
     SELECT 1
     FROM files
-    WHERE project_id = $1
+    WHERE project_id IS NOT DISTINCT FROM $1
       AND folder_id IS NOT DISTINCT FROM $2
       AND name = $3
 )
@@ -673,7 +677,7 @@ func (q *Queries) GetChildFolders(ctx context.Context, parentFolderID pgtype.UUI
 }
 
 const getDeletedFiles = `-- name: GetDeletedFiles :many
-SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
 JOIN file_properties fp
 ON f.id = fp.file_id
@@ -695,6 +699,7 @@ func (q *Queries) GetDeletedFiles(ctx context.Context, projectID pgtype.UUID) ([
 			&i.ID,
 			&i.FolderID,
 			&i.ProjectID,
+			&i.UploadedBy,
 			&i.Name,
 			&i.Size,
 			&i.CreatedAt,
@@ -711,7 +716,7 @@ func (q *Queries) GetDeletedFiles(ctx context.Context, projectID pgtype.UUID) ([
 }
 
 const getFavoritesFiles = `-- name: GetFavoritesFiles :many
-SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
 JOIN user_file_preferences ufp
 ON f.id = ufp.file_id
@@ -738,6 +743,7 @@ func (q *Queries) GetFavoritesFiles(ctx context.Context, arg GetFavoritesFilesPa
 			&i.ID,
 			&i.FolderID,
 			&i.ProjectID,
+			&i.UploadedBy,
 			&i.Name,
 			&i.Size,
 			&i.CreatedAt,
@@ -816,7 +822,7 @@ func (q *Queries) GetFileAIMetadataByFileIDs(ctx context.Context, dollar_1 []pgt
 }
 
 const getFileByFolderAndName = `-- name: GetFileByFolderAndName :one
-SELECT id, folder_id, project_id, name, size, created_at, updated_at
+SELECT id, folder_id, project_id, uploaded_by, name, size, created_at, updated_at
 FROM files
 WHERE folder_id IS NOT DISTINCT FROM $1
   AND name = $2
@@ -834,6 +840,7 @@ func (q *Queries) GetFileByFolderAndName(ctx context.Context, arg GetFileByFolde
 		&i.ID,
 		&i.FolderID,
 		&i.ProjectID,
+		&i.UploadedBy,
 		&i.Name,
 		&i.Size,
 		&i.CreatedAt,
@@ -843,7 +850,7 @@ func (q *Queries) GetFileByFolderAndName(ctx context.Context, arg GetFileByFolde
 }
 
 const getFileByID = `-- name: GetFileByID :one
-SELECT id, folder_id, project_id, name, size, created_at, updated_at
+SELECT id, folder_id, project_id, uploaded_by, name, size, created_at, updated_at
 FROM files
 WHERE id = $1
 `
@@ -855,6 +862,7 @@ func (q *Queries) GetFileByID(ctx context.Context, id pgtype.UUID) (File, error)
 		&i.ID,
 		&i.FolderID,
 		&i.ProjectID,
+		&i.UploadedBy,
 		&i.Name,
 		&i.Size,
 		&i.CreatedAt,
@@ -1131,7 +1139,7 @@ func (q *Queries) GetFileStoragesByFileIDs(ctx context.Context, dollar_1 []pgtyp
 }
 
 const getFilesByFolderID = `-- name: GetFilesByFolderID :many
-SELECT id, folder_id, project_id, name, size, created_at, updated_at
+SELECT id, folder_id, project_id, uploaded_by, name, size, created_at, updated_at
 FROM files
 WHERE folder_id IS NOT DISTINCT FROM $1
 ORDER BY name
@@ -1150,6 +1158,7 @@ func (q *Queries) GetFilesByFolderID(ctx context.Context, folderID pgtype.UUID) 
 			&i.ID,
 			&i.FolderID,
 			&i.ProjectID,
+			&i.UploadedBy,
 			&i.Name,
 			&i.Size,
 			&i.CreatedAt,
@@ -1166,7 +1175,7 @@ func (q *Queries) GetFilesByFolderID(ctx context.Context, folderID pgtype.UUID) 
 }
 
 const getFilesByFolderIDs = `-- name: GetFilesByFolderIDs :many
-SELECT id, folder_id, project_id, name, size, created_at, updated_at
+SELECT id, folder_id, project_id, uploaded_by, name, size, created_at, updated_at
 FROM files
 WHERE folder_id = ANY($1::uuid[])
 ORDER BY folder_id, name
@@ -1186,6 +1195,7 @@ func (q *Queries) GetFilesByFolderIDs(ctx context.Context, dollar_1 []pgtype.UUI
 			&i.ID,
 			&i.FolderID,
 			&i.ProjectID,
+			&i.UploadedBy,
 			&i.Name,
 			&i.Size,
 			&i.CreatedAt,
@@ -1202,7 +1212,7 @@ func (q *Queries) GetFilesByFolderIDs(ctx context.Context, dollar_1 []pgtype.UUI
 }
 
 const getFilesByIDs = `-- name: GetFilesByIDs :many
-SELECT id, folder_id, project_id, name, size, created_at, updated_at
+SELECT id, folder_id, project_id, uploaded_by, name, size, created_at, updated_at
 FROM files
 WHERE id = ANY($1::UUID[])
 ORDER BY name
@@ -1221,6 +1231,7 @@ func (q *Queries) GetFilesByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]
 			&i.ID,
 			&i.FolderID,
 			&i.ProjectID,
+			&i.UploadedBy,
 			&i.Name,
 			&i.Size,
 			&i.CreatedAt,
@@ -1237,7 +1248,7 @@ func (q *Queries) GetFilesByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]
 }
 
 const getFilesByProcessingStatus = `-- name: GetFilesByProcessingStatus :many
-SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
 JOIN file_ai_metadata fam
 ON f.id = fam.file_id
@@ -1264,6 +1275,7 @@ func (q *Queries) GetFilesByProcessingStatus(ctx context.Context, arg GetFilesBy
 			&i.ID,
 			&i.FolderID,
 			&i.ProjectID,
+			&i.UploadedBy,
 			&i.Name,
 			&i.Size,
 			&i.CreatedAt,
@@ -1280,7 +1292,7 @@ func (q *Queries) GetFilesByProcessingStatus(ctx context.Context, arg GetFilesBy
 }
 
 const getFilesByProjectID = `-- name: GetFilesByProjectID :many
-SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
 WHERE f.project_id = $1
 ORDER BY f.name
@@ -1299,6 +1311,7 @@ func (q *Queries) GetFilesByProjectID(ctx context.Context, projectID pgtype.UUID
 			&i.ID,
 			&i.FolderID,
 			&i.ProjectID,
+			&i.UploadedBy,
 			&i.Name,
 			&i.Size,
 			&i.CreatedAt,
@@ -1315,7 +1328,7 @@ func (q *Queries) GetFilesByProjectID(ctx context.Context, projectID pgtype.UUID
 }
 
 const getFilesByProjectIDs = `-- name: GetFilesByProjectIDs :many
-SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
 WHERE f.project_id = ANY($1::uuid[])
 ORDER BY f.project_id, f.name
@@ -1336,6 +1349,7 @@ func (q *Queries) GetFilesByProjectIDs(ctx context.Context, dollar_1 []pgtype.UU
 			&i.ID,
 			&i.FolderID,
 			&i.ProjectID,
+			&i.UploadedBy,
 			&i.Name,
 			&i.Size,
 			&i.CreatedAt,
@@ -1352,7 +1366,7 @@ func (q *Queries) GetFilesByProjectIDs(ctx context.Context, dollar_1 []pgtype.UU
 }
 
 const getFilesPendingEmbedding = `-- name: GetFilesPendingEmbedding :many
-SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
 JOIN file_ai_metadata fam
 ON f.id = fam.file_id
@@ -1373,6 +1387,7 @@ func (q *Queries) GetFilesPendingEmbedding(ctx context.Context) ([]File, error) 
 			&i.ID,
 			&i.FolderID,
 			&i.ProjectID,
+			&i.UploadedBy,
 			&i.Name,
 			&i.Size,
 			&i.CreatedAt,
@@ -1633,7 +1648,7 @@ func (q *Queries) GetFoldersByProjectIDs(ctx context.Context, dollar_1 []pgtype.
 }
 
 const getIndexedFiles = `-- name: GetIndexedFiles :many
-SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
 JOIN file_properties fp
 ON f.id = fp.file_id
@@ -1654,6 +1669,7 @@ func (q *Queries) GetIndexedFiles(ctx context.Context, projectID pgtype.UUID) ([
 			&i.ID,
 			&i.FolderID,
 			&i.ProjectID,
+			&i.UploadedBy,
 			&i.Name,
 			&i.Size,
 			&i.CreatedAt,
@@ -1670,7 +1686,7 @@ func (q *Queries) GetIndexedFiles(ctx context.Context, projectID pgtype.UUID) ([
 }
 
 const getMessageFileReferences = `-- name: GetMessageFileReferences :many
-SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
 JOIN message_file_references mfr
 ON f.id = mfr.file_id
@@ -1691,6 +1707,7 @@ func (q *Queries) GetMessageFileReferences(ctx context.Context, messageID pgtype
 			&i.ID,
 			&i.FolderID,
 			&i.ProjectID,
+			&i.UploadedBy,
 			&i.Name,
 			&i.Size,
 			&i.CreatedAt,
@@ -1743,6 +1760,49 @@ func (q *Queries) GetMessagesReferencingFile(ctx context.Context, fileID pgtype.
 	return items, nil
 }
 
+const getPersonalFiles = `-- name: GetPersonalFiles :many
+SELECT id, folder_id, project_id, uploaded_by, name, size, created_at, updated_at
+FROM files
+WHERE project_id IS NULL
+  AND folder_id IS NULL
+  AND uploaded_by = $1
+ORDER BY name
+`
+
+// Root-level files with no project, owned by whoever created them
+// (files.uploaded_by, set at CreateFile time - file_storage.uploaded_by is
+// never actually populated by any current code path, so it can't be used
+// for this). There is no personal-folder concept, so this is always a
+// flat list.
+func (q *Queries) GetPersonalFiles(ctx context.Context, uploadedBy pgtype.UUID) ([]File, error) {
+	rows, err := q.db.Query(ctx, getPersonalFiles, uploadedBy)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []File
+	for rows.Next() {
+		var i File
+		if err := rows.Scan(
+			&i.ID,
+			&i.FolderID,
+			&i.ProjectID,
+			&i.UploadedBy,
+			&i.Name,
+			&i.Size,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getProjectFile = `-- name: GetProjectFile :one
 SELECT project_id, file_id, folder_id, created_at
 FROM project_files
@@ -1768,7 +1828,7 @@ func (q *Queries) GetProjectFile(ctx context.Context, arg GetProjectFileParams) 
 }
 
 const getProjectFileByFolderAndName = `-- name: GetProjectFileByFolderAndName :one
-SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
 WHERE f.project_id = $1
   AND f.folder_id IS NOT DISTINCT FROM $2
@@ -1788,6 +1848,7 @@ func (q *Queries) GetProjectFileByFolderAndName(ctx context.Context, arg GetProj
 		&i.ID,
 		&i.FolderID,
 		&i.ProjectID,
+		&i.UploadedBy,
 		&i.Name,
 		&i.Size,
 		&i.CreatedAt,
@@ -1797,7 +1858,7 @@ func (q *Queries) GetProjectFileByFolderAndName(ctx context.Context, arg GetProj
 }
 
 const getProjectFileByID = `-- name: GetProjectFileByID :one
-SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
 WHERE f.id = $1
   AND f.project_id = $2
@@ -1815,6 +1876,7 @@ func (q *Queries) GetProjectFileByID(ctx context.Context, arg GetProjectFileByID
 		&i.ID,
 		&i.FolderID,
 		&i.ProjectID,
+		&i.UploadedBy,
 		&i.Name,
 		&i.Size,
 		&i.CreatedAt,
@@ -1824,7 +1886,7 @@ func (q *Queries) GetProjectFileByID(ctx context.Context, arg GetProjectFileByID
 }
 
 const getProjectFilesByFolderID = `-- name: GetProjectFilesByFolderID :many
-SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
 WHERE f.project_id = $1
   AND f.folder_id IS NOT DISTINCT FROM $2
@@ -1849,6 +1911,7 @@ func (q *Queries) GetProjectFilesByFolderID(ctx context.Context, arg GetProjectF
 			&i.ID,
 			&i.FolderID,
 			&i.ProjectID,
+			&i.UploadedBy,
 			&i.Name,
 			&i.Size,
 			&i.CreatedAt,
@@ -1949,7 +2012,7 @@ func (q *Queries) GetProjectFolderContents(ctx context.Context, arg GetProjectFo
 }
 
 const getRootFiles = `-- name: GetRootFiles :many
-SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
 WHERE f.project_id = $1
   AND f.folder_id IS NULL
@@ -1969,6 +2032,7 @@ func (q *Queries) GetRootFiles(ctx context.Context, projectID pgtype.UUID) ([]Fi
 			&i.ID,
 			&i.FolderID,
 			&i.ProjectID,
+			&i.UploadedBy,
 			&i.Name,
 			&i.Size,
 			&i.CreatedAt,
@@ -2165,7 +2229,7 @@ SET
     folder_id = $2,
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, folder_id, project_id, name, size, created_at, updated_at
+RETURNING id, folder_id, project_id, uploaded_by, name, size, created_at, updated_at
 `
 
 type MoveFileParams struct {
@@ -2180,6 +2244,7 @@ func (q *Queries) MoveFile(ctx context.Context, arg MoveFileParams) (File, error
 		&i.ID,
 		&i.FolderID,
 		&i.ProjectID,
+		&i.UploadedBy,
 		&i.Name,
 		&i.Size,
 		&i.CreatedAt,
@@ -2266,7 +2331,7 @@ SET
     name = $2,
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, folder_id, project_id, name, size, created_at, updated_at
+RETURNING id, folder_id, project_id, uploaded_by, name, size, created_at, updated_at
 `
 
 type RenameFileParams struct {
@@ -2281,6 +2346,7 @@ func (q *Queries) RenameFile(ctx context.Context, arg RenameFileParams) (File, e
 		&i.ID,
 		&i.FolderID,
 		&i.ProjectID,
+		&i.UploadedBy,
 		&i.Name,
 		&i.Size,
 		&i.CreatedAt,
@@ -2331,7 +2397,7 @@ func (q *Queries) RestoreFile(ctx context.Context, fileID pgtype.UUID) error {
 }
 
 const searchFiles = `-- name: SearchFiles :many
-SELECT f.id, f.folder_id, f.project_id, f.name, f.size, f.created_at, f.updated_at
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
 WHERE f.project_id = $1
   AND f.name ILIKE '%' || $2 || '%'
@@ -2356,6 +2422,7 @@ func (q *Queries) SearchFiles(ctx context.Context, arg SearchFilesParams) ([]Fil
 			&i.ID,
 			&i.FolderID,
 			&i.ProjectID,
+			&i.UploadedBy,
 			&i.Name,
 			&i.Size,
 			&i.CreatedAt,
@@ -2634,7 +2701,7 @@ SET
     size = $2,
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, folder_id, project_id, name, size, created_at, updated_at
+RETURNING id, folder_id, project_id, uploaded_by, name, size, created_at, updated_at
 `
 
 type UpdateFileSizeParams struct {
@@ -2649,6 +2716,7 @@ func (q *Queries) UpdateFileSize(ctx context.Context, arg UpdateFileSizeParams) 
 		&i.ID,
 		&i.FolderID,
 		&i.ProjectID,
+		&i.UploadedBy,
 		&i.Name,
 		&i.Size,
 		&i.CreatedAt,

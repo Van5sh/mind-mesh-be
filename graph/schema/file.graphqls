@@ -95,7 +95,8 @@ extend type Query {
 
   file(id: ID!): File
   files(projectId: ID, folderId: ID): [File!]!
-  rootFiles(projectId: ID!): [File!]!
+  # projectId omitted - the current user's personal (project-less) files.
+  rootFiles(projectId: ID): [File!]!
   favoriteFiles(userId: ID!, projectId: ID): [File!]!
 
   fileShare(id: ID!): FileShare
@@ -131,7 +132,10 @@ input CreateFolderInput {
 }
 
 input CreateFileInput {
-  projectId: ID!
+  # Omit for a personal file (uploaded to the user's own drive, not tied to
+  # any project). folderId must also be omitted in that case - folders are
+  # still project-scoped only.
+  projectId: ID
   folderId: ID
   name: String!
   file: Upload!

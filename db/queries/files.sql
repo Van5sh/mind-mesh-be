@@ -2,10 +2,11 @@
 INSERT INTO files (
     folder_id,
     project_id,
+    uploaded_by,
     name,
     size
 )
-VALUES ($1, $2, $3,$4)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: GetFileByID :one
@@ -685,7 +686,7 @@ SELECT EXISTS (
 SELECT EXISTS (
     SELECT 1
     FROM files
-    WHERE project_id = $1
+    WHERE project_id IS NOT DISTINCT FROM $1
       AND folder_id IS NOT DISTINCT FROM $2
       AND name = $3
 );
@@ -751,3 +752,16 @@ SELECT *
 FROM file_shares
 WHERE shared_with = ANY($1::uuid[])
 ORDER BY shared_with, created_at DESC;
+
+-- name: GetPersonalFiles :many
+-- Root-level files with no project, owned by whoever created them
+-- (files.uploaded_by, set at CreateFile time - file_storage.uploaded_by is
+-- never actually populated by any current code path, so it can't be used
+-- for this). There is no personal-folder concept, so this is always a
+-- flat list.
+SELECT *
+FROM files
+WHERE project_id IS NULL
+  AND folder_id IS NULL
+  AND uploaded_by = $1
+ORDER BY name;

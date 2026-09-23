@@ -214,6 +214,25 @@ func (r *queryResolver) Users(ctx context.Context, ids []string) ([]*model.User,
 	return result, nil
 }
 
+// SearchUsers is the resolver for the searchUsers field.
+func (r *queryResolver) SearchUsers(ctx context.Context, query string, limit *int) ([]*model.User, error) {
+	rowLimit := int32(0)
+	if limit != nil {
+		rowLimit = int32(*limit)
+	}
+
+	users, err := r.App.Services.User.SearchUsersByUsername(ctx, query, rowLimit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search users: %w", err)
+	}
+
+	result := make([]*model.User, 0, len(users))
+	for _, user := range users {
+		result = append(result, helpers.UserToModel(user))
+	}
+	return result, nil
+}
+
 // Username is the resolver for the username field.
 func (r *userResolver) Username(ctx context.Context, obj *model.User) (string, error) {
 	// Already populated (a full user from UserToModel) - no lookup needed.

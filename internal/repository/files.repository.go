@@ -382,3 +382,9 @@ func (r *FileRepository) GetFileSharesByFileIDs(ctx context.Context, fileIDs []p
 func (r *FileRepository) GetFileSharesBySharedWithIDs(ctx context.Context, userIDs []pgtype.UUID) ([]database.FileShare, error) {
 	return r.q.GetFileSharesBySharedWithIDs(ctx, userIDs)
 }
+
+// GetPersonalFiles returns a user's root-level files that have no project
+// (files.uploaded_by, not file_storage.uploaded_by - see the query comment).
+func (r *FileRepository) GetPersonalFiles(ctx context.Context, uploadedBy pgtype.UUID) ([]database.File, error) {
+	return r.q.GetPersonalFiles(ctx, uploadedBy)
+}

@@ -42,6 +42,7 @@ extend type Query {
 
   allUsers: [User!]!
   users(ids: [ID!]!): [User!]!
+  searchUsers(query: String!, limit: Int): [User!]!
 }
 
 # ============================================================

@@ -363,13 +363,23 @@ func (r *mutationResolver) DeleteFolder(ctx context.Context, folderID string) (b
 
 // CreateFile is the resolver for the createFile field.
 func (r *mutationResolver) CreateFile(ctx context.Context, input model.CreateFileInput) (*model.File, error) {
-	projectID, err := parseUUID(input.ProjectID)
+	userID, err := currentUserID(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := r.requireProjectMember(ctx, projectID); err != nil {
-		return nil, err
+	// input.ProjectID nil = a personal file, uploaded to the user's own
+	// drive rather than any project. Only a project member may upload into
+	// a project; a personal file just needs a signed-in user.
+	var projectID pgtype.UUID
+	if input.ProjectID != nil {
+		projectID, err = parseUUID(*input.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if err := r.requireProjectMember(ctx, projectID); err != nil {
+			return nil, err
+		}
 	}
 
 	var folderID pgtype.UUID
@@ -377,6 +387,9 @@ func (r *mutationResolver) CreateFile(ctx context.Context, input model.CreateFil
 	// nil = root file
 	// non-nil = file inside a folder
 	if input.FolderID != nil {
+		if input.ProjectID == nil {
+			return nil, fmt.Errorf("a personal file (no project) cannot be placed in a folder")
+		}
 		folderID, err = parseUUID(*input.FolderID)
 		if err != nil {
 			return nil, err
@@ -386,10 +399,11 @@ func (r *mutationResolver) CreateFile(ctx context.Context, input model.CreateFil
 	file, err := r.App.Services.File.CreateFile(
 		ctx,
 		database.CreateFileParams{
-			FolderID:  folderID,
-			ProjectID: projectID,
-			Name:      input.Name,
-			Size:      input.File.Size,
+			FolderID:   folderID,
+			ProjectID:  projectID,
+			UploadedBy: userID,
+			Name:       input.Name,
+			Size:       input.File.Size,
 		},
 		input.File.File,
 		input.File.ContentType,
@@ -412,7 +426,7 @@ func (r *mutationResolver) RenameFile(ctx context.Context, fileID string, name s
 	if err != nil {
 		return nil, err
 	}
-	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
+	if err := r.requireFileAccess(ctx, existing); err != nil {
 		return nil, err
 	}
 
@@ -441,7 +455,7 @@ func (r *mutationResolver) MoveFile(ctx context.Context, input model.MoveFileInp
 	if err != nil {
 		return nil, err
 	}
-	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
+	if err := r.requireFileAccess(ctx, existing); err != nil {
 		return nil, err
 	}
 
@@ -481,7 +495,7 @@ func (r *mutationResolver) DeleteFile(ctx context.Context, fileID string) (bool,
 	if err != nil {
 		return false, err
 	}
-	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
+	if err := r.requireFileAccess(ctx, existing); err != nil {
 		return false, err
 	}
 
@@ -718,7 +732,7 @@ func (r *queryResolver) File(ctx context.Context, id string) (*model.File, error
 	if err != nil {
 		return nil, err
 	}
-	if err := r.requireProjectMember(ctx, file.ProjectID); err != nil {
+	if err := r.requireFileAccess(ctx, file); err != nil {
 		return nil, err
 	}
 
@@ -772,12 +786,37 @@ func (r *queryResolver) Files(ctx context.Context, projectID *string, folderID *
 		return helpers.MapFilesToModel(files), nil
 	}
 
-	return []*model.File{}, nil
+	// Neither given - the current user's personal (project-less) files.
+	userID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	files, err := r.App.Services.File.GetPersonalFiles(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return helpers.MapFilesToModel(files), nil
 }
 
 // RootFiles is the resolver for the rootFiles field.
-func (r *queryResolver) RootFiles(ctx context.Context, projectID string) ([]*model.File, error) {
-	id, err := parseUUID(projectID)
+func (r *queryResolver) RootFiles(ctx context.Context, projectID *string) ([]*model.File, error) {
+	if projectID == nil {
+		userID, err := currentUserID(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		files, err := r.App.Services.File.GetPersonalFiles(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+
+		return helpers.MapFilesToModel(files), nil
+	}
+
+	id, err := parseUUID(*projectID)
 	if err != nil {
 		return nil, err
 	}

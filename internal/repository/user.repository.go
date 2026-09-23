@@ -214,3 +214,10 @@ func (r *UserRepository) DeleteUserProfile(
 func (r *UserRepository) GetUserProfilesByUserIDs(ctx context.Context, userIDs []pgtype.UUID) ([]database.UserProfile, error) {
 	return r.q.GetUserProfilesByUserIDs(ctx, userIDs)
 }
+
+func (r *UserRepository) SearchUsersByUsername(ctx context.Context, query string, limit int32) ([]database.User, error) {
+	return r.q.SearchUsersByUsername(ctx, database.SearchUsersByUsernameParams{
+		Query:    pgtype.Text{String: query, Valid: true},
+		RowLimit: limit,
+	})
+}

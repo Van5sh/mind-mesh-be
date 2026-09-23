@@ -478,10 +478,15 @@ SELECT DISTINCT p.id, p.owner_id, p.name, p.description, p.visibility, p.archive
 FROM projects p
 LEFT JOIN project_members pm
     ON p.id = pm.project_id
-WHERE p.owner_id = $1
-   OR pm.user_id = $1
+WHERE p.archived_at IS NULL
+  AND (
+      p.owner_id = $1
+      OR pm.user_id = $1
+  )
 `
 
+// Active projects only: archived ones are served by GetArchivedProjectsForUser
+// (the owner-scoped GetProjectsByOwnerID already excludes them the same way).
 func (q *Queries) GetProjectsForUser(ctx context.Context, ownerID pgtype.UUID) ([]Project, error) {
 	rows, err := q.db.Query(ctx, getProjectsForUser, ownerID)
 	if err != nil {

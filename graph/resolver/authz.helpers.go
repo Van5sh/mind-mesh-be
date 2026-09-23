@@ -5,6 +5,7 @@ import (
 
 	"example/hello/internal/apperrors"
 	"example/hello/internal/auth"
+	"example/hello/internal/database"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -41,4 +42,28 @@ func (r *Resolver) requireProjectOwner(ctx context.Context, projectID pgtype.UUI
 		return err
 	}
 	return r.App.Services.Project.EnsureOwnerAccess(ctx, projectID, userID)
+}
+
+// requireFileAccess authorizes the authenticated user against a file that
+// may or may not belong to a project. A project file uses project
+// membership, unchanged. A personal file (no project) is visible only to
+// whoever uploaded it, or to someone it's been explicitly shared with via
+// ShareFile - both existing mechanisms, not a new permission system.
+func (r *Resolver) requireFileAccess(ctx context.Context, file database.File) error {
+	if file.ProjectID.Valid {
+		return r.requireProjectMember(ctx, file.ProjectID)
+	}
+
+	userID, err := currentUserID(ctx)
+	if err != nil {
+		return err
+	}
+	if file.UploadedBy.Valid && file.UploadedBy == userID {
+		return nil
+	}
+
+	if _, err := r.App.Services.File.GetFileShareByUser(ctx, file.ID, userID); err != nil {
+		return apperrors.ForbiddenError("you do not have access to this file")
+	}
+	return nil
 }
