@@ -259,6 +259,18 @@ FROM message_mentions
 WHERE message_id = $1;
 
 
+-- name: GetMentionsForMessages :many
+-- Batched variant of GetMessageMentions, for the MentionedUsersByMessage
+-- DataLoader - one query for every message in a GetChatMessages page
+-- instead of one per message.
+SELECT
+    mm.message_id,
+    mm.mentioned_user_id
+FROM message_mentions mm
+WHERE mm.message_id = ANY($1::uuid[])
+ORDER BY mm.created_at ASC;
+
+
 -- name: GetMessagesMentioningUser :many
 SELECT cm.*
 FROM chat_messages cm

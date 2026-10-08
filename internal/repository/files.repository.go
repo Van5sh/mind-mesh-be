@@ -61,6 +61,10 @@ func (r *FileRepository) CreateMessageFileReference(ctx context.Context, params 
 	return r.q.CreateMessageFileReference(ctx, params)
 }
 
+func (r *FileRepository) GetFileReferencesForMessages(ctx context.Context, messageIDs []pgtype.UUID) ([]database.GetFileReferencesForMessagesRow, error) {
+	return r.q.GetFileReferencesForMessages(ctx, messageIDs)
+}
+
 func (r *FileRepository) CreateProjectFile(ctx context.Context, params database.CreateProjectFileParams) (database.ProjectFile, error) {
 	return r.q.CreateProjectFile(ctx, params)
 }

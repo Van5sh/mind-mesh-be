@@ -73,6 +73,12 @@ models:
         resolver: true
       messages:
         resolver: true
+  ChatMessage:
+    fields:
+      mentionedUsers:
+        resolver: true
+      referencedFiles:
+        resolver: true
   File:
     fields:
       storage:

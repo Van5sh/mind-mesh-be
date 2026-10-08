@@ -50,14 +50,16 @@ type Sources struct {
 	ActivityByProject   Grouped[database.ActivityLog]
 
 	// Lists per chat / file / folder / user.
-	MessagesByChat       Grouped[database.ChatMessage]
-	ParticipantsByChat   Grouped[database.ChatParticipant]
-	SharesByFile         Grouped[database.FileShare]
-	FilesByFolder        Grouped[database.File]
-	ChildFoldersByParent Grouped[database.Folder]
-	OwnedProjectsByOwner Grouped[database.Project]
-	MembershipsByUser    Grouped[database.ProjectMember]
-	SharesBySharedWith   Grouped[database.FileShare]
+	MessagesByChat          Grouped[database.ChatMessage]
+	ParticipantsByChat      Grouped[database.ChatParticipant]
+	SharesByFile            Grouped[database.FileShare]
+	FilesByFolder           Grouped[database.File]
+	ChildFoldersByParent    Grouped[database.Folder]
+	OwnedProjectsByOwner    Grouped[database.Project]
+	MembershipsByUser       Grouped[database.ProjectMember]
+	SharesBySharedWith      Grouped[database.FileShare]
+	MentionsByMessage       Grouped[database.GetMentionsForMessagesRow]
+	FileReferencesByMessage Grouped[database.File]
 
 	// One row per ID.
 	Users      Rows[database.User]
@@ -89,14 +91,16 @@ type Loaders struct {
 	FlowchartsByProject *ListLoader[database.Flowchart]
 	ActivityByProject   *ListLoader[database.ActivityLog]
 
-	MessagesByChat       *ListLoader[database.ChatMessage]
-	ParticipantsByChat   *ListLoader[database.ChatParticipant]
-	SharesByFile         *ListLoader[database.FileShare]
-	FilesByFolder        *ListLoader[database.File]
-	ChildFoldersByParent *ListLoader[database.Folder]
-	OwnedProjectsByOwner *ListLoader[database.Project]
-	MembershipsByUser    *ListLoader[database.ProjectMember]
-	SharesBySharedWith   *ListLoader[database.FileShare]
+	MessagesByChat          *ListLoader[database.ChatMessage]
+	ParticipantsByChat      *ListLoader[database.ChatParticipant]
+	SharesByFile            *ListLoader[database.FileShare]
+	FilesByFolder           *ListLoader[database.File]
+	ChildFoldersByParent    *ListLoader[database.Folder]
+	OwnedProjectsByOwner    *ListLoader[database.Project]
+	MembershipsByUser       *ListLoader[database.ProjectMember]
+	SharesBySharedWith      *ListLoader[database.FileShare]
+	MentionsByMessage       *ListLoader[database.GetMentionsForMessagesRow]
+	FileReferencesByMessage *ListLoader[database.File]
 
 	UserByID         *LookupLoader[database.User]
 	ProjectByID      *LookupLoader[database.Project]
@@ -176,14 +180,16 @@ func New(src Sources) *Loaders {
 		FlowchartsByProject: byKey(func() Grouped[database.Flowchart] { return src.FlowchartsByProject }),
 		ActivityByProject:   byKey(func() Grouped[database.ActivityLog] { return src.ActivityByProject }),
 
-		MessagesByChat:       byKey(func() Grouped[database.ChatMessage] { return src.MessagesByChat }),
-		ParticipantsByChat:   byKey(func() Grouped[database.ChatParticipant] { return src.ParticipantsByChat }),
-		SharesByFile:         byKey(func() Grouped[database.FileShare] { return src.SharesByFile }),
-		FilesByFolder:        byKey(func() Grouped[database.File] { return src.FilesByFolder }),
-		ChildFoldersByParent: byKey(func() Grouped[database.Folder] { return src.ChildFoldersByParent }),
-		OwnedProjectsByOwner: byKey(func() Grouped[database.Project] { return src.OwnedProjectsByOwner }),
-		MembershipsByUser:    byKey(func() Grouped[database.ProjectMember] { return src.MembershipsByUser }),
-		SharesBySharedWith:   byKey(func() Grouped[database.FileShare] { return src.SharesBySharedWith }),
+		MessagesByChat:          byKey(func() Grouped[database.ChatMessage] { return src.MessagesByChat }),
+		ParticipantsByChat:      byKey(func() Grouped[database.ChatParticipant] { return src.ParticipantsByChat }),
+		SharesByFile:            byKey(func() Grouped[database.FileShare] { return src.SharesByFile }),
+		FilesByFolder:           byKey(func() Grouped[database.File] { return src.FilesByFolder }),
+		ChildFoldersByParent:    byKey(func() Grouped[database.Folder] { return src.ChildFoldersByParent }),
+		OwnedProjectsByOwner:    byKey(func() Grouped[database.Project] { return src.OwnedProjectsByOwner }),
+		MembershipsByUser:       byKey(func() Grouped[database.ProjectMember] { return src.MembershipsByUser }),
+		SharesBySharedWith:      byKey(func() Grouped[database.FileShare] { return src.SharesBySharedWith }),
+		MentionsByMessage:       byKey(func() Grouped[database.GetMentionsForMessagesRow] { return src.MentionsByMessage }),
+		FileReferencesByMessage: byKey(func() Grouped[database.File] { return src.FileReferencesByMessage }),
 
 		UserByID: byID(
 			func() Rows[database.User] { return src.Users },

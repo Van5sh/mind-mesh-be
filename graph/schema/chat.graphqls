@@ -67,6 +67,11 @@ input CreateChatMessageInput {
   chatId: ID!
   role: MessageRole!
   content: String!
+  # Resolved at compose time by the client (e.g. an @/# picker) - never
+  # parsed server-side from `content`. Each id is validated (project
+  # membership / file visibility) before being saved.
+  mentionedUserIds: [ID!]
+  referencedFileIds: [ID!]
 }
 
 input UpdateChatMessageInput {

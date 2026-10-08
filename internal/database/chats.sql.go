@@ -1013,6 +1013,43 @@ func (q *Queries) GetLatestChatMessage(ctx context.Context, chatID pgtype.UUID) 
 	return i, err
 }
 
+const getMentionsForMessages = `-- name: GetMentionsForMessages :many
+SELECT
+    mm.message_id,
+    mm.mentioned_user_id
+FROM message_mentions mm
+WHERE mm.message_id = ANY($1::uuid[])
+ORDER BY mm.created_at ASC
+`
+
+type GetMentionsForMessagesRow struct {
+	MessageID       pgtype.UUID
+	MentionedUserID pgtype.UUID
+}
+
+// Batched variant of GetMessageMentions, for the MentionedUsersByMessage
+// DataLoader - one query for every message in a GetChatMessages page
+// instead of one per message.
+func (q *Queries) GetMentionsForMessages(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetMentionsForMessagesRow, error) {
+	rows, err := q.db.Query(ctx, getMentionsForMessages, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetMentionsForMessagesRow
+	for rows.Next() {
+		var i GetMentionsForMessagesRow
+		if err := rows.Scan(&i.MessageID, &i.MentionedUserID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getMessageMentions = `-- name: GetMessageMentions :many
 SELECT
     mm.message_id,

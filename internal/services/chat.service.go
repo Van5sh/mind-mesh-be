@@ -720,6 +720,18 @@ func (s *ChatService) GetMessageMentions(
 	return mentions, nil
 }
 
+// GetMentionsByMessageIDs fetches the mentions of many messages in one
+// query, grouped by message ID. It exists for the ChatMessage.mentionedUsers
+// dataloader.
+func (s *ChatService) GetMentionsByMessageIDs(
+	ctx context.Context,
+	messageIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.GetMentionsForMessagesRow, error) {
+	return fetchGrouped(ctx, messageIDs, "mentions by messages",
+		s.repo.GetMentionsForMessages,
+		func(m database.GetMentionsForMessagesRow) pgtype.UUID { return m.MessageID })
+}
+
 // GetChatMessagesByIDs gets messages by a list of IDs.
 func (s *ChatService) GetChatMessagesByIDs(
 	ctx context.Context,

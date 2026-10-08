@@ -11,6 +11,7 @@ import (
 	"example/hello/graph/helpers"
 	"example/hello/graph/loaders"
 	"example/hello/graph/model"
+	"example/hello/internal/apperrors"
 	"example/hello/internal/database"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -67,6 +68,63 @@ func (r *chatResolver) Messages(ctx context.Context, obj *model.Chat) ([]*model.
 		result = append(result, helpers.ChatMessageToModel(message))
 	}
 	return result, nil
+}
+
+// MentionedUsers is the resolver for the mentionedUsers field.
+func (r *chatMessageResolver) MentionedUsers(ctx context.Context, obj *model.ChatMessage) ([]*model.User, error) {
+	messageID, err := parseUUID(obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Batched across every message in the operation (see graph/loaders);
+	// falls back to a direct per-message query when no loaders are on the
+	// context.
+	var mentions []database.GetMentionsForMessagesRow
+	if l := loaders.From(ctx); l != nil {
+		mentions, err = l.MentionsByMessage.Load(ctx, messageID)
+	} else {
+		var rows []database.GetMessageMentionsRow
+		rows, err = r.App.Services.Chat.GetMessageMentions(ctx, messageID)
+		for _, row := range rows {
+			mentions = append(mentions, database.GetMentionsForMessagesRow{
+				MessageID:       row.MessageID,
+				MentionedUserID: row.MentionedUserID,
+			})
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Stubs, same as Sender/Participants above - only the ID is known
+	// here, the rest of User resolves lazily through its own field
+	// resolvers (backed by UserByID) if the query actually selects them.
+	result := make([]*model.User, 0, len(mentions))
+	for _, mention := range mentions {
+		result = append(result, &model.User{ID: mention.MentionedUserID.String()})
+	}
+	return result, nil
+}
+
+// ReferencedFiles is the resolver for the referencedFiles field.
+func (r *chatMessageResolver) ReferencedFiles(ctx context.Context, obj *model.ChatMessage) ([]*model.File, error) {
+	messageID, err := parseUUID(obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	var files []database.File
+	if l := loaders.From(ctx); l != nil {
+		files, err = l.FileReferencesByMessage.Load(ctx, messageID)
+	} else {
+		files, err = r.App.Services.File.GetFileReferencesByMessage(ctx, messageID)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return helpers.MapFilesToModel(files), nil
 }
 
 // CreateChat is the resolver for the createChat field.
@@ -282,6 +340,39 @@ func (r *mutationResolver) CreateChatMessage(ctx context.Context, input model.Cr
 		return nil, err
 	}
 
+	// Mentions/references are resolved to IDs by the client (an @/# picker)
+	// and validated here, never parsed server-side from input.Content - see
+	// docs/chat-mentions-and-file-references.pdf for why. Validate all of
+	// them before creating the message, so a bad ID fails the whole
+	// request instead of leaving a message with a partially-attached set.
+	mentionedUserIDs := make([]pgtype.UUID, 0, len(input.MentionedUserIds))
+	for _, idStr := range input.MentionedUserIds {
+		mentionedID, err := parseUUID(idStr)
+		if err != nil {
+			return nil, err
+		}
+		if err := r.App.Services.Project.EnsureMemberAccess(ctx, chat.ProjectID, mentionedID); err != nil {
+			return nil, apperrors.ForbiddenError("mentioned user is not a project member")
+		}
+		mentionedUserIDs = append(mentionedUserIDs, mentionedID)
+	}
+
+	referencedFileIDs := make([]pgtype.UUID, 0, len(input.ReferencedFileIds))
+	for _, idStr := range input.ReferencedFileIds {
+		fileID, err := parseUUID(idStr)
+		if err != nil {
+			return nil, err
+		}
+		file, err := r.App.Services.File.GetFileByID(ctx, fileID)
+		if err != nil {
+			return nil, err
+		}
+		if file.ProjectID != chat.ProjectID {
+			return nil, apperrors.ForbiddenError("referenced file is not visible in this chat")
+		}
+		referencedFileIDs = append(referencedFileIDs, fileID)
+	}
+
 	message, err := r.App.Services.Chat.CreateChatMessage(
 		ctx,
 		database.CreateChatMessageParams{
@@ -296,6 +387,23 @@ func (r *mutationResolver) CreateChatMessage(ctx context.Context, input model.Cr
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	for _, mentionedID := range mentionedUserIDs {
+		if _, err := r.App.Services.Chat.CreateMessageMention(ctx, database.CreateMessageMentionParams{
+			MessageID:       message.ID,
+			MentionedUserID: mentionedID,
+		}); err != nil {
+			return nil, err
+		}
+	}
+	for _, fileID := range referencedFileIDs {
+		if _, err := r.App.Services.File.CreateMessageFileReference(ctx, database.CreateMessageFileReferenceParams{
+			MessageID: message.ID,
+			FileID:    fileID,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return helpers.ChatMessageToModel(message), nil
@@ -593,4 +701,10 @@ func (r *subscriptionResolver) ChatMessageAdded(ctx context.Context, chatID stri
 // Chat returns graph.ChatResolver implementation.
 func (r *Resolver) Chat() graph.ChatResolver { return &chatResolver{r} }
 
-type chatResolver struct{ *Resolver }
+// ChatMessage returns graph.ChatMessageResolver implementation.
+func (r *Resolver) ChatMessage() graph.ChatMessageResolver { return &chatMessageResolver{r} }
+
+type (
+	chatResolver        struct{ *Resolver }
+	chatMessageResolver struct{ *Resolver }
+)

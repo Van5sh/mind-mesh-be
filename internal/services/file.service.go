@@ -1297,6 +1297,83 @@ func (s *FileService) GetFileSharesByFileIDs(
 		func(s database.FileShare) pgtype.UUID { return s.FileID })
 }
 
+// GetFileReferencesByMessage gets the files referenced by one message. Only
+// used as the ChatMessage.referencedFiles fallback when no dataloader is on
+// the context - see GetFileReferencesByMessageIDs for the batched path.
+func (s *FileService) GetFileReferencesByMessage(
+	ctx context.Context,
+	messageID pgtype.UUID,
+) ([]database.File, error) {
+	if err := validators.ValidateUUID("message id", messageID); err != nil {
+		return nil, err
+	}
+
+	files, err := s.repo.GetMessageFileReferences(ctx, messageID)
+	if err != nil {
+		return nil, apperrors.InternalError("failed to fetch referenced files", err)
+	}
+	return files, nil
+}
+
+// CreateMessageFileReference attaches a file reference (a #filename token
+// resolved to an ID by the client, see CreateChatMessageInput) to a chat
+// message. The caller validates that the file is actually visible in the
+// message's chat before calling this - this just writes the row.
+func (s *FileService) CreateMessageFileReference(
+	ctx context.Context,
+	params database.CreateMessageFileReferenceParams,
+) (database.MessageFileReference, error) {
+	if err := validators.ValidateUUID("message id", params.MessageID); err != nil {
+		return database.MessageFileReference{}, err
+	}
+	if err := validators.ValidateUUID("file id", params.FileID); err != nil {
+		return database.MessageFileReference{}, err
+	}
+
+	reference, err := s.repo.CreateMessageFileReference(ctx, params)
+	if err != nil {
+		return database.MessageFileReference{}, apperrors.InternalError(
+			"failed to create message file reference",
+			err,
+		)
+	}
+	return reference, nil
+}
+
+// GetFileReferencesByMessageIDs fetches the files referenced by many
+// messages in one query, grouped by message ID. It exists for the
+// ChatMessage.referencedFiles dataloader.
+func (s *FileService) GetFileReferencesByMessageIDs(
+	ctx context.Context,
+	messageIDs []pgtype.UUID,
+) (map[pgtype.UUID][]database.File, error) {
+	grouped, err := fetchGrouped(ctx, messageIDs, "file references by messages",
+		s.repo.GetFileReferencesForMessages,
+		func(r database.GetFileReferencesForMessagesRow) pgtype.UUID { return r.MessageID })
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[pgtype.UUID][]database.File, len(grouped))
+	for messageID, rows := range grouped {
+		files := make([]database.File, 0, len(rows))
+		for _, row := range rows {
+			files = append(files, database.File{
+				ID:         row.ID,
+				FolderID:   row.FolderID,
+				ProjectID:  row.ProjectID,
+				UploadedBy: row.UploadedBy,
+				Name:       row.Name,
+				Size:       row.Size,
+				CreatedAt:  row.CreatedAt,
+				UpdatedAt:  row.UpdatedAt,
+			})
+		}
+		result[messageID] = files
+	}
+	return result, nil
+}
+
 // GetFileSharesBySharedWithIDs fetches the shares made with many users in one
 // query, grouped by recipient. It exists for the User.sharedFiles dataloader.
 func (s *FileService) GetFileSharesBySharedWithIDs(

@@ -985,6 +985,62 @@ func (q *Queries) GetFilePropertiesByFileIDs(ctx context.Context, dollar_1 []pgt
 	return items, nil
 }
 
+const getFileReferencesForMessages = `-- name: GetFileReferencesForMessages :many
+SELECT
+    mfr.message_id,
+    f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
+FROM files f
+JOIN message_file_references mfr
+ON f.id = mfr.file_id
+WHERE mfr.message_id = ANY($1::uuid[])
+ORDER BY f.name
+`
+
+type GetFileReferencesForMessagesRow struct {
+	MessageID  pgtype.UUID
+	ID         pgtype.UUID
+	FolderID   pgtype.UUID
+	ProjectID  pgtype.UUID
+	UploadedBy pgtype.UUID
+	Name       string
+	Size       int64
+	CreatedAt  pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
+}
+
+// Batched variant of GetMessageFileReferences, for the
+// ReferencedFilesByMessage DataLoader - one query for every message in a
+// GetChatMessages page instead of one per message.
+func (q *Queries) GetFileReferencesForMessages(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetFileReferencesForMessagesRow, error) {
+	rows, err := q.db.Query(ctx, getFileReferencesForMessages, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetFileReferencesForMessagesRow
+	for rows.Next() {
+		var i GetFileReferencesForMessagesRow
+		if err := rows.Scan(
+			&i.MessageID,
+			&i.ID,
+			&i.FolderID,
+			&i.ProjectID,
+			&i.UploadedBy,
+			&i.Name,
+			&i.Size,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFileShareByFileAndSharedWith = `-- name: GetFileShareByFileAndSharedWith :one
 SELECT id, file_id, shared_by, shared_with, permission, created_at
 FROM file_shares

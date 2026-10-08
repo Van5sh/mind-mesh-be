@@ -485,6 +485,20 @@ FROM message_file_references
 WHERE message_id = $1;
 
 
+-- name: GetFileReferencesForMessages :many
+-- Batched variant of GetMessageFileReferences, for the
+-- ReferencedFilesByMessage DataLoader - one query for every message in a
+-- GetChatMessages page instead of one per message.
+SELECT
+    mfr.message_id,
+    f.*
+FROM files f
+JOIN message_file_references mfr
+ON f.id = mfr.file_id
+WHERE mfr.message_id = ANY($1::uuid[])
+ORDER BY f.name;
+
+
 -- name: GetMessagesReferencingFile :many
 SELECT cm.*
 FROM chat_messages cm

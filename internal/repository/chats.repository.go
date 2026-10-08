@@ -141,6 +141,10 @@ func (r *ChatRepository) GetMessageMentions(ctx context.Context, messageID pgtyp
 	return r.q.GetMessageMentions(ctx, messageID)
 }
 
+func (r *ChatRepository) GetMentionsForMessages(ctx context.Context, messageIDs []pgtype.UUID) ([]database.GetMentionsForMessagesRow, error) {
+	return r.q.GetMentionsForMessages(ctx, messageIDs)
+}
+
 func (r *ChatRepository) GetMessagesMentioningUser(ctx context.Context, mentionedUserID pgtype.UUID) ([]database.ChatMessage, error) {
 	return r.q.GetMessagesMentioningUser(ctx, mentionedUserID)
 }
