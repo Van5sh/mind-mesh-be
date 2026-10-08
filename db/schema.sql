@@ -103,9 +103,11 @@ CREATE TABLE folders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     parent_folder_id UUID REFERENCES folders(id) ON DELETE CASCADE,
+    owner_id UUID REFERENCES users(id) ON DELETE SET NULL,
     name VARCHAR(100) NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ,
     CHECK (parent_folder_id IS NULL OR parent_folder_id <> id),
     UNIQUE(project_id, parent_folder_id, name),
     UNIQUE(id, project_id)

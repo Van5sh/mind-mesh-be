@@ -77,6 +77,8 @@ models:
     fields:
       storage:
         resolver: true
+      properties:
+        resolver: true
       aiMetadata:
         resolver: true
       shares:

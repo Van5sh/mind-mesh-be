@@ -60,16 +60,14 @@ func (s *FileService) CreateFile(
 		return database.File{}, err
 	}
 	// ProjectID is optional: unset means a personal file, uploaded to the
-	// user's own drive rather than any project. A personal file can't sit
-	// inside a folder, since folders are still project-scoped only.
+	// user's own drive rather than any project. A personal file can sit in
+	// a personal folder owned by the same uploader - the destination-folder
+	// check below (folder.ProjectID != params.ProjectID, plus an owner
+	// check for the personal case) covers both that and the project case.
 	if params.ProjectID.Valid {
 		if err := validators.ValidateUUID("project id", params.ProjectID); err != nil {
 			return database.File{}, err
 		}
-	} else if params.FolderID.Valid {
-		return database.File{}, apperrors.Validation(
-			"a personal file (no project) cannot be placed in a folder",
-		)
 	}
 	if err := validators.ValidateUUID("uploaded by", params.UploadedBy); err != nil {
 		return database.File{}, err
@@ -100,6 +98,10 @@ func (s *FileService) CreateFile(
 			return database.File{},
 				apperrors.Validation("destination folder does not belong to the given project")
 		}
+		if !params.ProjectID.Valid && folder.OwnerID != params.UploadedBy {
+			return database.File{},
+				apperrors.Validation("destination folder belongs to another user's personal drive")
+		}
 	}
 
 	name, err := s.resolveFileName(
@@ -119,22 +121,11 @@ func (s *FileService) CreateFile(
 		return database.File{}, apperrors.InternalError("failed to create file", err)
 	}
 
-	var s3Key string
-	if file.ProjectID.Valid {
-		s3Key = fmt.Sprintf(
-			"projects/%s/files/%s/%s",
-			file.ProjectID,
-			file.ID,
-			file.Name,
-		)
-	} else {
-		s3Key = fmt.Sprintf(
-			"personal/%s/files/%s/%s",
-			file.UploadedBy,
-			file.ID,
-			file.Name,
-		)
-	}
+	// file_properties doesn't exist yet at this point (created further
+	// below), so fileS3Key necessarily falls back to file.Name here - which
+	// is correct, since file.Name is still the original, never-renamed
+	// value.
+	s3Key := s.fileS3Key(ctx, file)
 	if err := s.s3.S3Upload(
 		ctx,
 		s3Key,
@@ -156,6 +147,19 @@ func (s *FileService) CreateFile(
 		_ = s.repo.DeleteFile(ctx, file.ID)
 		return database.File{},
 			apperrors.InternalError("failed to initialize file processing status", err)
+	}
+
+	// Create the properties row up front too - trashFile/restoreFile write
+	// to it (file_properties.deleted_at), and File.properties is non-null,
+	// so every file needs one from the moment it exists.
+	if _, err := s.repo.CreateFileProperties(ctx, database.CreateFilePropertiesParams{
+		FileID:       file.ID,
+		OriginalName: pgtype.Text{String: file.Name, Valid: true},
+		IsIndexed:    false,
+	}); err != nil {
+		_ = s.repo.DeleteFile(ctx, file.ID)
+		return database.File{},
+			apperrors.InternalError("failed to initialize file properties", err)
 	}
 
 	// Personal files (no project) aren't queued for AI processing: RAG/chat
@@ -287,8 +291,13 @@ func (s *FileService) DeleteFile(
 		return err
 	}
 
-	if _, err := s.guards.EnsureFileExists(ctx, id); err != nil {
+	file, err := s.guards.EnsureFileExists(ctx, id)
+	if err != nil {
 		return apperrors.NotFoundError("file not found")
+	}
+
+	if err := s.s3.S3Delete(ctx, s.fileS3Key(ctx, file)); err != nil {
+		return apperrors.InternalError("failed to delete file from storage", err)
 	}
 
 	if err := s.repo.DeleteFile(ctx, id); err != nil {
@@ -296,6 +305,105 @@ func (s *FileService) DeleteFile(
 	}
 
 	return nil
+}
+
+// fileS3Key reconstructs the S3 key CreateFile originally uploaded this
+// file under. It can't just use file.Name - RenameFile only updates the
+// files row, it never touches S3, so a renamed file's key would otherwise
+// go stale. file_properties.original_name is frozen at upload time (never
+// updated by RenameFile) and is exactly the name CreateFile built the key
+// from, so it survives renames correctly. Falls back to the current name
+// only if that row is somehow missing (pre-dates the backfill migration or
+// was never created) - best effort rather than blocking the delete.
+func (s *FileService) fileS3Key(ctx context.Context, file database.File) string {
+	name := file.Name
+	if props, err := s.repo.GetFileProperties(ctx, file.ID); err == nil && props.OriginalName.Valid {
+		name = props.OriginalName.String
+	}
+
+	if file.ProjectID.Valid {
+		return fmt.Sprintf("projects/%s/files/%s/%s", file.ProjectID, file.ID, name)
+	}
+	return fmt.Sprintf("personal/%s/files/%s/%s", file.UploadedBy, file.ID, name)
+}
+
+// TrashFile soft-deletes a file (file_properties.deleted_at) - unlike
+// DeleteFile, this is reversible via RestoreFile. The files row itself is
+// untouched, so the pre-fetched row is still accurate to return.
+func (s *FileService) TrashFile(
+	ctx context.Context,
+	id pgtype.UUID,
+) (database.File, error) {
+	if err := validators.ValidateUUID("file id", id); err != nil {
+		return database.File{}, err
+	}
+
+	file, err := s.guards.EnsureFileExists(ctx, id)
+	if err != nil {
+		return database.File{}, apperrors.NotFoundError("file not found")
+	}
+
+	if err := s.repo.SoftDeleteFile(ctx, id); err != nil {
+		return database.File{}, apperrors.InternalError("failed to trash file", err)
+	}
+
+	return file, nil
+}
+
+// RestoreFile undoes TrashFile.
+func (s *FileService) RestoreFile(
+	ctx context.Context,
+	id pgtype.UUID,
+) (database.File, error) {
+	if err := validators.ValidateUUID("file id", id); err != nil {
+		return database.File{}, err
+	}
+
+	file, err := s.guards.EnsureFileExists(ctx, id)
+	if err != nil {
+		return database.File{}, apperrors.NotFoundError("file not found")
+	}
+
+	if err := s.repo.RestoreFile(ctx, id); err != nil {
+		return database.File{}, apperrors.InternalError("failed to restore file", err)
+	}
+
+	return file, nil
+}
+
+// GetTrashedFiles lists a project's soft-deleted files.
+func (s *FileService) GetTrashedFiles(
+	ctx context.Context,
+	projectID pgtype.UUID,
+) ([]database.File, error) {
+	if err := validators.ValidateUUID("project id", projectID); err != nil {
+		return nil, err
+	}
+
+	files, err := s.repo.GetDeletedFiles(ctx, projectID)
+	if err != nil {
+		return nil, apperrors.InternalError("failed to get trashed files", err)
+	}
+
+	return files, nil
+}
+
+// GetTrashedPersonalFiles lists a user's soft-deleted personal (project-less)
+// files.
+func (s *FileService) GetTrashedPersonalFiles(
+	ctx context.Context,
+	userID pgtype.UUID,
+) ([]database.File, error) {
+	if err := validators.ValidateUUID("user id", userID); err != nil {
+		return nil, err
+	}
+
+	files, err := s.repo.GetTrashedPersonalFiles(ctx, userID)
+	if err != nil {
+		return nil, apperrors.InternalError("failed to get trashed personal files", err)
+	}
+
+	return files, nil
 }
 
 func (s *FileService) resolveFileName(
@@ -341,6 +449,10 @@ func (s *FileService) CreateFolder(
 		return database.Folder{}, err
 	}
 
+	// ProjectID is optional: unset means a personal folder, in the owning
+	// user's own drive rather than any project. A personal folder needs an
+	// owner (that's what its authorization and listing queries key off);
+	// a project folder gets one too, for free, as useful metadata.
 	if params.ProjectID.Valid {
 		if err := validators.ValidateUUID(
 			"project id",
@@ -348,6 +460,9 @@ func (s *FileService) CreateFolder(
 		); err != nil {
 			return database.Folder{}, err
 		}
+	}
+	if err := validators.ValidateUUID("owner id", params.OwnerID); err != nil {
+		return database.Folder{}, err
 	}
 
 	if params.ParentFolderID.Valid {
@@ -367,12 +482,20 @@ func (s *FileService) CreateFolder(
 				apperrors.NotFoundError("parent folder not found")
 		}
 
-		if params.ProjectID.Valid &&
-			parent.ProjectID.Valid &&
-			parent.ProjectID.Bytes != params.ProjectID.Bytes {
+		// A folder's space (project, or personal-to-an-owner) must match
+		// its parent's - a personal folder can't sit inside a project
+		// folder or another user's personal folder, and vice versa.
+		if parent.ProjectID.Valid != params.ProjectID.Valid ||
+			(parent.ProjectID.Valid && parent.ProjectID.Bytes != params.ProjectID.Bytes) {
 			return database.Folder{},
-				apperrors.ConflictError(
-					"parent folder belongs to another project",
+				apperrors.Validation(
+					"parent folder does not belong to the given project",
+				)
+		}
+		if !params.ProjectID.Valid && parent.OwnerID != params.OwnerID {
+			return database.Folder{},
+				apperrors.Validation(
+					"parent folder belongs to another user's personal drive",
 				)
 		}
 	}
@@ -440,6 +563,68 @@ func (s *FileService) DeleteFolder(
 	}
 
 	return nil
+}
+
+// TrashFolder soft-deletes a folder (folders.deleted_at) - unlike
+// DeleteFolder, this is reversible via RestoreFolder. It does not cascade to
+// the folder's contents; a file/subfolder inside a trashed folder does not
+// itself become trashed.
+func (s *FileService) TrashFolder(
+	ctx context.Context,
+	id pgtype.UUID,
+) (database.Folder, error) {
+	if err := validators.ValidateUUID("folder id", id); err != nil {
+		return database.Folder{}, err
+	}
+
+	folder, err := s.guards.EnsureFolderExists(ctx, id)
+	if err != nil {
+		return database.Folder{}, apperrors.NotFoundError("folder not found")
+	}
+
+	if err := s.repo.SoftDeleteFolder(ctx, id); err != nil {
+		return database.Folder{}, apperrors.InternalError("failed to trash folder", err)
+	}
+
+	return folder, nil
+}
+
+// RestoreFolder undoes TrashFolder.
+func (s *FileService) RestoreFolder(
+	ctx context.Context,
+	id pgtype.UUID,
+) (database.Folder, error) {
+	if err := validators.ValidateUUID("folder id", id); err != nil {
+		return database.Folder{}, err
+	}
+
+	folder, err := s.guards.EnsureFolderExists(ctx, id)
+	if err != nil {
+		return database.Folder{}, apperrors.NotFoundError("folder not found")
+	}
+
+	if err := s.repo.RestoreFolder(ctx, id); err != nil {
+		return database.Folder{}, apperrors.InternalError("failed to restore folder", err)
+	}
+
+	return folder, nil
+}
+
+// GetTrashedFolders lists a project's soft-deleted folders.
+func (s *FileService) GetTrashedFolders(
+	ctx context.Context,
+	projectID pgtype.UUID,
+) ([]database.Folder, error) {
+	if err := validators.ValidateUUID("project id", projectID); err != nil {
+		return nil, err
+	}
+
+	folders, err := s.repo.GetTrashedFolders(ctx, projectID)
+	if err != nil {
+		return nil, apperrors.InternalError("failed to get trashed folders", err)
+	}
+
+	return folders, nil
 }
 
 func (s *FileService) resolveFolderName(
@@ -600,6 +785,10 @@ func (s *FileService) MoveFile(
 			return database.File{},
 				apperrors.Validation("destination folder does not belong to the file's project")
 		}
+		if !existing.ProjectID.Valid && folder.OwnerID != existing.UploadedBy {
+			return database.File{},
+				apperrors.Validation("destination folder belongs to another user's personal drive")
+		}
 	}
 
 	file, err := s.repo.MoveFile(ctx, params)
@@ -664,6 +853,15 @@ func (s *FileService) MoveFolder(
 		return database.Folder{}, err
 	}
 
+	existing, err := s.guards.EnsureFolderExists(
+		ctx,
+		params.ID,
+	)
+	if err != nil {
+		return database.Folder{},
+			apperrors.NotFoundError("folder not found")
+	}
+
 	if params.ParentFolderID.Valid {
 		if err := validators.ValidateUUID(
 			"parent folder id",
@@ -672,21 +870,27 @@ func (s *FileService) MoveFolder(
 			return database.Folder{}, err
 		}
 
-		if _, err := s.guards.EnsureFolderExists(
+		parent, err := s.guards.EnsureFolderExists(
 			ctx,
 			params.ParentFolderID,
-		); err != nil {
+		)
+		if err != nil {
 			return database.Folder{},
 				apperrors.NotFoundError("parent folder not found")
 		}
-	}
 
-	if _, err := s.guards.EnsureFolderExists(
-		ctx,
-		params.ID,
-	); err != nil {
-		return database.Folder{},
-			apperrors.NotFoundError("folder not found")
+		// MoveFolder only ever changes parent_folder_id, never which
+		// project/owner a folder belongs to - the new parent must be in
+		// that same space.
+		if parent.ProjectID.Valid != existing.ProjectID.Valid ||
+			(parent.ProjectID.Valid && parent.ProjectID.Bytes != existing.ProjectID.Bytes) {
+			return database.Folder{},
+				apperrors.Validation("destination folder belongs to another project")
+		}
+		if !existing.ProjectID.Valid && parent.OwnerID != existing.OwnerID {
+			return database.Folder{},
+				apperrors.Validation("destination folder belongs to another user's personal drive")
+		}
 	}
 
 	folder, err := s.repo.MoveFolder(ctx, params)
@@ -775,6 +979,62 @@ func (s *FileService) GetRootFolders(
 	if err != nil {
 		return nil,
 			apperrors.InternalError("failed to get root folders", err)
+	}
+
+	return folders, nil
+}
+
+// GetPersonalRootFolders returns a user's top-level personal (project-less)
+// folders - the personal-drive counterpart to GetRootFolders.
+func (s *FileService) GetPersonalRootFolders(
+	ctx context.Context,
+	ownerID pgtype.UUID,
+) ([]database.Folder, error) {
+	if err := validators.ValidateUUID("owner id", ownerID); err != nil {
+		return nil, err
+	}
+
+	folders, err := s.repo.GetStandaloneRootFolders(ctx, ownerID)
+	if err != nil {
+		return nil,
+			apperrors.InternalError("failed to get personal root folders", err)
+	}
+
+	return folders, nil
+}
+
+// GetPersonalFolders returns every personal folder a user owns, flat - the
+// personal-drive counterpart to GetFoldersByProjectID.
+func (s *FileService) GetPersonalFolders(
+	ctx context.Context,
+	ownerID pgtype.UUID,
+) ([]database.Folder, error) {
+	if err := validators.ValidateUUID("owner id", ownerID); err != nil {
+		return nil, err
+	}
+
+	folders, err := s.repo.GetPersonalFolders(ctx, ownerID)
+	if err != nil {
+		return nil,
+			apperrors.InternalError("failed to get personal folders", err)
+	}
+
+	return folders, nil
+}
+
+// GetTrashedPersonalFolders lists a user's soft-deleted personal folders.
+func (s *FileService) GetTrashedPersonalFolders(
+	ctx context.Context,
+	ownerID pgtype.UUID,
+) ([]database.Folder, error) {
+	if err := validators.ValidateUUID("owner id", ownerID); err != nil {
+		return nil, err
+	}
+
+	folders, err := s.repo.GetTrashedPersonalFolders(ctx, ownerID)
+	if err != nil {
+		return nil,
+			apperrors.InternalError("failed to get trashed personal folders", err)
 	}
 
 	return folders, nil
@@ -897,6 +1157,15 @@ func (s *FileService) GetFileProperties(
 	}
 
 	return properties, nil
+}
+
+// GetFilePropertiesByFileIDs fetches the properties row of many files in one
+// query. It exists for the File.properties dataloader.
+func (s *FileService) GetFilePropertiesByFileIDs(
+	ctx context.Context,
+	fileIDs []pgtype.UUID,
+) ([]database.FileProperty, error) {
+	return fetchRows(ctx, fileIDs, "file properties", s.repo.GetFilePropertiesByFileIDs)
 }
 
 // GetFileAIMetadata returns the AI metadata record for a file. AI
@@ -1076,4 +1345,158 @@ func (s *FileService) GetFileShareByUser(
 		return database.FileShare{}, apperrors.InternalError("failed to check file share", err)
 	}
 	return share, nil
+}
+
+// CreateFileShare grants a user access to a file. Re-sharing with someone
+// who already has a share updates their permission instead of hitting the
+// file_id+shared_with unique constraint - a share is "this user's access
+// level to this file", not a log of grants.
+func (s *FileService) CreateFileShare(
+	ctx context.Context,
+	params database.FileShareParams,
+) (database.FileShare, error) {
+	if err := validators.ValidateUUID("file id", params.FileID); err != nil {
+		return database.FileShare{}, err
+	}
+	if err := validators.ValidateUUID("shared by", params.SharedBy); err != nil {
+		return database.FileShare{}, err
+	}
+	if err := validators.ValidateUUID("shared with", params.SharedWith); err != nil {
+		return database.FileShare{}, err
+	}
+	if params.SharedBy == params.SharedWith {
+		return database.FileShare{}, apperrors.Validation("cannot share a file with yourself")
+	}
+
+	if _, err := s.guards.EnsureFileExists(ctx, params.FileID); err != nil {
+		return database.FileShare{}, apperrors.NotFoundError("file not found")
+	}
+
+	existing, err := s.repo.GetFileShareByFileAndSharedWith(ctx, database.GetFileShareByFileAndSharedWithParams{
+		FileID:     params.FileID,
+		SharedWith: params.SharedWith,
+	})
+	if err == nil {
+		updated, err := s.repo.UpdateFileSharePermission(ctx, database.UpdateFileSharePermissionParams{
+			ID:         existing.ID,
+			Permission: params.Permission,
+		})
+		if err != nil {
+			return database.FileShare{}, apperrors.InternalError("failed to update file share", err)
+		}
+		return updated, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return database.FileShare{}, apperrors.InternalError("failed to check existing file share", err)
+	}
+
+	share, err := s.repo.FileShare(ctx, params)
+	if err != nil {
+		return database.FileShare{}, apperrors.InternalError("failed to share file", err)
+	}
+	return share, nil
+}
+
+// GetFileShareByID returns a single share record by its own ID.
+func (s *FileService) GetFileShareByID(
+	ctx context.Context,
+	id pgtype.UUID,
+) (database.FileShare, error) {
+	if err := validators.ValidateUUID("file share id", id); err != nil {
+		return database.FileShare{}, err
+	}
+
+	share, err := s.repo.GetFileShareByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return database.FileShare{}, apperrors.NotFoundError("file share not found")
+		}
+		return database.FileShare{}, apperrors.InternalError("failed to fetch file share", err)
+	}
+	return share, nil
+}
+
+// GetFavoriteFilesByProject lists a user's starred files within a project.
+func (s *FileService) GetFavoriteFilesByProject(
+	ctx context.Context,
+	userID pgtype.UUID,
+	projectID pgtype.UUID,
+) ([]database.File, error) {
+	if err := validators.ValidateUUID("user id", userID); err != nil {
+		return nil, err
+	}
+	if err := validators.ValidateUUID("project id", projectID); err != nil {
+		return nil, err
+	}
+
+	files, err := s.repo.GetFavoriteFilesByProject(ctx, database.GetFavoriteFilesByProjectParams{
+		UserID:    userID,
+		ProjectID: projectID,
+	})
+	if err != nil {
+		return nil, apperrors.InternalError("failed to get favorite files", err)
+	}
+	return files, nil
+}
+
+// GetFavoritePersonalFiles lists a user's starred personal (project-less)
+// files - the personal-drive counterpart to GetFavoriteFilesByProject.
+func (s *FileService) GetFavoritePersonalFiles(
+	ctx context.Context,
+	userID pgtype.UUID,
+) ([]database.File, error) {
+	if err := validators.ValidateUUID("user id", userID); err != nil {
+		return nil, err
+	}
+
+	files, err := s.repo.GetFavoritePersonalFiles(ctx, userID)
+	if err != nil {
+		return nil, apperrors.InternalError("failed to get favorite personal files", err)
+	}
+	return files, nil
+}
+
+// UpdateFileSharePermission changes an existing share's permission level.
+func (s *FileService) UpdateFileSharePermission(
+	ctx context.Context,
+	params database.UpdateFileSharePermissionParams,
+) (database.FileShare, error) {
+	if err := validators.ValidateUUID("file share id", params.ID); err != nil {
+		return database.FileShare{}, err
+	}
+
+	if _, err := s.repo.GetFileShareByID(ctx, params.ID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return database.FileShare{}, apperrors.NotFoundError("file share not found")
+		}
+		return database.FileShare{}, apperrors.InternalError("failed to fetch file share", err)
+	}
+
+	share, err := s.repo.UpdateFileSharePermission(ctx, params)
+	if err != nil {
+		return database.FileShare{}, apperrors.InternalError("failed to update file share", err)
+	}
+	return share, nil
+}
+
+// DeleteFileShare revokes a share, removing the recipient's access.
+func (s *FileService) DeleteFileShare(
+	ctx context.Context,
+	id pgtype.UUID,
+) error {
+	if err := validators.ValidateUUID("file share id", id); err != nil {
+		return err
+	}
+
+	if _, err := s.repo.GetFileShareByID(ctx, id); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.NotFoundError("file share not found")
+		}
+		return apperrors.InternalError("failed to fetch file share", err)
+	}
+
+	if err := s.repo.DeleteFileShare(ctx, id); err != nil {
+		return apperrors.InternalError("failed to delete file share", err)
+	}
+	return nil
 }

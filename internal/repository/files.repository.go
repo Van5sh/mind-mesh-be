@@ -93,6 +93,30 @@ func (r *FileRepository) DeleteFolder(ctx context.Context, id pgtype.UUID) error
 	return r.q.DeleteFolder(ctx, id)
 }
 
+func (r *FileRepository) SoftDeleteFolder(ctx context.Context, id pgtype.UUID) error {
+	return r.q.SoftDeleteFolder(ctx, id)
+}
+
+func (r *FileRepository) RestoreFolder(ctx context.Context, id pgtype.UUID) error {
+	return r.q.RestoreFolder(ctx, id)
+}
+
+func (r *FileRepository) GetTrashedFolders(ctx context.Context, projectID pgtype.UUID) ([]database.Folder, error) {
+	return r.q.GetTrashedFolders(ctx, projectID)
+}
+
+func (r *FileRepository) GetStandaloneRootFolders(ctx context.Context, ownerID pgtype.UUID) ([]database.Folder, error) {
+	return r.q.GetStandaloneRootFolders(ctx, ownerID)
+}
+
+func (r *FileRepository) GetPersonalFolders(ctx context.Context, ownerID pgtype.UUID) ([]database.Folder, error) {
+	return r.q.GetPersonalFolders(ctx, ownerID)
+}
+
+func (r *FileRepository) GetTrashedPersonalFolders(ctx context.Context, ownerID pgtype.UUID) ([]database.Folder, error) {
+	return r.q.GetTrashedPersonalFolders(ctx, ownerID)
+}
+
 func (r *FileRepository) DeleteMessageFileReferences(ctx context.Context, messageID pgtype.UUID) error {
 	return r.q.DeleteMessageFileReferences(ctx, messageID)
 }
@@ -113,8 +137,8 @@ func (r *FileRepository) GetDeletedFiles(ctx context.Context, projectID pgtype.U
 	return r.q.GetDeletedFiles(ctx, projectID)
 }
 
-func (r *FileRepository) GetFavoritesFiles(ctx context.Context, params database.GetFavoritesFilesParams) ([]database.File, error) {
-	return r.q.GetFavoritesFiles(ctx, params)
+func (r *FileRepository) GetTrashedPersonalFiles(ctx context.Context, uploadedBy pgtype.UUID) ([]database.File, error) {
+	return r.q.GetTrashedPersonalFiles(ctx, uploadedBy)
 }
 
 func (r *FileRepository) GetFileAIMetadata(ctx context.Context, fileID pgtype.UUID) (database.FileAiMetadatum, error) {
@@ -133,12 +157,24 @@ func (r *FileRepository) GetFileProperties(ctx context.Context, fileID pgtype.UU
 	return r.q.GetFileProperties(ctx, fileID)
 }
 
+func (r *FileRepository) GetFilePropertiesByFileIDs(ctx context.Context, fileIDs []pgtype.UUID) ([]database.FileProperty, error) {
+	return r.q.GetFilePropertiesByFileIDs(ctx, fileIDs)
+}
+
 func (r *FileRepository) GetFileShareByFileAndSharedWith(ctx context.Context, params database.GetFileShareByFileAndSharedWithParams) (database.FileShare, error) {
 	return r.q.GetFileShareByFileAndSharedWith(ctx, params)
 }
 
 func (r *FileRepository) GetFileShareByID(ctx context.Context, id pgtype.UUID) (database.FileShare, error) {
 	return r.q.GetFileShareByID(ctx, id)
+}
+
+func (r *FileRepository) GetFavoriteFilesByProject(ctx context.Context, params database.GetFavoriteFilesByProjectParams) ([]database.File, error) {
+	return r.q.GetFavoriteFilesByProject(ctx, params)
+}
+
+func (r *FileRepository) GetFavoritePersonalFiles(ctx context.Context, userID pgtype.UUID) ([]database.File, error) {
+	return r.q.GetFavoritePersonalFiles(ctx, userID)
 }
 
 func (r *FileRepository) GetFileSharesByFileID(ctx context.Context, fileID pgtype.UUID) ([]database.FileShare, error) {
@@ -231,10 +267,6 @@ func (r *FileRepository) GetRootFiles(ctx context.Context, projectID pgtype.UUID
 
 func (r *FileRepository) GetRootFolders(ctx context.Context, projectID pgtype.UUID) ([]database.Folder, error) {
 	return r.q.GetRootFolders(ctx, projectID)
-}
-
-func (r *FileRepository) GetStandaloneRootFolders(ctx context.Context) ([]database.Folder, error) {
-	return r.q.GetStandaloneRootFolders(ctx)
 }
 
 func (r *FileRepository) GetUserFilePreference(ctx context.Context, params database.GetUserFilePreferenceParams) (database.UserFilePreference, error) {

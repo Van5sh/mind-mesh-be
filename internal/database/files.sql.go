@@ -328,28 +328,37 @@ const createFolder = `-- name: CreateFolder :one
 INSERT INTO folders (
     project_id,
     parent_folder_id,
+    owner_id,
     name
 )
-VALUES ($1, $2, $3)
-RETURNING id, project_id, parent_folder_id, name, created_at, updated_at
+VALUES ($1, $2, $3, $4)
+RETURNING id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
 `
 
 type CreateFolderParams struct {
 	ProjectID      pgtype.UUID
 	ParentFolderID pgtype.UUID
+	OwnerID        pgtype.UUID
 	Name           string
 }
 
 func (q *Queries) CreateFolder(ctx context.Context, arg CreateFolderParams) (Folder, error) {
-	row := q.db.QueryRow(ctx, createFolder, arg.ProjectID, arg.ParentFolderID, arg.Name)
+	row := q.db.QueryRow(ctx, createFolder,
+		arg.ProjectID,
+		arg.ParentFolderID,
+		arg.OwnerID,
+		arg.Name,
+	)
 	var i Folder
 	err := row.Scan(
 		&i.ID,
 		&i.ProjectID,
 		&i.ParentFolderID,
+		&i.OwnerID,
 		&i.Name,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -643,9 +652,10 @@ func (q *Queries) FolderNameExists(ctx context.Context, arg FolderNameExistsPara
 }
 
 const getChildFolders = `-- name: GetChildFolders :many
-SELECT id, project_id, parent_folder_id, name, created_at, updated_at
+SELECT id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
 FROM folders
 WHERE parent_folder_id IS NOT DISTINCT FROM $1
+  AND deleted_at IS NULL
 ORDER BY name
 `
 
@@ -662,9 +672,11 @@ func (q *Queries) GetChildFolders(ctx context.Context, parentFolderID pgtype.UUI
 			&i.ID,
 			&i.ProjectID,
 			&i.ParentFolderID,
+			&i.OwnerID,
 			&i.Name,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -715,23 +727,71 @@ func (q *Queries) GetDeletedFiles(ctx context.Context, projectID pgtype.UUID) ([
 	return items, nil
 }
 
-const getFavoritesFiles = `-- name: GetFavoritesFiles :many
+const getFavoriteFilesByProject = `-- name: GetFavoriteFilesByProject :many
 SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
-JOIN user_file_preferences ufp
-ON f.id = ufp.file_id
+JOIN user_file_preferences ufp ON f.id = ufp.file_id
+LEFT JOIN file_properties fp ON fp.file_id = f.id
 WHERE ufp.user_id = $1
   AND ufp.is_favorite = TRUE
   AND f.project_id = $2
+  AND fp.deleted_at IS NULL
+ORDER BY f.name
 `
 
-type GetFavoritesFilesParams struct {
+type GetFavoriteFilesByProjectParams struct {
 	UserID    pgtype.UUID
 	ProjectID pgtype.UUID
 }
 
-func (q *Queries) GetFavoritesFiles(ctx context.Context, arg GetFavoritesFilesParams) ([]File, error) {
-	rows, err := q.db.Query(ctx, getFavoritesFiles, arg.UserID, arg.ProjectID)
+// Not restricted to files this user owns/uploaded - favoriting works on any
+// file they have access to (any project member).
+func (q *Queries) GetFavoriteFilesByProject(ctx context.Context, arg GetFavoriteFilesByProjectParams) ([]File, error) {
+	rows, err := q.db.Query(ctx, getFavoriteFilesByProject, arg.UserID, arg.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []File
+	for rows.Next() {
+		var i File
+		if err := rows.Scan(
+			&i.ID,
+			&i.FolderID,
+			&i.ProjectID,
+			&i.UploadedBy,
+			&i.Name,
+			&i.Size,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFavoritePersonalFiles = `-- name: GetFavoritePersonalFiles :many
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
+FROM files f
+JOIN user_file_preferences ufp ON f.id = ufp.file_id
+LEFT JOIN file_properties fp ON fp.file_id = f.id
+WHERE ufp.user_id = $1
+  AND ufp.is_favorite = TRUE
+  AND f.project_id IS NULL
+  AND fp.deleted_at IS NULL
+ORDER BY f.name
+`
+
+// Personal-drive counterpart to GetFavoriteFilesByProject - not restricted
+// to files this user uploaded, since they can favorite a personal file
+// someone else shared with them too.
+func (q *Queries) GetFavoritePersonalFiles(ctx context.Context, userID pgtype.UUID) ([]File, error) {
+	rows, err := q.db.Query(ctx, getFavoritePersonalFiles, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -889,6 +949,40 @@ func (q *Queries) GetFileProperties(ctx context.Context, fileID pgtype.UUID) (Fi
 		&i.DeletedAt,
 	)
 	return i, err
+}
+
+const getFilePropertiesByFileIDs = `-- name: GetFilePropertiesByFileIDs :many
+SELECT file_id, original_name, is_indexed, created_at, updated_at, deleted_at
+FROM file_properties
+WHERE file_id = ANY($1::uuid[])
+`
+
+// Batched form of GetFileProperties, used by the File.properties dataloader.
+func (q *Queries) GetFilePropertiesByFileIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]FileProperty, error) {
+	rows, err := q.db.Query(ctx, getFilePropertiesByFileIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FileProperty
+	for rows.Next() {
+		var i FileProperty
+		if err := rows.Scan(
+			&i.FileID,
+			&i.OriginalName,
+			&i.IsIndexed,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getFileShareByFileAndSharedWith = `-- name: GetFileShareByFileAndSharedWith :one
@@ -1139,10 +1233,12 @@ func (q *Queries) GetFileStoragesByFileIDs(ctx context.Context, dollar_1 []pgtyp
 }
 
 const getFilesByFolderID = `-- name: GetFilesByFolderID :many
-SELECT id, folder_id, project_id, uploaded_by, name, size, created_at, updated_at
-FROM files
-WHERE folder_id IS NOT DISTINCT FROM $1
-ORDER BY name
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
+FROM files f
+LEFT JOIN file_properties fp ON fp.file_id = f.id
+WHERE f.folder_id IS NOT DISTINCT FROM $1
+  AND fp.deleted_at IS NULL
+ORDER BY f.name
 `
 
 func (q *Queries) GetFilesByFolderID(ctx context.Context, folderID pgtype.UUID) ([]File, error) {
@@ -1175,10 +1271,12 @@ func (q *Queries) GetFilesByFolderID(ctx context.Context, folderID pgtype.UUID) 
 }
 
 const getFilesByFolderIDs = `-- name: GetFilesByFolderIDs :many
-SELECT id, folder_id, project_id, uploaded_by, name, size, created_at, updated_at
-FROM files
-WHERE folder_id = ANY($1::uuid[])
-ORDER BY folder_id, name
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
+FROM files f
+LEFT JOIN file_properties fp ON fp.file_id = f.id
+WHERE f.folder_id = ANY($1::uuid[])
+  AND fp.deleted_at IS NULL
+ORDER BY f.folder_id, f.name
 `
 
 // Batched form of GetFilesByFolderID, used by the Folder.files dataloader.
@@ -1294,7 +1392,9 @@ func (q *Queries) GetFilesByProcessingStatus(ctx context.Context, arg GetFilesBy
 const getFilesByProjectID = `-- name: GetFilesByProjectID :many
 SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
+LEFT JOIN file_properties fp ON fp.file_id = f.id
 WHERE f.project_id = $1
+  AND fp.deleted_at IS NULL
 ORDER BY f.name
 `
 
@@ -1330,7 +1430,9 @@ func (q *Queries) GetFilesByProjectID(ctx context.Context, projectID pgtype.UUID
 const getFilesByProjectIDs = `-- name: GetFilesByProjectIDs :many
 SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
+LEFT JOIN file_properties fp ON fp.file_id = f.id
 WHERE f.project_id = ANY($1::uuid[])
+  AND fp.deleted_at IS NULL
 ORDER BY f.project_id, f.name
 `
 
@@ -1438,7 +1540,7 @@ func (q *Queries) GetFilesSharedByUser(ctx context.Context, sharedBy pgtype.UUID
 }
 
 const getFolderByID = `-- name: GetFolderByID :one
-SELECT id, project_id, parent_folder_id, name, created_at, updated_at
+SELECT id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
 FROM folders
 WHERE id = $1
 `
@@ -1450,9 +1552,11 @@ func (q *Queries) GetFolderByID(ctx context.Context, id pgtype.UUID) (Folder, er
 		&i.ID,
 		&i.ProjectID,
 		&i.ParentFolderID,
+		&i.OwnerID,
 		&i.Name,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -1509,7 +1613,7 @@ func (q *Queries) GetFolderContents(ctx context.Context, parentFolderID pgtype.U
 }
 
 const getFoldersByIDs = `-- name: GetFoldersByIDs :many
-SELECT id, project_id, parent_folder_id, name, created_at, updated_at
+SELECT id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
 FROM folders
 WHERE id = ANY($1::uuid[])
 `
@@ -1528,9 +1632,11 @@ func (q *Queries) GetFoldersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) (
 			&i.ID,
 			&i.ProjectID,
 			&i.ParentFolderID,
+			&i.OwnerID,
 			&i.Name,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1543,9 +1649,10 @@ func (q *Queries) GetFoldersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) (
 }
 
 const getFoldersByParentFolderIDs = `-- name: GetFoldersByParentFolderIDs :many
-SELECT id, project_id, parent_folder_id, name, created_at, updated_at
+SELECT id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
 FROM folders
 WHERE parent_folder_id = ANY($1::uuid[])
+  AND deleted_at IS NULL
 ORDER BY parent_folder_id, name
 `
 
@@ -1564,9 +1671,11 @@ func (q *Queries) GetFoldersByParentFolderIDs(ctx context.Context, dollar_1 []pg
 			&i.ID,
 			&i.ProjectID,
 			&i.ParentFolderID,
+			&i.OwnerID,
 			&i.Name,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1579,9 +1688,10 @@ func (q *Queries) GetFoldersByParentFolderIDs(ctx context.Context, dollar_1 []pg
 }
 
 const getFoldersByProjectID = `-- name: GetFoldersByProjectID :many
-SELECT id, project_id, parent_folder_id, name, created_at, updated_at
+SELECT id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
 FROM folders
 WHERE project_id = $1
+  AND deleted_at IS NULL
 ORDER BY name
 `
 
@@ -1598,9 +1708,11 @@ func (q *Queries) GetFoldersByProjectID(ctx context.Context, projectID pgtype.UU
 			&i.ID,
 			&i.ProjectID,
 			&i.ParentFolderID,
+			&i.OwnerID,
 			&i.Name,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1613,9 +1725,10 @@ func (q *Queries) GetFoldersByProjectID(ctx context.Context, projectID pgtype.UU
 }
 
 const getFoldersByProjectIDs = `-- name: GetFoldersByProjectIDs :many
-SELECT id, project_id, parent_folder_id, name, created_at, updated_at
+SELECT id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
 FROM folders
 WHERE project_id = ANY($1::uuid[])
+  AND deleted_at IS NULL
 ORDER BY project_id, name
 `
 
@@ -1633,9 +1746,11 @@ func (q *Queries) GetFoldersByProjectIDs(ctx context.Context, dollar_1 []pgtype.
 			&i.ID,
 			&i.ProjectID,
 			&i.ParentFolderID,
+			&i.OwnerID,
 			&i.Name,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1761,12 +1876,14 @@ func (q *Queries) GetMessagesReferencingFile(ctx context.Context, fileID pgtype.
 }
 
 const getPersonalFiles = `-- name: GetPersonalFiles :many
-SELECT id, folder_id, project_id, uploaded_by, name, size, created_at, updated_at
-FROM files
-WHERE project_id IS NULL
-  AND folder_id IS NULL
-  AND uploaded_by = $1
-ORDER BY name
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
+FROM files f
+LEFT JOIN file_properties fp ON fp.file_id = f.id
+WHERE f.project_id IS NULL
+  AND f.folder_id IS NULL
+  AND f.uploaded_by = $1
+  AND fp.deleted_at IS NULL
+ORDER BY f.name
 `
 
 // Root-level files with no project, owned by whoever created them
@@ -1792,6 +1909,46 @@ func (q *Queries) GetPersonalFiles(ctx context.Context, uploadedBy pgtype.UUID) 
 			&i.Size,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPersonalFolders = `-- name: GetPersonalFolders :many
+SELECT id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
+FROM folders
+WHERE project_id IS NULL
+  AND owner_id = $1
+  AND deleted_at IS NULL
+ORDER BY name
+`
+
+// Every personal folder owned by the given user, flat - not just root-level.
+// Mirrors GetFoldersByProjectID for the personal-drive case.
+func (q *Queries) GetPersonalFolders(ctx context.Context, ownerID pgtype.UUID) ([]Folder, error) {
+	rows, err := q.db.Query(ctx, getPersonalFolders, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Folder
+	for rows.Next() {
+		var i Folder
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.ParentFolderID,
+			&i.OwnerID,
+			&i.Name,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1928,7 +2085,7 @@ func (q *Queries) GetProjectFilesByFolderID(ctx context.Context, arg GetProjectF
 }
 
 const getProjectFolderByID = `-- name: GetProjectFolderByID :one
-SELECT id, project_id, parent_folder_id, name, created_at, updated_at
+SELECT id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
 FROM folders
 WHERE id = $1
   AND project_id = $2
@@ -1946,9 +2103,11 @@ func (q *Queries) GetProjectFolderByID(ctx context.Context, arg GetProjectFolder
 		&i.ID,
 		&i.ProjectID,
 		&i.ParentFolderID,
+		&i.OwnerID,
 		&i.Name,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -2014,8 +2173,10 @@ func (q *Queries) GetProjectFolderContents(ctx context.Context, arg GetProjectFo
 const getRootFiles = `-- name: GetRootFiles :many
 SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
 FROM files f
+LEFT JOIN file_properties fp ON fp.file_id = f.id
 WHERE f.project_id = $1
   AND f.folder_id IS NULL
+  AND fp.deleted_at IS NULL
 ORDER BY f.name
 `
 
@@ -2049,10 +2210,11 @@ func (q *Queries) GetRootFiles(ctx context.Context, projectID pgtype.UUID) ([]Fi
 }
 
 const getRootFolders = `-- name: GetRootFolders :many
-SELECT id, project_id, parent_folder_id, name, created_at, updated_at
+SELECT id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
 FROM folders
 WHERE project_id = $1
   AND parent_folder_id IS NULL
+  AND deleted_at IS NULL
 ORDER BY name
 `
 
@@ -2069,7 +2231,130 @@ func (q *Queries) GetRootFolders(ctx context.Context, projectID pgtype.UUID) ([]
 			&i.ID,
 			&i.ProjectID,
 			&i.ParentFolderID,
+			&i.OwnerID,
 			&i.Name,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStandaloneRootFolders = `-- name: GetStandaloneRootFolders :many
+SELECT id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
+FROM folders
+WHERE project_id IS NULL
+  AND parent_folder_id IS NULL
+  AND owner_id = $1
+  AND deleted_at IS NULL
+ORDER BY name
+`
+
+// Top-level personal (project-less) folders owned by the given user.
+func (q *Queries) GetStandaloneRootFolders(ctx context.Context, ownerID pgtype.UUID) ([]Folder, error) {
+	rows, err := q.db.Query(ctx, getStandaloneRootFolders, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Folder
+	for rows.Next() {
+		var i Folder
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.ParentFolderID,
+			&i.OwnerID,
+			&i.Name,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTrashedFolders = `-- name: GetTrashedFolders :many
+SELECT id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
+FROM folders
+WHERE project_id = $1
+  AND deleted_at IS NOT NULL
+ORDER BY deleted_at DESC
+`
+
+// Folders are always project-scoped, so unlike files there's no personal
+// variant needed here.
+func (q *Queries) GetTrashedFolders(ctx context.Context, projectID pgtype.UUID) ([]Folder, error) {
+	rows, err := q.db.Query(ctx, getTrashedFolders, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Folder
+	for rows.Next() {
+		var i Folder
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.ParentFolderID,
+			&i.OwnerID,
+			&i.Name,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTrashedPersonalFiles = `-- name: GetTrashedPersonalFiles :many
+SELECT f.id, f.folder_id, f.project_id, f.uploaded_by, f.name, f.size, f.created_at, f.updated_at
+FROM files f
+JOIN file_properties fp
+ON f.id = fp.file_id
+WHERE fp.deleted_at IS NOT NULL
+  AND f.project_id IS NULL
+  AND f.uploaded_by = $1
+ORDER BY fp.deleted_at DESC
+`
+
+// Personal-drive counterpart to GetDeletedFiles (which requires a
+// project_id) - trashed files with no project, owned by the given user.
+func (q *Queries) GetTrashedPersonalFiles(ctx context.Context, uploadedBy pgtype.UUID) ([]File, error) {
+	rows, err := q.db.Query(ctx, getTrashedPersonalFiles, uploadedBy)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []File
+	for rows.Next() {
+		var i File
+		if err := rows.Scan(
+			&i.ID,
+			&i.FolderID,
+			&i.ProjectID,
+			&i.UploadedBy,
+			&i.Name,
+			&i.Size,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -2083,16 +2368,17 @@ func (q *Queries) GetRootFolders(ctx context.Context, projectID pgtype.UUID) ([]
 	return items, nil
 }
 
-const getStandaloneRootFolders = `-- name: GetStandaloneRootFolders :many
-SELECT id, project_id, parent_folder_id, name, created_at, updated_at
+const getTrashedPersonalFolders = `-- name: GetTrashedPersonalFolders :many
+SELECT id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
 FROM folders
 WHERE project_id IS NULL
-  AND parent_folder_id IS NULL
-ORDER BY name
+  AND owner_id = $1
+  AND deleted_at IS NOT NULL
+ORDER BY deleted_at DESC
 `
 
-func (q *Queries) GetStandaloneRootFolders(ctx context.Context) ([]Folder, error) {
-	rows, err := q.db.Query(ctx, getStandaloneRootFolders)
+func (q *Queries) GetTrashedPersonalFolders(ctx context.Context, ownerID pgtype.UUID) ([]Folder, error) {
+	rows, err := q.db.Query(ctx, getTrashedPersonalFolders, ownerID)
 	if err != nil {
 		return nil, err
 	}
@@ -2104,9 +2390,11 @@ func (q *Queries) GetStandaloneRootFolders(ctx context.Context) ([]Folder, error
 			&i.ID,
 			&i.ProjectID,
 			&i.ParentFolderID,
+			&i.OwnerID,
 			&i.Name,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -2259,7 +2547,7 @@ SET
     parent_folder_id = $2,
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, project_id, parent_folder_id, name, created_at, updated_at
+RETURNING id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
 `
 
 type MoveFolderParams struct {
@@ -2274,9 +2562,11 @@ func (q *Queries) MoveFolder(ctx context.Context, arg MoveFolderParams) (Folder,
 		&i.ID,
 		&i.ProjectID,
 		&i.ParentFolderID,
+		&i.OwnerID,
 		&i.Name,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -2361,7 +2651,7 @@ SET
     name = $2,
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, project_id, parent_folder_id, name, created_at, updated_at
+RETURNING id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
 `
 
 type RenameFolderParams struct {
@@ -2376,9 +2666,11 @@ func (q *Queries) RenameFolder(ctx context.Context, arg RenameFolderParams) (Fol
 		&i.ID,
 		&i.ProjectID,
 		&i.ParentFolderID,
+		&i.OwnerID,
 		&i.Name,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -2393,6 +2685,19 @@ WHERE file_id = $1
 
 func (q *Queries) RestoreFile(ctx context.Context, fileID pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, restoreFile, fileID)
+	return err
+}
+
+const restoreFolder = `-- name: RestoreFolder :exec
+UPDATE folders
+SET
+    deleted_at = NULL,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) RestoreFolder(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, restoreFolder, id)
 	return err
 }
 
@@ -2439,7 +2744,7 @@ func (q *Queries) SearchFiles(ctx context.Context, arg SearchFilesParams) ([]Fil
 }
 
 const searchFolders = `-- name: SearchFolders :many
-SELECT id, project_id, parent_folder_id, name, created_at, updated_at
+SELECT id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
 FROM folders
 WHERE project_id = $1
   AND name ILIKE '%' || $2 || '%'
@@ -2464,9 +2769,11 @@ func (q *Queries) SearchFolders(ctx context.Context, arg SearchFoldersParams) ([
 			&i.ID,
 			&i.ProjectID,
 			&i.ParentFolderID,
+			&i.OwnerID,
 			&i.Name,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -2479,7 +2786,7 @@ func (q *Queries) SearchFolders(ctx context.Context, arg SearchFoldersParams) ([
 }
 
 const searchStandaloneFolders = `-- name: SearchStandaloneFolders :many
-SELECT id, project_id, parent_folder_id, name, created_at, updated_at
+SELECT id, project_id, parent_folder_id, owner_id, name, created_at, updated_at, deleted_at
 FROM folders
 WHERE project_id IS NULL
   AND name ILIKE '%' || $1 || '%'
@@ -2499,9 +2806,11 @@ func (q *Queries) SearchStandaloneFolders(ctx context.Context, dollar_1 pgtype.T
 			&i.ID,
 			&i.ProjectID,
 			&i.ParentFolderID,
+			&i.OwnerID,
 			&i.Name,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -2556,6 +2865,19 @@ WHERE file_id = $1
 
 func (q *Queries) SoftDeleteFile(ctx context.Context, fileID pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, softDeleteFile, fileID)
+	return err
+}
+
+const softDeleteFolder = `-- name: SoftDeleteFolder :exec
+UPDATE folders
+SET
+    deleted_at = NOW(),
+    updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) SoftDeleteFolder(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, softDeleteFolder, id)
 	return err
 }
 

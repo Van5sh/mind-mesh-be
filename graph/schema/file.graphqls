@@ -91,13 +91,21 @@ extend type Query {
   folders(projectId: ID): [Folder!]!
   folderContents(folderId: ID, projectId: ID): [FolderItem!]!
   folderPath(folderId: ID!): [Folder!]!
-  rootFolders(projectId: ID!): [Folder!]!
+  # projectId omitted - the current user's top-level personal (project-less)
+  # folders.
+  rootFolders(projectId: ID): [Folder!]!
+  # Trashed (soft-deleted) folders, most recently trashed first. projectId
+  # omitted - the current user's trashed personal folders.
+  trashedFolders(projectId: ID): [Folder!]!
 
   file(id: ID!): File
   files(projectId: ID, folderId: ID): [File!]!
   # projectId omitted - the current user's personal (project-less) files.
   rootFiles(projectId: ID): [File!]!
   favoriteFiles(userId: ID!, projectId: ID): [File!]!
+  # Trashed (soft-deleted) files, most recently trashed first. projectId
+  # omitted - the current user's trashed personal files.
+  trashedFiles(projectId: ID): [File!]!
 
   fileShare(id: ID!): FileShare
   fileShares(fileId: ID!): [FileShare!]!
@@ -108,12 +116,20 @@ extend type Mutation {
   createFolder(input: CreateFolderInput!): Folder!
   renameFolder(folderId: ID!, name: String!): Folder!
   moveFolder(folderId: ID!, parentFolderId: ID): Folder!
+  # Permanent, unrecoverable delete. To move to trash instead, use
+  # trashFolder.
   deleteFolder(folderId: ID!): Boolean!
+  trashFolder(folderId: ID!): Folder!
+  restoreFolder(folderId: ID!): Folder!
 
   createFile(input: CreateFileInput!): File!
   renameFile(fileId: ID!, name: String!): File!
   moveFile(input: MoveFileInput!): File!
+  # Permanent, unrecoverable delete. To move to trash instead, use
+  # trashFile.
   deleteFile(fileId: ID!): Boolean!
+  trashFile(fileId: ID!): File!
+  restoreFile(fileId: ID!): File!
 
   shareFile(input: ShareFileInput!): FileShare!
   updateFileSharePermission(
@@ -126,7 +142,9 @@ extend type Mutation {
 }
 
 input CreateFolderInput {
-  projectId: ID!
+  # Omit for a personal folder (created in the user's own drive, not tied to
+  # any project).
+  projectId: ID
   parentFolderId: ID
   name: String!
 }

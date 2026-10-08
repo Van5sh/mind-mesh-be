@@ -67,3 +67,23 @@ func (r *Resolver) requireFileAccess(ctx context.Context, file database.File) er
 	}
 	return nil
 }
+
+// requireFolderAccess authorizes the authenticated user against a folder
+// that may or may not belong to a project. A project folder uses project
+// membership, unchanged. A personal folder (no project) is visible only to
+// its owner - folders have no sharing mechanism, unlike files.
+func (r *Resolver) requireFolderAccess(ctx context.Context, folder database.Folder) error {
+	if folder.ProjectID.Valid {
+		return r.requireProjectMember(ctx, folder.ProjectID)
+	}
+
+	userID, err := currentUserID(ctx)
+	if err != nil {
+		return err
+	}
+	if folder.OwnerID.Valid && folder.OwnerID == userID {
+		return nil
+	}
+
+	return apperrors.ForbiddenError("you do not have access to this folder")
+}

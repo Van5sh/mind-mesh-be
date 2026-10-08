@@ -600,9 +600,11 @@ type Folder struct {
 	ID             pgtype.UUID
 	ProjectID      pgtype.UUID
 	ParentFolderID pgtype.UUID
+	OwnerID        pgtype.UUID
 	Name           string
 	CreatedAt      pgtype.Timestamptz
 	UpdatedAt      pgtype.Timestamptz
+	DeletedAt      pgtype.Timestamptz
 }
 
 type MessageFileReference struct {

@@ -66,6 +66,7 @@ type Sources struct {
 	Profiles   Rows[database.UserProfile]
 	AIMetadata Rows[database.FileAiMetadatum]
 	Storages   Rows[database.FileStorage]
+	Properties Rows[database.FileProperty]
 }
 
 // ErrNotFound is what a lookup loader's Load returns for an ID that has no
@@ -103,6 +104,7 @@ type Loaders struct {
 	ProfileByUser    *LookupLoader[database.UserProfile]
 	AIMetadataByFile *LookupLoader[database.FileAiMetadatum]
 	StorageByFile    *LookupLoader[database.FileStorage]
+	PropertiesByFile *LookupLoader[database.FileProperty]
 }
 
 // batchWait is how long a loader waits for more keys before firing a batch.
@@ -206,6 +208,10 @@ func New(src Sources) *Loaders {
 		StorageByFile: byID(
 			func() Rows[database.FileStorage] { return src.Storages },
 			func(s database.FileStorage) pgtype.UUID { return s.FileID },
+		),
+		PropertiesByFile: byID(
+			func() Rows[database.FileProperty] { return src.Properties },
+			func(p database.FileProperty) pgtype.UUID { return p.FileID },
 		),
 	}
 }

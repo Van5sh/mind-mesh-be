@@ -35,14 +35,18 @@ func FileToModel(file database.File) *model.File {
 // ParentFolder/ChildFolders/Files are resolved separately (see
 // folder.resolvers.go-style methods on *folderResolver), since gqlgen
 // is configured to call dedicated resolvers for those fields instead of
-// reading them off this struct.
+// reading them off this struct. Project is nullable - a personal folder
+// (ProjectID invalid) has none.
 func FolderToModel(folder database.Folder) *model.Folder {
+	var project *model.Project
+	if folder.ProjectID.Valid {
+		project = &model.Project{ID: folder.ProjectID.String()}
+	}
+
 	return &model.Folder{
-		ID:   folder.ID.String(),
-		Name: folder.Name,
-		Project: &model.Project{
-			ID: folder.ProjectID.String(),
-		},
+		ID:        folder.ID.String(),
+		Name:      folder.Name,
+		Project:   project,
 		CreatedAt: folder.CreatedAt.Time,
 		UpdatedAt: folder.UpdatedAt.Time,
 	}
@@ -72,6 +76,32 @@ func MapFilesToModel(
 
 	for _, file := range files {
 		result = append(result, FileToModel(file))
+	}
+
+	return result
+}
+
+func MapFoldersToModel(
+	folders []database.Folder,
+) []*model.Folder {
+
+	result := make([]*model.Folder, 0, len(folders))
+
+	for _, folder := range folders {
+		result = append(result, FolderToModel(folder))
+	}
+
+	return result
+}
+
+func MapFileSharesToModel(
+	shares []database.FileShare,
+) []*model.FileShare {
+
+	result := make([]*model.FileShare, 0, len(shares))
+
+	for _, share := range shares {
+		result = append(result, FileShareToModel(share))
 	}
 
 	return result

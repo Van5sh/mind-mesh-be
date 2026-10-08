@@ -64,6 +64,54 @@ func (r *fileResolver) Storage(ctx context.Context, obj *model.File) (*model.Fil
 	}, nil
 }
 
+// Properties is the resolver for the properties field.
+func (r *fileResolver) Properties(ctx context.Context, obj *model.File) (*model.FileProperties, error) {
+	fileID, err := parseUUID(obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Batched across every file in the operation (see graph/loaders); falls
+	// back to a direct query when no loaders are on the context. Every file
+	// gets a file_properties row at CreateFile time (older files were
+	// backfilled by migration), so a missing row is unexpected - fall back
+	// to a zero-value properties row rather than erroring the whole file,
+	// since the field is non-null.
+	fallback := func() (*model.FileProperties, error) {
+		return &model.FileProperties{
+			File:      &model.File{ID: obj.ID},
+			IsIndexed: false,
+			CreatedAt: obj.CreatedAt,
+			UpdatedAt: obj.UpdatedAt,
+		}, nil
+	}
+
+	var properties database.FileProperty
+	if l := loaders.From(ctx); l != nil {
+		properties, err = l.PropertiesByFile.Load(ctx, fileID)
+		if errors.Is(err, loaders.ErrNotFound) {
+			return fallback()
+		}
+	} else {
+		properties, err = r.App.Services.File.GetFileProperties(ctx, fileID)
+		if apperrors.IsCode(err, apperrors.NotFound) {
+			return fallback()
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.FileProperties{
+		File:         &model.File{ID: obj.ID},
+		OriginalName: helpers.NullableString(properties.OriginalName),
+		IsIndexed:    properties.IsIndexed,
+		DeletedAt:    helpers.NullableTime(properties.DeletedAt),
+		CreatedAt:    properties.CreatedAt.Time,
+		UpdatedAt:    properties.UpdatedAt.Time,
+	}, nil
+}
+
 // AiMetadata is the resolver for the aiMetadata field.
 func (r *fileResolver) AiMetadata(ctx context.Context, obj *model.File) (*model.FileAIMetadata, error) {
 	fileID, err := parseUUID(obj.ID)
@@ -217,13 +265,22 @@ func (r *folderResolver) Files(ctx context.Context, obj *model.Folder) ([]*model
 
 // CreateFolder is the resolver for the createFolder field.
 func (r *mutationResolver) CreateFolder(ctx context.Context, input model.CreateFolderInput) (*model.Folder, error) {
-	projectID, err := parseUUID(input.ProjectID)
+	userID, err := currentUserID(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := r.requireProjectMember(ctx, projectID); err != nil {
-		return nil, err
+	// projectId omitted = a personal folder, created in the caller's own
+	// drive.
+	var projectID pgtype.UUID
+	if input.ProjectID != nil {
+		projectID, err = parseUUID(*input.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if err := r.requireProjectMember(ctx, projectID); err != nil {
+			return nil, err
+		}
 	}
 
 	var parentFolderID pgtype.UUID
@@ -242,6 +299,7 @@ func (r *mutationResolver) CreateFolder(ctx context.Context, input model.CreateF
 		database.CreateFolderParams{
 			ProjectID:      projectID,
 			ParentFolderID: parentFolderID,
+			OwnerID:        userID,
 			Name:           input.Name,
 		},
 	)
@@ -249,13 +307,7 @@ func (r *mutationResolver) CreateFolder(ctx context.Context, input model.CreateF
 		return nil, err
 	}
 
-	return &model.Folder{
-		ID:   folder.ID.String(),
-		Name: folder.Name,
-		Project: &model.Project{
-			ID: folder.ProjectID.String(),
-		},
-	}, nil
+	return helpers.FolderToModel(folder), nil
 }
 
 // RenameFolder is the resolver for the renameFolder field.
@@ -269,7 +321,7 @@ func (r *mutationResolver) RenameFolder(ctx context.Context, folderID string, na
 	if err != nil {
 		return nil, err
 	}
-	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
+	if err := r.requireFolderAccess(ctx, existing); err != nil {
 		return nil, err
 	}
 
@@ -284,13 +336,7 @@ func (r *mutationResolver) RenameFolder(ctx context.Context, folderID string, na
 		return nil, err
 	}
 
-	return &model.Folder{
-		ID:   folder.ID.String(),
-		Name: folder.Name,
-		Project: &model.Project{
-			ID: folder.ProjectID.String(),
-		},
-	}, nil
+	return helpers.FolderToModel(folder), nil
 }
 
 // MoveFolder is the resolver for the moveFolder field.
@@ -304,13 +350,13 @@ func (r *mutationResolver) MoveFolder(ctx context.Context, folderID string, pare
 	if err != nil {
 		return nil, err
 	}
-	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
+	if err := r.requireFolderAccess(ctx, existing); err != nil {
 		return nil, err
 	}
 
 	var parentID pgtype.UUID
 
-	// nil = move folder to project root
+	// nil = move folder to its own space's root
 	// non-nil = move folder inside another folder
 	if parentFolderID != nil {
 		parentID, err = parseUUID(*parentFolderID)
@@ -330,13 +376,7 @@ func (r *mutationResolver) MoveFolder(ctx context.Context, folderID string, pare
 		return nil, err
 	}
 
-	return &model.Folder{
-		ID:   folder.ID.String(),
-		Name: folder.Name,
-		Project: &model.Project{
-			ID: folder.ProjectID.String(),
-		},
-	}, nil
+	return helpers.FolderToModel(folder), nil
 }
 
 // DeleteFolder is the resolver for the deleteFolder field.
@@ -350,7 +390,7 @@ func (r *mutationResolver) DeleteFolder(ctx context.Context, folderID string) (b
 	if err != nil {
 		return false, err
 	}
-	if err := r.requireProjectMember(ctx, existing.ProjectID); err != nil {
+	if err := r.requireFolderAccess(ctx, existing); err != nil {
 		return false, err
 	}
 
@@ -359,6 +399,52 @@ func (r *mutationResolver) DeleteFolder(ctx context.Context, folderID string) (b
 	}
 
 	return true, nil
+}
+
+// TrashFolder is the resolver for the trashFolder field.
+func (r *mutationResolver) TrashFolder(ctx context.Context, folderID string) (*model.Folder, error) {
+	id, err := parseUUID(folderID)
+	if err != nil {
+		return nil, err
+	}
+
+	existing, err := r.App.Services.File.GetFolderByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireFolderAccess(ctx, existing); err != nil {
+		return nil, err
+	}
+
+	folder, err := r.App.Services.File.TrashFolder(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return helpers.FolderToModel(folder), nil
+}
+
+// RestoreFolder is the resolver for the restoreFolder field.
+func (r *mutationResolver) RestoreFolder(ctx context.Context, folderID string) (*model.Folder, error) {
+	id, err := parseUUID(folderID)
+	if err != nil {
+		return nil, err
+	}
+
+	existing, err := r.App.Services.File.GetFolderByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireFolderAccess(ctx, existing); err != nil {
+		return nil, err
+	}
+
+	folder, err := r.App.Services.File.RestoreFolder(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return helpers.FolderToModel(folder), nil
 }
 
 // CreateFile is the resolver for the createFile field.
@@ -385,11 +471,10 @@ func (r *mutationResolver) CreateFile(ctx context.Context, input model.CreateFil
 	var folderID pgtype.UUID
 
 	// nil = root file
-	// non-nil = file inside a folder
+	// non-nil = file inside a folder - a personal file can go in a personal
+	// folder too, not just a project one. The service layer checks the
+	// destination folder actually belongs to the given project/owner.
 	if input.FolderID != nil {
-		if input.ProjectID == nil {
-			return nil, fmt.Errorf("a personal file (no project) cannot be placed in a folder")
-		}
 		folderID, err = parseUUID(*input.FolderID)
 		if err != nil {
 			return nil, err
@@ -506,25 +591,157 @@ func (r *mutationResolver) DeleteFile(ctx context.Context, fileID string) (bool,
 	return true, nil
 }
 
+// TrashFile is the resolver for the trashFile field.
+func (r *mutationResolver) TrashFile(ctx context.Context, fileID string) (*model.File, error) {
+	id, err := parseUUID(fileID)
+	if err != nil {
+		return nil, err
+	}
+
+	existing, err := r.App.Services.File.GetFileByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireFileAccess(ctx, existing); err != nil {
+		return nil, err
+	}
+
+	file, err := r.App.Services.File.TrashFile(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return helpers.FileToModel(file), nil
+}
+
+// RestoreFile is the resolver for the restoreFile field.
+func (r *mutationResolver) RestoreFile(ctx context.Context, fileID string) (*model.File, error) {
+	id, err := parseUUID(fileID)
+	if err != nil {
+		return nil, err
+	}
+
+	existing, err := r.App.Services.File.GetFileByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireFileAccess(ctx, existing); err != nil {
+		return nil, err
+	}
+
+	file, err := r.App.Services.File.RestoreFile(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return helpers.FileToModel(file), nil
+}
+
 // ShareFile is the resolver for the shareFile field.
 func (r *mutationResolver) ShareFile(ctx context.Context, input model.ShareFileInput) (*model.FileShare, error) {
-	return nil, fmt.Errorf(
-		"shareFile is not implemented by FileService",
-	)
+	authUserID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	fileID, err := parseUUID(input.FileID)
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := r.App.Services.File.GetFileByID(ctx, fileID)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireFileAccess(ctx, file); err != nil {
+		return nil, err
+	}
+
+	sharedBy, err := parseUUID(input.SharedBy)
+	if err != nil {
+		return nil, err
+	}
+	// The input carries sharedBy explicitly, but only the authenticated
+	// user may act as themselves - otherwise anyone with file access could
+	// forge who granted a share.
+	if sharedBy != authUserID {
+		return nil, apperrors.ForbiddenError("cannot share a file as another user")
+	}
+
+	sharedWith, err := parseUUID(input.SharedWith)
+	if err != nil {
+		return nil, err
+	}
+
+	share, err := r.App.Services.File.CreateFileShare(ctx, database.FileShareParams{
+		FileID:     fileID,
+		SharedBy:   sharedBy,
+		SharedWith: sharedWith,
+		Permission: database.FilePermission(input.Permission),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return helpers.FileShareToModel(share), nil
 }
 
 // UpdateFileSharePermission is the resolver for the updateFileSharePermission field.
 func (r *mutationResolver) UpdateFileSharePermission(ctx context.Context, fileShareID string, permission model.FilePermission) (*model.FileShare, error) {
-	return nil, fmt.Errorf(
-		"updateFileSharePermission is not implemented by FileService",
-	)
+	id, err := parseUUID(fileShareID)
+	if err != nil {
+		return nil, err
+	}
+
+	existing, err := r.App.Services.File.GetFileShareByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := r.App.Services.File.GetFileByID(ctx, existing.FileID)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireFileAccess(ctx, file); err != nil {
+		return nil, err
+	}
+
+	share, err := r.App.Services.File.UpdateFileSharePermission(ctx, database.UpdateFileSharePermissionParams{
+		ID:         id,
+		Permission: database.FilePermission(permission),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return helpers.FileShareToModel(share), nil
 }
 
 // DeleteFileShare is the resolver for the deleteFileShare field.
 func (r *mutationResolver) DeleteFileShare(ctx context.Context, fileShareID string) (bool, error) {
-	return false, fmt.Errorf(
-		"deleteFileShare is not implemented by FileService",
-	)
+	id, err := parseUUID(fileShareID)
+	if err != nil {
+		return false, err
+	}
+
+	existing, err := r.App.Services.File.GetFileShareByID(ctx, id)
+	if err != nil {
+		return false, err
+	}
+
+	file, err := r.App.Services.File.GetFileByID(ctx, existing.FileID)
+	if err != nil {
+		return false, err
+	}
+	if err := r.requireFileAccess(ctx, file); err != nil {
+		return false, err
+	}
+
+	if err := r.App.Services.File.DeleteFileShare(ctx, id); err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // SetFileFavorite is the resolver for the setFileFavorite field.
@@ -554,8 +771,9 @@ func (r *mutationResolver) SetFileFavorite(ctx context.Context, input model.SetF
 	preference, err := r.App.Services.File.SetFavorite(
 		ctx,
 		database.SetFavoriteParams{
-			FileID: fileID,
-			UserID: userID,
+			FileID:     fileID,
+			UserID:     userID,
+			IsFavorite: input.IsFavorite,
 		},
 	)
 	if err != nil {
@@ -590,23 +808,27 @@ func (r *queryResolver) Folder(ctx context.Context, id string) (*model.Folder, e
 	if err != nil {
 		return nil, err
 	}
-	if err := r.requireProjectMember(ctx, folder.ProjectID); err != nil {
+	if err := r.requireFolderAccess(ctx, folder); err != nil {
 		return nil, err
 	}
 
-	return &model.Folder{
-		ID:   folder.ID.String(),
-		Name: folder.Name,
-		Project: &model.Project{
-			ID: folder.ProjectID.String(),
-		},
-	}, nil
+	return helpers.FolderToModel(folder), nil
 }
 
 // Folders is the resolver for the folders field.
 func (r *queryResolver) Folders(ctx context.Context, projectID *string) ([]*model.Folder, error) {
 	if projectID == nil {
-		return []*model.Folder{}, nil
+		userID, err := currentUserID(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		folders, err := r.App.Services.File.GetPersonalFolders(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+
+		return helpers.MapFoldersToModel(folders), nil
 	}
 
 	id, err := parseUUID(*projectID)
@@ -625,19 +847,7 @@ func (r *queryResolver) Folders(ctx context.Context, projectID *string) ([]*mode
 		return nil, err
 	}
 
-	result := make([]*model.Folder, 0, len(folders))
-
-	for _, folder := range folders {
-		result = append(result, &model.Folder{
-			ID:   folder.ID.String(),
-			Name: folder.Name,
-			Project: &model.Project{
-				ID: folder.ProjectID.String(),
-			},
-		})
-	}
-
-	return result, nil
+	return helpers.MapFoldersToModel(folders), nil
 }
 
 // FolderContents is the resolver for the folderContents field.
@@ -658,7 +868,7 @@ func (r *queryResolver) FolderPath(ctx context.Context, folderID string) ([]*mod
 	if err != nil {
 		return nil, err
 	}
-	if err := r.requireProjectMember(ctx, target.ProjectID); err != nil {
+	if err := r.requireFolderAccess(ctx, target); err != nil {
 		return nil, err
 	}
 
@@ -670,24 +880,26 @@ func (r *queryResolver) FolderPath(ctx context.Context, folderID string) ([]*mod
 		return nil, err
 	}
 
-	result := make([]*model.Folder, 0, len(folders))
-
-	for _, folder := range folders {
-		result = append(result, &model.Folder{
-			ID:   folder.ID.String(),
-			Name: folder.Name,
-			Project: &model.Project{
-				ID: folder.ProjectID.String(),
-			},
-		})
-	}
-
-	return result, nil
+	return helpers.MapFoldersToModel(folders), nil
 }
 
 // RootFolders is the resolver for the rootFolders field.
-func (r *queryResolver) RootFolders(ctx context.Context, projectID string) ([]*model.Folder, error) {
-	id, err := parseUUID(projectID)
+func (r *queryResolver) RootFolders(ctx context.Context, projectID *string) ([]*model.Folder, error) {
+	if projectID == nil {
+		userID, err := currentUserID(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		folders, err := r.App.Services.File.GetPersonalRootFolders(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+
+		return helpers.MapFoldersToModel(folders), nil
+	}
+
+	id, err := parseUUID(*projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -703,19 +915,41 @@ func (r *queryResolver) RootFolders(ctx context.Context, projectID string) ([]*m
 		return nil, err
 	}
 
-	result := make([]*model.Folder, 0, len(folders))
-
-	for _, folder := range folders {
-		result = append(result, &model.Folder{
-			ID:   folder.ID.String(),
-			Name: folder.Name,
-			Project: &model.Project{
-				ID: folder.ProjectID.String(),
-			},
-		})
-	}
+	result := helpers.MapFoldersToModel(folders)
 
 	return result, nil
+}
+
+// TrashedFolders is the resolver for the trashedFolders field.
+func (r *queryResolver) TrashedFolders(ctx context.Context, projectID *string) ([]*model.Folder, error) {
+	if projectID == nil {
+		userID, err := currentUserID(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		folders, err := r.App.Services.File.GetTrashedPersonalFolders(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+
+		return helpers.MapFoldersToModel(folders), nil
+	}
+
+	id, err := parseUUID(*projectID)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, id); err != nil {
+		return nil, err
+	}
+
+	folders, err := r.App.Services.File.GetTrashedFolders(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return helpers.MapFoldersToModel(folders), nil
 }
 
 // File is the resolver for the file field.
@@ -751,7 +985,7 @@ func (r *queryResolver) Files(ctx context.Context, projectID *string, folderID *
 		if err != nil {
 			return nil, err
 		}
-		if err := r.requireProjectMember(ctx, folder.ProjectID); err != nil {
+		if err := r.requireFolderAccess(ctx, folder); err != nil {
 			return nil, err
 		}
 
@@ -837,32 +1071,141 @@ func (r *queryResolver) RootFiles(ctx context.Context, projectID *string) ([]*mo
 
 // FavoriteFiles is the resolver for the favoriteFiles field.
 func (r *queryResolver) FavoriteFiles(ctx context.Context, userID string, projectID *string) ([]*model.File, error) {
-	// Your current FileService does not expose a method
-	// that returns a list of favorite files.
-	return nil, fmt.Errorf(
-		"favoriteFiles is not implemented by FileService",
-	)
+	authUserID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := parseUUID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if id != authUserID {
+		return nil, apperrors.ForbiddenError("cannot view another user's favorite files")
+	}
+
+	if projectID == nil {
+		files, err := r.App.Services.File.GetFavoritePersonalFiles(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return helpers.MapFilesToModel(files), nil
+	}
+
+	pID, err := parseUUID(*projectID)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, pID); err != nil {
+		return nil, err
+	}
+
+	files, err := r.App.Services.File.GetFavoriteFilesByProject(ctx, id, pID)
+	if err != nil {
+		return nil, err
+	}
+	return helpers.MapFilesToModel(files), nil
+}
+
+// TrashedFiles is the resolver for the trashedFiles field.
+func (r *queryResolver) TrashedFiles(ctx context.Context, projectID *string) ([]*model.File, error) {
+	if projectID == nil {
+		userID, err := currentUserID(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		files, err := r.App.Services.File.GetTrashedPersonalFiles(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+
+		return helpers.MapFilesToModel(files), nil
+	}
+
+	id, err := parseUUID(*projectID)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireProjectMember(ctx, id); err != nil {
+		return nil, err
+	}
+
+	files, err := r.App.Services.File.GetTrashedFiles(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return helpers.MapFilesToModel(files), nil
 }
 
 // FileShare is the resolver for the fileShare field.
 func (r *queryResolver) FileShare(ctx context.Context, id string) (*model.FileShare, error) {
-	return nil, fmt.Errorf(
-		"fileShare is not implemented by FileService",
-	)
+	shareID, err := parseUUID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	share, err := r.App.Services.File.GetFileShareByID(ctx, shareID)
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := r.App.Services.File.GetFileByID(ctx, share.FileID)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireFileAccess(ctx, file); err != nil {
+		return nil, err
+	}
+
+	return helpers.FileShareToModel(share), nil
 }
 
 // FileShares is the resolver for the fileShares field.
 func (r *queryResolver) FileShares(ctx context.Context, fileID string) ([]*model.FileShare, error) {
-	return nil, fmt.Errorf(
-		"fileShares is not implemented by FileService",
-	)
+	id, err := parseUUID(fileID)
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := r.App.Services.File.GetFileByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.requireFileAccess(ctx, file); err != nil {
+		return nil, err
+	}
+
+	shares, err := r.App.Services.File.GetFileSharesByFileID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return helpers.MapFileSharesToModel(shares), nil
 }
 
 // SharedWithMe is the resolver for the sharedWithMe field.
 func (r *queryResolver) SharedWithMe(ctx context.Context, userID string) ([]*model.FileShare, error) {
-	return nil, fmt.Errorf(
-		"sharedWithMe is not implemented by FileService",
-	)
+	authUserID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := parseUUID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if id != authUserID {
+		return nil, apperrors.ForbiddenError("cannot view another user's shared files")
+	}
+
+	shares, err := r.App.Services.File.GetFileSharesBySharedWith(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return helpers.MapFileSharesToModel(shares), nil
 }
 
 // File returns graph.FileResolver implementation.

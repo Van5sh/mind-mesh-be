@@ -46,7 +46,9 @@ SELECT EXISTS (
 -- name: GetFilesByProjectID :many
 SELECT f.*
 FROM files f
+LEFT JOIN file_properties fp ON fp.file_id = f.id
 WHERE f.project_id = $1
+  AND fp.deleted_at IS NULL
 ORDER BY f.name;
 
 -- name: GetFilesByProjectIDs :many
@@ -54,7 +56,9 @@ ORDER BY f.name;
 -- so resolving files for N projects is one query instead of N.
 SELECT f.*
 FROM files f
+LEFT JOIN file_properties fp ON fp.file_id = f.id
 WHERE f.project_id = ANY($1::uuid[])
+  AND fp.deleted_at IS NULL
 ORDER BY f.project_id, f.name;
 
 -- name: CountProjectFiles :one
@@ -63,10 +67,12 @@ FROM files
 WHERE project_id = $1;
 
 -- name: GetFilesByFolderID :many
-SELECT *
-FROM files
-WHERE folder_id IS NOT DISTINCT FROM $1
-ORDER BY name;
+SELECT f.*
+FROM files f
+LEFT JOIN file_properties fp ON fp.file_id = f.id
+WHERE f.folder_id IS NOT DISTINCT FROM $1
+  AND fp.deleted_at IS NULL
+ORDER BY f.name;
 
 -- name: GetProjectFilesByFolderID :many
 SELECT f.*
@@ -78,8 +84,10 @@ ORDER BY f.name;
 -- name: GetRootFiles :many
 SELECT f.*
 FROM files f
+LEFT JOIN file_properties fp ON fp.file_id = f.id
 WHERE f.project_id = $1
   AND f.folder_id IS NULL
+  AND fp.deleted_at IS NULL
 ORDER BY f.name;
 
 -- name: GetFileByFolderAndName :one
@@ -166,9 +174,10 @@ WHERE project_id = $1
 INSERT INTO folders (
     project_id,
     parent_folder_id,
+    owner_id,
     name
 )
-VALUES ($1, $2, $3)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: GetFolderByID :one
@@ -188,6 +197,7 @@ WHERE id = $1
 SELECT *
 FROM folders
 WHERE project_id = $1
+  AND deleted_at IS NULL
 ORDER BY name;
 
 
@@ -195,6 +205,7 @@ ORDER BY name;
 SELECT *
 FROM folders
 WHERE parent_folder_id IS NOT DISTINCT FROM $1
+  AND deleted_at IS NULL
 ORDER BY name;
 
 
@@ -203,14 +214,36 @@ SELECT *
 FROM folders
 WHERE project_id = $1
   AND parent_folder_id IS NULL
+  AND deleted_at IS NULL
 ORDER BY name;
 
 -- name: GetStandaloneRootFolders :many
+-- Top-level personal (project-less) folders owned by the given user.
 SELECT *
 FROM folders
 WHERE project_id IS NULL
   AND parent_folder_id IS NULL
+  AND owner_id = $1
+  AND deleted_at IS NULL
 ORDER BY name;
+
+-- name: GetPersonalFolders :many
+-- Every personal folder owned by the given user, flat - not just root-level.
+-- Mirrors GetFoldersByProjectID for the personal-drive case.
+SELECT *
+FROM folders
+WHERE project_id IS NULL
+  AND owner_id = $1
+  AND deleted_at IS NULL
+ORDER BY name;
+
+-- name: GetTrashedPersonalFolders :many
+SELECT *
+FROM folders
+WHERE project_id IS NULL
+  AND owner_id = $1
+  AND deleted_at IS NOT NULL
+ORDER BY deleted_at DESC;
 
 
 -- name: SearchFolders :many
@@ -250,6 +283,32 @@ RETURNING *;
 DELETE
 FROM folders
 WHERE id = $1;
+
+
+-- name: SoftDeleteFolder :exec
+UPDATE folders
+SET
+    deleted_at = NOW(),
+    updated_at = NOW()
+WHERE id = $1;
+
+
+-- name: RestoreFolder :exec
+UPDATE folders
+SET
+    deleted_at = NULL,
+    updated_at = NOW()
+WHERE id = $1;
+
+
+-- name: GetTrashedFolders :many
+-- Folders are always project-scoped, so unlike files there's no personal
+-- variant needed here.
+SELECT *
+FROM folders
+WHERE project_id = $1
+  AND deleted_at IS NOT NULL
+ORDER BY deleted_at DESC;
 
 
 -- name: CheckFolderNameExists :one
@@ -349,6 +408,13 @@ SET
     deleted_at = NULL,
     updated_at = NOW()
 WHERE file_id = $1;
+
+
+-- name: GetFilePropertiesByFileIDs :many
+-- Batched form of GetFileProperties, used by the File.properties dataloader.
+SELECT *
+FROM file_properties
+WHERE file_id = ANY($1::uuid[]);
 
 
 -- name: DeleteFileProperties :exec
@@ -577,6 +643,18 @@ WHERE fp.deleted_at IS NOT NULL
   AND f.project_id = $1
 ORDER BY fp.deleted_at DESC;
 
+-- name: GetTrashedPersonalFiles :many
+-- Personal-drive counterpart to GetDeletedFiles (which requires a
+-- project_id) - trashed files with no project, owned by the given user.
+SELECT f.*
+FROM files f
+JOIN file_properties fp
+ON f.id = fp.file_id
+WHERE fp.deleted_at IS NOT NULL
+  AND f.project_id IS NULL
+  AND f.uploaded_by = $1
+ORDER BY fp.deleted_at DESC;
+
 
 -- name: FileShare :one
 INSERT INTO file_shares (
@@ -637,14 +715,32 @@ FROM file_shares
 WHERE id = $1;
 
 
--- name: GetFavoritesFiles :many
+-- name: GetFavoriteFilesByProject :many
+-- Not restricted to files this user owns/uploaded - favoriting works on any
+-- file they have access to (any project member).
 SELECT f.*
 FROM files f
-JOIN user_file_preferences ufp
-ON f.id = ufp.file_id
+JOIN user_file_preferences ufp ON f.id = ufp.file_id
+LEFT JOIN file_properties fp ON fp.file_id = f.id
 WHERE ufp.user_id = $1
   AND ufp.is_favorite = TRUE
-  AND f.project_id = $2;
+  AND f.project_id = $2
+  AND fp.deleted_at IS NULL
+ORDER BY f.name;
+
+-- name: GetFavoritePersonalFiles :many
+-- Personal-drive counterpart to GetFavoriteFilesByProject - not restricted
+-- to files this user uploaded, since they can favorite a personal file
+-- someone else shared with them too.
+SELECT f.*
+FROM files f
+JOIN user_file_preferences ufp ON f.id = ufp.file_id
+LEFT JOIN file_properties fp ON fp.file_id = f.id
+WHERE ufp.user_id = $1
+  AND ufp.is_favorite = TRUE
+  AND f.project_id IS NULL
+  AND fp.deleted_at IS NULL
+ORDER BY f.name;
 
 
 -- name: GetIndexedFiles :many
@@ -696,15 +792,18 @@ SELECT EXISTS (
 SELECT *
 FROM folders
 WHERE project_id = ANY($1::uuid[])
+  AND deleted_at IS NULL
 ORDER BY project_id, name;
 
 
 -- name: GetFilesByFolderIDs :many
 -- Batched form of GetFilesByFolderID, used by the Folder.files dataloader.
-SELECT *
-FROM files
-WHERE folder_id = ANY($1::uuid[])
-ORDER BY folder_id, name;
+SELECT f.*
+FROM files f
+LEFT JOIN file_properties fp ON fp.file_id = f.id
+WHERE f.folder_id = ANY($1::uuid[])
+  AND fp.deleted_at IS NULL
+ORDER BY f.folder_id, f.name;
 
 
 -- name: GetFoldersByParentFolderIDs :many
@@ -713,6 +812,7 @@ ORDER BY folder_id, name;
 SELECT *
 FROM folders
 WHERE parent_folder_id = ANY($1::uuid[])
+  AND deleted_at IS NULL
 ORDER BY parent_folder_id, name;
 
 
@@ -759,9 +859,11 @@ ORDER BY shared_with, created_at DESC;
 -- never actually populated by any current code path, so it can't be used
 -- for this). There is no personal-folder concept, so this is always a
 -- flat list.
-SELECT *
-FROM files
-WHERE project_id IS NULL
-  AND folder_id IS NULL
-  AND uploaded_by = $1
-ORDER BY name;
+SELECT f.*
+FROM files f
+LEFT JOIN file_properties fp ON fp.file_id = f.id
+WHERE f.project_id IS NULL
+  AND f.folder_id IS NULL
+  AND f.uploaded_by = $1
+  AND fp.deleted_at IS NULL
+ORDER BY f.name;

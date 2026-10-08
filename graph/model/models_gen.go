@@ -113,7 +113,7 @@ type CreateFlowchartInput struct {
 }
 
 type CreateFolderInput struct {
-	ProjectID      string  `json:"projectId"`
+	ProjectID      *string `json:"projectId,omitempty"`
 	ParentFolderID *string `json:"parentFolderId,omitempty"`
 	Name           string  `json:"name"`
 }

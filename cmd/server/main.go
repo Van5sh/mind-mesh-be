@@ -175,6 +175,7 @@ func StartServer() {
 				Profiles:   application.Services.User.GetUserProfilesByUserIDs,
 				AIMetadata: application.Services.File.GetFileAIMetadataByFileIDs,
 				Storages:   application.Services.File.GetFileStoragesByFileIDs,
+				Properties: application.Services.File.GetFilePropertiesByFileIDs,
 			},
 		),
 	)
